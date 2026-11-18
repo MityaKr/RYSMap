@@ -39,7 +39,8 @@ import works.repka.rysmap.point.PointsLayer;
  */
 final class MapSearch {
     static final int W = 128, H = 18, ROW = 18, MAX = 8;
-    private static final Pattern COORDS = Pattern.compile("^\\s*([−-]?\\d+)[\\s,;]+(?:([−-]?\\d+)[\\s,;]+)?([−-]?\\d+)\\s*$");
+    /** До восьми цифр: длинное число в поле не роняет игру (перепроверка 18.11, пункт 5), граница мира 30 000 000. */
+    private static final Pattern COORDS = Pattern.compile("^\\s*([−-]?\\d{1,8})[\\s,;]+(?:([−-]?\\d{1,8})[\\s,;]+)?([−-]?\\d{1,8})\\s*$");
 
     final Field field = new Field(100, 10);
     private List<Result> results = List.of();
@@ -239,6 +240,10 @@ final class MapSearch {
     }
 
     private static int num(String s) {
-        return Integer.parseInt(s.replace('−', '-'));
+        try {
+            return Integer.parseInt(s.replace('−', '-'));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }

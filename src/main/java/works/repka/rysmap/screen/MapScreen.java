@@ -1352,6 +1352,7 @@ public final class MapScreen extends ScaledScreen {
         closeSettings();
         setTab(null);
         menu = null;
+        if (!dim.equals(dimension)) multi.clear();
         dimension = dim;
         centerX = x;
         centerZ = z;
@@ -1590,6 +1591,7 @@ public final class MapScreen extends ScaledScreen {
         ResourceKey<Level> next = ResourceKey.create(Registries.DIMENSION, loc);
         if (next.equals(dimension)) return;
         dimension = next;
+        multi.clear(); // выбор Shift+кликом только в видимом измерении (перепроверка 18.11, пункт 3)
         LocalPlayer p = Minecraft.getInstance().player;
         if (p != null && p.level().dimension().equals(dimension)) toPlayer();
         else {
