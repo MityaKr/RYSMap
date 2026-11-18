@@ -58,6 +58,13 @@ public final class PointStore {
 
     private final List<Point> points = new ArrayList<>();
     private long revision;
+    private int deathsKept = DEATHS_KEPT;
+
+    /** Сколько последних мест гибели хранить (настройка игрока); лишние старые уходят сразу. */
+    public void deathsKept(int n) {
+        deathsKept = Math.max(0, n);
+        if (trimDeaths()) revision++;
+    }
 
     public List<Point> points() {
         return Collections.unmodifiableList(points);
@@ -90,12 +97,13 @@ public final class PointStore {
         revision++;
     }
 
-    private void trimDeaths() {
+    private boolean trimDeaths() {
         List<Point> deaths = new ArrayList<>();
         for (Point p : points) if (p.death()) deaths.add(p);
-        if (deaths.size() <= DEATHS_KEPT) return;
+        if (deaths.size() <= deathsKept) return false;
         deaths.sort(Comparator.comparingLong(p -> p.created));
-        for (int i = 0; i < deaths.size() - DEATHS_KEPT; i++) points.remove(deaths.get(i));
+        for (int i = 0; i < deaths.size() - deathsKept; i++) points.remove(deaths.get(i));
+        return true;
     }
 
     /** Ближайший из двенадцати цветов к {@code rgb}. */

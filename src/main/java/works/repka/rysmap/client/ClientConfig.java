@@ -15,8 +15,9 @@ import java.util.Set;
 import works.repka.rysmap.RYSMap;
 
 /**
- * Настройки игрока: {@code config/rysmap/client.json}. В М1 только то, что нужно сканеру и памяти; страница настроек
- * придёт вместе с окном карты. Неизвестные поля файла сохраняются как есть.
+ * Настройки игрока: {@code config/rysmap/client.json}. Миникарту, угол, приближение и места гибели правит страница
+ * настроек окна карты ({@code screen.SettingsPage}); память и сканер только файлом. Неизвестные поля файла сохраняются
+ * как есть.
  */
 public final class ClientConfig {
     public static final int VERSION = 1;
@@ -43,6 +44,10 @@ public final class ClientConfig {
     public int minimapSize = 0;
     /** Ступень приближения миникарты: 0 ×0,5, 1 ×1, 2 ×2 пикселя экрана на блок. */
     public int minimapZoom = 1;
+    /** Угол миникарты ({@code TOP_RIGHT} и т. п.) или null: угол зоны карты ядра. */
+    public @org.jetbrains.annotations.Nullable String minimapCorner;
+    /** Сколько последних мест гибели хранить: 0 (не ставить), 1, 3, 5. Точки FTB не в счёт. */
+    public int deathsKept = 3;
     /** Глаз слоёв по id; слоя нет в списке: как решил мод. */
     public final java.util.Map<String, Boolean> layers = new java.util.LinkedHashMap<>();
 
@@ -78,6 +83,9 @@ public final class ClientConfig {
                 c.minimapSize = clamp(json, "minimapSize", c.minimapSize, 0, 128);
                 if (c.minimapSize != 0 && c.minimapSize != 72 && c.minimapSize != 96 && c.minimapSize != 128) c.minimapSize = 0;
                 c.minimapZoom = clamp(json, "minimapZoom", c.minimapZoom, 0, 2);
+                if (json.has("minimapCorner") && json.get("minimapCorner").isJsonPrimitive()) c.minimapCorner = json.get("minimapCorner").getAsString();
+                c.deathsKept = clamp(json, "deathsKept", c.deathsKept, 0, 5);
+                if (c.deathsKept == 2 || c.deathsKept == 4) c.deathsKept = 3;
                 if (json.has("layers") && json.get("layers").isJsonObject())
                     for (var e : json.getAsJsonObject("layers").entrySet()) c.layers.put(e.getKey(), e.getValue().getAsBoolean());
             } else {
@@ -112,6 +120,9 @@ public final class ClientConfig {
         json.addProperty("minimap", minimap);
         json.addProperty("minimapSize", minimapSize);
         json.addProperty("minimapZoom", minimapZoom);
+        if (minimapCorner != null) json.addProperty("minimapCorner", minimapCorner);
+        else json.remove("minimapCorner");
+        json.addProperty("deathsKept", deathsKept);
         JsonObject l = new JsonObject();
         layers.forEach(l::addProperty);
         json.add("layers", l);

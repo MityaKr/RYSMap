@@ -64,6 +64,8 @@ public final class MapScreen extends ScaledScreen {
     private java.util.@Nullable UUID selected;
     private @Nullable PointEditor editor;
     private Kit.@Nullable Dialog dialog;
+    /** Открыта страница настроек вместо полотна (шестерёнка в шапке). */
+    private @Nullable SettingsPage settings;
 
     private record Menu(int x, int y, MapApi.Spot spot, List<MapApi.MenuItem> items) {}
 
@@ -138,6 +140,12 @@ public final class MapScreen extends ScaledScreen {
         MapSession s = ClientEntry.session();
         if (s == null) return;
 
+        if (settings != null) {
+            header(g, t, s, mx, my);
+            settings.draw(g, t, hits, this, mx, my);
+            if (tip != null) Kit.tooltip(g, t, tip, mx, my);
+            return;
+        }
         canvas(g, t, canvas, s, mx, my, partial);
         PointStore.Point sel = selectedPoint();
         if (sel != null) {
@@ -172,10 +180,42 @@ public final class MapScreen extends ScaledScreen {
         String shown = Draw.ellipsize(world, 110, 15, Weight.SEMIBOLD);
         Draw.label(g, shown, bx, y + HEADER / 2f, 15, Weight.SEMIBOLD, t.c("text.primary"));
         int tx = (int) (bx + Draw.labelWidth(shown, 15, Weight.SEMIBOLD) + 9);
-        Kit.sectionTab(g, t, hits, tx, y, HEADER, Component.translatable("rysmap.screen.tab.map").getString(), true, mx, my, () -> {});
+        Kit.sectionTab(g, t, hits, tx, y, HEADER, Component.translatable("rysmap.screen.tab.map").getString(), settings == null, mx, my, this::closeSettings);
         int closeX = wx + ww - 7 - 18;
         Kit.close(g, t, hits, closeX, y + 5, mx, my, this::onClose);
+        int gearX = closeX - 4 - 18;
+        boolean hot = Kit.over(mx, my, gearX, y + 5, 18, 18);
+        boolean on = settings != null;
+        if (t.beveled()) {
+            if (on) t.pressed(g, gearX, y + 5, 18, 18, 0);
+            else t.button(g, gearX, y + 5, 18, 18, hot, false);
+        } else {
+            Draw.roundBox(g, gearX, y + 5, 18, 18, 4.5f, hot ? Draw.mix(t.c("button.bg"), t.c("text.primary"), 0.08f) : t.c("button.bg"),
+                on ? t.c("text.secondary") : t.c("button.border"));
+        }
+        Icons.draw(g, Icons.Shape.GEAR, gearX + 4.5f, y + 9.5f, 9, hot || on ? t.c("text.primary") : t.c("button.fg"));
+        hits.add(gearX, y + 5, 18, 18, b -> {
+            if (settings == null) openSettings();
+            else closeSettings();
+        });
+        if (hot) tip = List.of(Component.translatable("rysmap.screen.settings").getString());
         Kit.divider(g, t, wx, wy + HEADER - 0.5f, ww);
+    }
+
+    void openSettings() {
+        closeEditor();
+        menu = null;
+        dimDrop.close();
+        settings = new SettingsPage();
+    }
+
+    void closeSettings() {
+        settings = null;
+    }
+
+    /** Для автотеста: страница настроек. */
+    public void settingsForTest() {
+        openSettings();
     }
 
     private void sidebar(GuiGraphics g, Theme t, MapSession s, int mx, int my) {
@@ -861,6 +901,10 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     protected boolean onClick(double x, double y, int button) {
+        if (settings != null) {
+            hits.click(x, y, button);
+            return true;
+        }
         if (dialog != null) {
             hits.click(x, y, button);
             return true;
@@ -951,6 +995,7 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     protected boolean onScroll(double x, double y, double scrollX, double scrollY) {
+        if (settings != null) return settings.scrolled(x, y, scrollY);
         if (dimDrop.scrolled(x, y, scrollY)) return true;
         if (Kit.over(x, y, wx, listTop, SIDEBAR, listBottom - listTop)) {
             listScroll.by((float) (-scrollY * ROW * 2));
@@ -992,6 +1037,18 @@ public final class MapScreen extends ScaledScreen {
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (dialog != null) return dialog.keyPressed(key);
+        if (settings != null) {
+            if (settings.keyPressed(key)) return true;
+            if (key == GLFW.GLFW_KEY_ESCAPE) {
+                closeSettings();
+                return true;
+            }
+            if (ClientEntry.OPEN.matches(key, scan)) {
+                onClose();
+                return true;
+            }
+            return true;
+        }
         if (editor != null) {
             if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
                 submitEditor();

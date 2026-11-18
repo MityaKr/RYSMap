@@ -136,7 +136,9 @@ public final class PointsLayer implements MapApi.Layer {
     public static void died() {
         MapSession s = ClientEntry.session();
         LocalPlayer player = Minecraft.getInstance().player;
-        if (s == null || player == null) return;
+        int kept = works.repka.rysmap.client.ClientConfig.get().deathsKept;
+        if (s == null || player == null || kept <= 0) return;
+        s.points().deathsKept(kept);
         PointStore.Point p = new PointStore.Point();
         p.kind = "death";
         p.icon = "skull";

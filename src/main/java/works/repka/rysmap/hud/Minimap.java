@@ -82,9 +82,8 @@ public final class Minimap {
         MapSession session = ClientEntry.session();
         LocalPlayer p = mc.player;
         if (session == null || p == null) return;
-        Theme t = ThemeManager.get();
         int size = size();
-        Anchors.Corner corner = Anchors.mapCorner();
+        Anchors.Corner corner = corner();
         boolean left = corner == Anchors.Corner.TOP_LEFT || corner == Anchors.Corner.BOTTOM_LEFT;
         boolean top = corner == Anchors.Corner.TOP_LEFT || corner == Anchors.Corner.TOP_RIGHT;
         // в левом нижнем углу карта прячется, пока открыт чат
@@ -93,6 +92,37 @@ public final class Minimap {
         int plateH = lines.size() * LINE + 4;
         int x = left ? MARGIN : UiScale.width() - MARGIN - size;
         int y = top ? MARGIN : UiScale.height() - MARGIN - size - GAP - plateH;
+        drawAt(g, mc, session, p, partial, x, y, size, lines);
+    }
+
+    /** Угол миникарты: свой выбор игрока в настройках карты, иначе угол зоны карты ядра. */
+    public static Anchors.Corner corner() {
+        String c = ClientConfig.get().minimapCorner;
+        if (c != null) {
+            try {
+                return Anchors.Corner.valueOf(c);
+            } catch (IllegalArgumentException ignored) {
+                // неизвестное значение в файле: угол ядра
+            }
+        }
+        return Anchors.mapCorner();
+    }
+
+    /** Живой образец для страницы настроек: та же миникарта с плашкой в точке {@code x, y}. Возвращает высоту. */
+    public static int preview(GuiGraphics g, int x, int y, int size, boolean plateBelow) {
+        Minecraft mc = Minecraft.getInstance();
+        MapSession session = ClientEntry.session();
+        LocalPlayer p = mc.player;
+        if (session == null || p == null) return 0;
+        List<Line> lines = lines(mc, p);
+        int plateH = lines.size() * LINE + 4;
+        drawAt(g, mc, session, p, 1f, x, plateBelow ? y : y + plateH + GAP, size, lines);
+        return size + GAP + plateH;
+    }
+
+    private static void drawAt(GuiGraphics g, Minecraft mc, MapSession session, LocalPlayer p, float partial, int x, int y, int size, List<Line> lines) {
+        Theme t = ThemeManager.get();
+        int plateH = lines.size() * LINE + 4;
         float r = t.beveled() ? 0 : Math.max(2f, t.r("panel.radius"));
 
         double px = p.getX(), pz = p.getZ();

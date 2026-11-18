@@ -172,6 +172,36 @@ final class MigrateAutoTest {
             if (mc().screen instanceof MapScreen s) s.setZoom(0.5);
         }, 100);
         shot("ftb_overworld");
+        // неизвестные блоки (моды RepYS в среде разработки отсутствуют) крупно: этап 5
+        step("zoom", () -> {
+            if (mc().screen instanceof MapScreen s) s.setZoom(4);
+        }, 40);
+        shot("ftb_unknown_zoom");
+        // страница настроек (этап 4): строка о переезде, образец миникарты
+        step("settings", () -> {
+            if (mc().screen instanceof MapScreen s) s.settingsForTest();
+        }, 20);
+        shot("settings");
+        step("settings changed", () -> {
+            ClientConfig c = ClientConfig.get();
+            c.minimapCorner = "TOP_LEFT";
+            c.minimapSize = 128;
+            c.minimapZoom = 2;
+            c.deathsKept = 1;
+            c.save();
+        }, 20);
+        shot("settings_changed");
+        step("hud corner", () -> mc().setScreen(null), 30);
+        shot("hud_top_left");
+        step("settings restore", () -> {
+            ClientConfig c = ClientConfig.get();
+            check("угол миникарты из настроек: " + works.repka.rysmap.hud.Minimap.corner(), works.repka.rysmap.hud.Minimap.corner() == works.repka.ryscore.ui.Anchors.Corner.TOP_LEFT);
+            c.minimapCorner = null;
+            c.minimapSize = 0;
+            c.minimapZoom = 1;
+            c.deathsKept = 3;
+            c.save();
+        }, 2);
         step("close", () -> mc().setScreen(null), 5);
         leaveAndReopen("2");
         step("again", () -> {}, 100);
