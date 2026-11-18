@@ -338,7 +338,7 @@ final class FixesAutoTest {
         // отказ: оператор выключает телепорт, просьба даёт строку сообщения без пакета
         step("rules off", () -> {
             var r = ServerRules.rules();
-            ServerRules.setRules(0, r.pause(), r.minimap(), r.caves(), r.players(), r.mobs());
+            ServerRules.setRules(0, r.pause(), r.minimap(), r.caves(), r.playersMode(), r.mobs());
             mc().setScreen(null);
         }, 20);
         step("deny", () -> {
@@ -351,7 +351,7 @@ final class FixesAutoTest {
         shot("map_message");
         step("rules on", () -> {
             var r = ServerRules.rules();
-            ServerRules.setRules(1, r.pause(), r.minimap(), r.caves(), r.players(), r.mobs());
+            ServerRules.setRules(1, r.pause(), r.minimap(), r.caves(), r.playersMode(), r.mobs());
             ServerRules.closeMessage();
         }, 20);
         // темы (М9): окно карты в glass и vanilla, затем сжатая раскладка в маленьком окне

@@ -23,13 +23,20 @@ public final class MapRules {
     /** Кто телепортируется с карты. */
     public enum Teleport { OFF, OPS, ALL }
 
+    /**
+     * Чужие игроки на карте (макет скептика {@code s3}): никогда; только рядом (кого клиент и так видит, сервер мест не
+     * шлёт); союз (места союзников везде, остальные рядом); все и везде (места всех игроков сервера раз в секунду).
+     * Своя команда видна всегда.
+     */
+    public enum Players { NEVER, NEAR, ALLIES, ALL }
+
     public boolean minimap = true;
     public boolean caves = true;
     public Teleport teleport = Teleport.OPS;
     /** Пауза между телепортами, секунды. */
     public int pause = 300;
-    /** Чужие игроки на карте (участники своей команды видны всегда). */
-    public boolean players = true;
+    /** Чужие игроки на карте; по умолчанию только рядом. */
+    public Players players = Players.NEAR;
     /** Мобы на карте. */
     public boolean mobs = true;
 
@@ -55,7 +62,9 @@ public final class MapRules {
             if (o.has("caves")) r.caves = o.get("caves").getAsBoolean();
             if (o.has("teleport")) r.teleport = teleport(o.get("teleport").getAsString());
             if (o.has("pause")) r.pause = clampPause(o.get("pause").getAsInt());
-            if (o.has("players")) r.players = o.get("players").getAsBoolean();
+            // до 0.1.0-m10 был флажок players (по умолчанию true, «все везде»): умолчание стало приватнее, true даёт «только рядом»
+            if (o.has("playersMode")) r.players = players(o.get("playersMode").getAsString());
+            else if (o.has("players")) r.players = o.get("players").getAsBoolean() ? Players.NEAR : Players.NEVER;
             if (o.has("mobs")) r.mobs = o.get("mobs").getAsBoolean();
         } catch (Exception e) {
             RYSMap.LOG.warn("[rysmap] {} не прочитался, правила по умолчанию: {}", file, e.toString());
@@ -70,7 +79,7 @@ public final class MapRules {
         o.addProperty("caves", caves);
         o.addProperty("teleport", teleport.name().toLowerCase(java.util.Locale.ROOT));
         o.addProperty("pause", pause);
-        o.addProperty("players", players);
+        o.addProperty("playersMode", players.name().toLowerCase(java.util.Locale.ROOT));
         o.addProperty("mobs", mobs);
         try {
             Files.createDirectories(file.getParent());
@@ -87,6 +96,14 @@ public final class MapRules {
             return Teleport.valueOf(s.trim().toUpperCase(java.util.Locale.ROOT));
         } catch (Exception e) {
             return Teleport.OPS;
+        }
+    }
+
+    public static Players players(String s) {
+        try {
+            return Players.valueOf(s.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (Exception e) {
+            return Players.NEAR;
         }
     }
 

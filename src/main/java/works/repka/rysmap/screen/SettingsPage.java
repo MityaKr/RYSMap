@@ -292,8 +292,9 @@ final class SettingsPage {
     private static final int[] PAUSES = {0, 30, 60, 300, 900};
 
     /**
-     * Раздел «Сервер»: миникарта и пещеры у игроков, кто телепортируется с карты и пауза, чужие игроки и мобы на карте.
-     * Каждое нажатие сразу уходит на сервер, сервер пишет файл и рассылает правила всем.
+     * Раздел «Сервер» (макеты {@code 50}, скептик {@code s3}): миникарта и пещеры у игроков, чужие игроки на карте (никогда,
+     * только рядом, союз, все и везде; у последнего предупреждение), мобы, телепорт и пауза. Каждое нажатие сразу уходит на
+     * сервер; 30 секунд после правки видна строка «Вернуть», она возвращает правила, какими они были до неё.
      */
     private int server(GuiGraphics g, Theme t, Kit.Hits hits, int lx, int lw, int y, int mx, int my) {
         works.repka.rysmap.net.MapNet.Rules r = works.repka.rysmap.client.ServerRules.rules();
@@ -305,15 +306,37 @@ final class SettingsPage {
         label(g, t, "rysmap.settings.server.maps", null, lx, y);
         pills(g, t, hits, lx + lw, y, new String[]{Component.translatable("rysmap.settings.server.minimap").getString(),
             Component.translatable("rysmap.settings.server.caves").getString()}, new boolean[]{r.minimap(), r.caves()}, mx, my, i -> {
-            if (i == 0) send(r, r.teleport(), r.pause(), !r.minimap(), r.caves(), r.players(), r.mobs());
-            else send(r, r.teleport(), r.pause(), r.minimap(), !r.caves(), r.players(), r.mobs());
+            if (i == 0) send(r, r.teleport(), r.pause(), !r.minimap(), r.caves(), r.playersMode(), r.mobs());
+            else send(r, r.teleport(), r.pause(), r.minimap(), !r.caves(), r.playersMode(), r.mobs());
         });
+        y += ROW;
+        label(g, t, "rysmap.settings.server.players", "rysmap.settings.server.players.note", lx, y);
+        String[] pm = new String[4];
+        for (int i = 0; i < 4; i++) pm[i] = Component.translatable("rysmap.settings.server.players." + i).getString();
+        segmented(g, t, hits, lx + lw, y, pm, r.playersMode(), mx, my, i -> send(r, r.teleport(), r.pause(), r.minimap(), r.caves(), i, r.mobs()));
+        y += ROW;
+        if (r.playersMode() == 3) {
+            // «Все и везде»: места всех игроков раз в секунду, на сервере с боем это радар для засад
+            List<String> warn = Draw.wrapLabel(Component.translatable("rysmap.settings.server.players.warn").getString(), lw - 22, 11.5f, Weight.REGULAR, 3);
+            int wh = warn.size() * 7 + 8;
+            Draw.roundBox(g, lx, y + 1, lw, wh, 4, Draw.alpha(t.c("state.warn"), 0.12f), Draw.alpha(t.c("state.warn"), 0.55f));
+            Icons.draw(g, Icons.Shape.WARN, lx + 6, y + 5, 8, t.c("state.warn"));
+            float ly = y + 1 + 4 + 3.5f;
+            for (String line : warn) {
+                Draw.label(g, line, lx + 18, ly, 11.5f, Weight.REGULAR, t.c("text.body"));
+                ly += 7;
+            }
+            y += wh + 4;
+        }
+        label(g, t, "rysmap.settings.server.mobs_row", "rysmap.settings.server.mobs_row.note", lx, y);
+        String[] yn = {Component.translatable("rysmap.settings.no").getString(), Component.translatable("rysmap.settings.yes").getString()};
+        segmented(g, t, hits, lx + lw, y, yn, r.mobs() ? 1 : 0, mx, my, i -> send(r, r.teleport(), r.pause(), r.minimap(), r.caves(), r.playersMode(), i == 1));
         y += ROW;
         label(g, t, "rysmap.settings.server.teleport", "rysmap.settings.server.teleport.note", lx, y);
         String[] modes = {Component.translatable("rysmap.settings.server.teleport.off").getString(),
             Component.translatable("rysmap.settings.server.teleport.ops").getString(),
             Component.translatable("rysmap.settings.server.teleport.all").getString()};
-        segmented(g, t, hits, lx + lw, y, modes, r.teleport(), mx, my, i -> send(r, i, r.pause(), r.minimap(), r.caves(), r.players(), r.mobs()));
+        segmented(g, t, hits, lx + lw, y, modes, r.teleport(), mx, my, i -> send(r, i, r.pause(), r.minimap(), r.caves(), r.playersMode(), r.mobs()));
         y += ROW;
         label(g, t, "rysmap.settings.server.pause", "rysmap.settings.server.pause.note", lx, y);
         String[] pauses = new String[PAUSES.length];
@@ -324,19 +347,37 @@ final class SettingsPage {
                 : Component.translatable("rysmap.settings.server.pause.m", PAUSES[i] / 60).getString();
             if (PAUSES[i] == r.pause()) ps = i;
         }
-        segmented(g, t, hits, lx + lw, y, pauses, ps, mx, my, i -> send(r, r.teleport(), PAUSES[i], r.minimap(), r.caves(), r.players(), r.mobs()));
+        segmented(g, t, hits, lx + lw, y, pauses, ps, mx, my, i -> send(r, r.teleport(), PAUSES[i], r.minimap(), r.caves(), r.playersMode(), r.mobs()));
         y += ROW;
-        label(g, t, "rysmap.settings.server.entities", "rysmap.settings.server.entities.note", lx, y);
-        pills(g, t, hits, lx + lw, y, new String[]{Component.translatable("rysmap.settings.server.players").getString(),
-            Component.translatable("rysmap.settings.server.mobs").getString()}, new boolean[]{r.players(), r.mobs()}, mx, my, i -> {
-            if (i == 0) send(r, r.teleport(), r.pause(), r.minimap(), r.caves(), !r.players(), r.mobs());
-            else send(r, r.teleport(), r.pause(), r.minimap(), r.caves(), r.players(), !r.mobs());
-        });
+        // «Вернуть · 30 с»: как у прав RYSClaims
+        long left = before == null ? 0 : 30_000 - (System.currentTimeMillis() - changedAt);
+        if (before != null && left > 0) {
+            works.repka.rysmap.net.MapNet.Rules b = before;
+            String changed = Component.translatable("rysmap.settings.server.changed").getString();
+            String undo = Component.translatable("rysmap.settings.server.undo", (left + 999) / 1000).getString();
+            Draw.label(g, changed, lx, y + 7, 11.5f, Weight.REGULAR, t.c("text.muted"));
+            float ux = lx + Draw.labelWidth(changed, 11.5f, Weight.REGULAR) + 6, uw = Draw.labelWidth(undo, 11.5f, Weight.MEDIUM);
+            boolean hot = Kit.over(mx, my, (int) ux - 1, y + 2, (int) uw + 2, 11);
+            Draw.label(g, undo, ux, y + 7, 11.5f, Weight.MEDIUM, hot ? t.c("text.primary") : t.c("link"));
+            hits.add((int) ux - 1, y + 2, (int) uw + 2, 11, btn -> {
+                works.repka.rysmap.client.ServerRules.setRules(b.teleport(), b.pause(), b.minimap(), b.caves(), b.playersMode(), b.mobs());
+                before = null;
+            });
+            y += 14;
+        } else {
+            before = null;
+        }
         return y + ROW;
     }
 
-    private static void send(works.repka.rysmap.net.MapNet.Rules r, int teleport, int pause, boolean minimap, boolean caves, boolean players, boolean mobs) {
-        works.repka.rysmap.client.ServerRules.setRules(teleport, pause, minimap, caves, players, mobs);
+    /** Правила до первой правки в окне 30 секунд: их возвращает «Вернуть». */
+    private static works.repka.rysmap.net.MapNet.@Nullable Rules before;
+    private static long changedAt;
+
+    private static void send(works.repka.rysmap.net.MapNet.Rules r, int teleport, int pause, boolean minimap, boolean caves, int playersMode, boolean mobs) {
+        if (before == null || System.currentTimeMillis() - changedAt > 30_000) before = r;
+        changedAt = System.currentTimeMillis();
+        works.repka.rysmap.client.ServerRules.setRules(teleport, pause, minimap, caves, playersMode, mobs);
     }
 
     /** Ряд независимых выключателей справа до {@code right} (макет 50: «Миникарта», «Пещеры»). */

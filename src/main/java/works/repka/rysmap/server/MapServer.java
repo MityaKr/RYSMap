@@ -100,8 +100,9 @@ public final class MapServer {
 
     public static void sendRules(ServerPlayer player) {
         MapRules r = rules;
-        MapNet.send(player, new MapNet.Rules(r.teleport.ordinal(), r.pause, r.minimap, r.caves, r.players, r.mobs,
-            op(player), canTeleport(player), Teleports.pauseLeft(player), PlayerFeed.teamOf(works.repka.ryscore.team.TeamsApi.get(), player.getUUID()) != null));
+        MapNet.send(player, new MapNet.Rules(r.teleport.ordinal(), r.pause, r.minimap, r.caves, r.players != MapRules.Players.NEVER, r.mobs,
+            op(player), canTeleport(player), Teleports.pauseLeft(player), PlayerFeed.teamOf(works.repka.ryscore.team.TeamsApi.get(), player.getUUID()) != null,
+            r.players.ordinal()));
     }
 
     /** Правка правил с клиента: только оператор. Новые правила пишутся в файл и уходят всем. */
@@ -117,7 +118,8 @@ public final class MapServer {
         r.pause = MapRules.clampPause(set.pause());
         r.minimap = set.minimap();
         r.caves = set.caves();
-        r.players = set.players();
+        MapRules.Players[] pm = MapRules.Players.values();
+        r.players = pm[Math.max(0, Math.min(pm.length - 1, set.playersMode()))];
         r.mobs = set.mobs();
         rules = r;
         r.save(rulesFile(server));

@@ -49,8 +49,8 @@ public final class ServerRules {
     public static void accept(MapNet.Rules r) {
         rules = r;
         rulesAt = System.currentTimeMillis();
-        RYSMap.LOG.info("[rysmap] правила сервера: телепорт {}, пауза {} с, миникарта {}, пещеры {}, игроки {}, мобы {}, оператор {}",
-            r.teleport(), r.pause(), r.minimap(), r.caves(), r.players(), r.mobs(), r.op());
+        RYSMap.LOG.info("[rysmap] правила сервера: телепорт {}, пауза {} с, миникарта {}, пещеры {}, чужие игроки {}, мобы {}, оператор {}",
+            r.teleport(), r.pause(), r.minimap(), r.caves(), r.playersMode(), r.mobs(), r.op());
     }
 
 
@@ -65,9 +65,9 @@ public final class ServerRules {
         return rules == null || rules.caves();
     }
 
-    /** Чужие игроки: без серверной части видны те, кого клиент и так видит рядом. */
+    /** Чужие игроки: без серверной части видны те, кого клиент и так видит рядом; правило «Никогда» прячет и их. */
     public static boolean playersAllowed() {
-        return rules == null || rules.players();
+        return rules == null || rules.playersMode() != 0;
     }
 
     public static boolean mobsAllowed() {
@@ -209,7 +209,7 @@ public final class ServerRules {
     }
 
     /** Оператор меняет правила сервера. */
-    public static void setRules(int teleport, int pause, boolean minimap, boolean caves, boolean players, boolean mobs) {
-        sendToServer(new MapNet.SetRules(teleport, pause, minimap, caves, players, mobs));
+    public static void setRules(int teleport, int pause, boolean minimap, boolean caves, int playersMode, boolean mobs) {
+        sendToServer(new MapNet.SetRules(teleport, pause, minimap, caves, playersMode != 0, mobs, playersMode));
     }
 }

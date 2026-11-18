@@ -10,9 +10,9 @@ import works.repka.ryscore.team.TeamsApi;
 import works.repka.rysmap.net.MapNet;
 
 /**
- * Раз в секунду каждому игроку с RYSMap уходят места других игроков, которых ему можно видеть: участники своей команды
- * всегда, остальные только при правиле {@link MapRules#players}. Так карта показывает и тех, кто далеко или в другом
- * измерении. Рядом стоящих клиент рисует по своим данным, плавно.
+ * Раз в секунду каждому игроку с RYSMap уходят места других игроков, которых ему можно видеть далеко: участники своей
+ * команды всегда, союзники при правиле «Союз» и выше, остальные только при «Все и везде» ({@link MapRules#players}).
+ * При «Только рядом» чужих мест сервер не шлёт: клиент рисует тех, кого игра и так ему показывает.
  */
 final class PlayerFeed {
     private PlayerFeed() {}
@@ -27,6 +27,7 @@ final class PlayerFeed {
         TeamsApi teams = TeamsApi.get();
         UUID[] team = new UUID[all.size()];
         for (int i = 0; i < all.size(); i++) team[i] = teamOf(teams, all.get(i).getUUID());
+        java.util.Map<UUID, java.util.Collection<UUID>> allies = new java.util.HashMap<>();
         for (int i = 0; i < all.size(); i++) {
             ServerPlayer to = all.get(i);
             if (!to.connection.hasChannel(MapNet.Players.TYPE)) continue;
@@ -36,7 +37,21 @@ final class PlayerFeed {
                 ServerPlayer p = all.get(j);
                 if (p.isSpectator() && !to.isSpectator()) continue;
                 boolean same = team[i] != null && Objects.equals(team[i], team[j]);
-                if (!same && (!rules.players || p.isInvisible())) continue;
+                if (!same) {
+                    if (p.isInvisible()) continue;
+                    boolean ally = false;
+                    if (rules.players == MapRules.Players.ALLIES && team[i] != null && team[j] != null) {
+                        java.util.Collection<UUID> a = allies.computeIfAbsent(team[i], t -> {
+                            try {
+                                return teams.allies(t);
+                            } catch (Throwable e) {
+                                return java.util.List.of();
+                            }
+                        });
+                        ally = a.contains(team[j]);
+                    }
+                    if (rules.players != MapRules.Players.ALL && !ally) continue;
+                }
                 out.add(new MapNet.PlayerSpot(p.getUUID(), p.getGameProfile().getName(), p.level().dimension().location().toString(),
                     p.getBlockX(), p.getBlockY(), p.getBlockZ(), same));
             }

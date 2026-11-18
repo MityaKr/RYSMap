@@ -57,7 +57,7 @@ public final class MapNet {
      * правила; {@code canTeleport}: правило пускает этого игрока; {@code pauseLeft}: сколько секунд паузы осталось.
      */
     public record Rules(int teleport, int pause, boolean minimap, boolean caves, boolean players, boolean mobs,
-                        boolean op, boolean canTeleport, int pauseLeft, boolean team) implements CustomPacketPayload {
+                        boolean op, boolean canTeleport, int pauseLeft, boolean team, int playersMode) implements CustomPacketPayload {
         public static final Type<Rules> TYPE = new Type<>(id("rules"));
         public static final StreamCodec<FriendlyByteBuf, Rules> CODEC = CustomPacketPayload.codec(Rules::write, Rules::read);
 
@@ -65,14 +65,18 @@ public final class MapNet {
             b.writeVarInt(teleport);
             b.writeVarInt(pause);
             // бит 64 «в команде» (0.1.0-m8): клиент 0.1.0-m7 его не читает
-            int flags = (minimap ? 1 : 0) | (caves ? 2 : 0) | (players ? 4 : 0) | (mobs ? 8 : 0) | (op ? 16 : 0) | (canTeleport ? 32 : 0) | (team ? 64 : 0);
+            int flags = (minimap ? 1 : 0) | (caves ? 2 : 0) | (players ? 4 : 0) | (mobs ? 8 : 0) | (op ? 16 : 0) | (canTeleport ? 32 : 0) | (team ? 64 : 0)
+                // режим чужих игроков (0.1.0-m10): номер + 1 в битах 7–9, 0 у старого сервера
+                | ((playersMode + 1) & 7) << 7;
             b.writeVarInt(flags);
             b.writeVarInt(pauseLeft);
         }
 
         private static Rules read(FriendlyByteBuf b) {
             int teleport = b.readVarInt(), pause = b.readVarInt(), f = b.readVarInt(), left = b.readVarInt();
-            return new Rules(teleport, pause, (f & 1) != 0, (f & 2) != 0, (f & 4) != 0, (f & 8) != 0, (f & 16) != 0, (f & 32) != 0, left, (f & 64) != 0);
+            int mode = ((f >> 7) & 7) - 1;
+            if (mode < 0) mode = (f & 4) != 0 ? 3 : 0; // старый сервер: флажок «все»
+            return new Rules(teleport, pause, (f & 1) != 0, (f & 2) != 0, (f & 4) != 0, (f & 8) != 0, (f & 16) != 0, (f & 32) != 0, left, (f & 64) != 0, mode);
         }
 
         @Override
@@ -82,19 +86,21 @@ public final class MapNet {
     }
 
     /** Оператор меняет правила. */
-    public record SetRules(int teleport, int pause, boolean minimap, boolean caves, boolean players, boolean mobs) implements CustomPacketPayload {
+    public record SetRules(int teleport, int pause, boolean minimap, boolean caves, boolean players, boolean mobs, int playersMode) implements CustomPacketPayload {
         public static final Type<SetRules> TYPE = new Type<>(id("set_rules"));
         public static final StreamCodec<FriendlyByteBuf, SetRules> CODEC = CustomPacketPayload.codec(SetRules::write, SetRules::read);
 
         private void write(FriendlyByteBuf b) {
             b.writeVarInt(teleport);
             b.writeVarInt(pause);
-            b.writeVarInt((minimap ? 1 : 0) | (caves ? 2 : 0) | (players ? 4 : 0) | (mobs ? 8 : 0));
+            b.writeVarInt((minimap ? 1 : 0) | (caves ? 2 : 0) | (players ? 4 : 0) | (mobs ? 8 : 0) | ((playersMode + 1) & 7) << 4);
         }
 
         private static SetRules read(FriendlyByteBuf b) {
             int teleport = b.readVarInt(), pause = b.readVarInt(), f = b.readVarInt();
-            return new SetRules(teleport, pause, (f & 1) != 0, (f & 2) != 0, (f & 4) != 0, (f & 8) != 0);
+            int mode = ((f >> 4) & 7) - 1;
+            if (mode < 0) mode = (f & 4) != 0 ? 1 : 0; // старый клиент: флажок
+            return new SetRules(teleport, pause, (f & 1) != 0, (f & 2) != 0, (f & 4) != 0, (f & 8) != 0, mode);
         }
 
         @Override

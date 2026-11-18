@@ -174,7 +174,7 @@
   "rysmap.settings.server.pause.m": "%s min",
   "rysmap.settings.server.entities": "Other players and mobs",
   "rysmap.settings.server.entities.note": "your team is always shown",
-  "rysmap.settings.server.players": "Players",
+  "rysmap.settings.server.players": "Other players on the map",
   "rysmap.settings.server.mobs": "Mobs",
   "rysmap.layer.players": "Players",
   "rysmap.layer.mobs": "Mobs",
@@ -225,5 +225,17 @@
   "rysmap.settings.entities": "Mobs and other players",
   "rysmap.settings.entities.note": "your team is shown on any layer",
   "rysmap.settings.entities.current": "Current layer",
-  "rysmap.settings.entities.all": "All layers"
+  "rysmap.settings.entities.all": "All layers",
+  "rysmap.settings.server.players.note": "your team is always shown; \"nearby\" means players the game already renders",
+  "rysmap.settings.server.players.0": "Never",
+  "rysmap.settings.server.players.1": "Nearby only",
+  "rysmap.settings.server.players.2": "Allies",
+  "rysmap.settings.server.players.3": "Everyone, everywhere",
+  "rysmap.settings.server.players.warn": "\"Everyone, everywhere\" sends every player the positions of all players once a second, in any dimension and at any distance. With PvP everywhere this is an ambush radar: do not use it on a public server.",
+  "rysmap.settings.server.mobs_row": "Mobs on the map",
+  "rysmap.settings.server.mobs_row.note": "only within the player's render distance",
+  "rysmap.settings.no": "No",
+  "rysmap.settings.yes": "Yes",
+  "rysmap.settings.server.changed": "Rules changed.",
+  "rysmap.settings.server.undo": "Undo · %s s"
 }

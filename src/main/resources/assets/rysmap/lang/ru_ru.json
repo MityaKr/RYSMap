@@ -174,7 +174,7 @@
   "rysmap.settings.server.pause.m": "%s мин",
   "rysmap.settings.server.entities": "Чужие игроки и мобы",
   "rysmap.settings.server.entities.note": "своя команда видна всегда",
-  "rysmap.settings.server.players": "Игроки",
+  "rysmap.settings.server.players": "Чужие игроки на карте",
   "rysmap.settings.server.mobs": "Мобы",
   "rysmap.layer.players": "Игроки",
   "rysmap.layer.mobs": "Мобы",
@@ -225,5 +225,17 @@
   "rysmap.settings.entities": "Мобы и чужие игроки",
   "rysmap.settings.entities.note": "своя команда видна на любом слое",
   "rysmap.settings.entities.current": "Текущий слой",
-  "rysmap.settings.entities.all": "Все слои"
+  "rysmap.settings.entities.all": "Все слои",
+  "rysmap.settings.server.players.note": "своя команда видна всегда; «рядом» это те, кого игра и так рисует",
+  "rysmap.settings.server.players.0": "Никогда",
+  "rysmap.settings.server.players.1": "Только рядом",
+  "rysmap.settings.server.players.2": "Союз",
+  "rysmap.settings.server.players.3": "Все и везде",
+  "rysmap.settings.server.players.warn": "«Все и везде» шлёт каждому игроку места всех игроков сервера раз в секунду, в любом измерении и на любом расстоянии. При бое везде это радар для засад: на публичном сервере не ставить.",
+  "rysmap.settings.server.mobs_row": "Мобы на карте",
+  "rysmap.settings.server.mobs_row.note": "только в дальности прорисовки игрока",
+  "rysmap.settings.no": "Нет",
+  "rysmap.settings.yes": "Да",
+  "rysmap.settings.server.changed": "Правила изменены.",
+  "rysmap.settings.server.undo": "Вернуть · %s с"
 }
