@@ -49,6 +49,11 @@ final class SettingsPage {
 
     /** Прокрутка страницы: в сжатой раскладке и у оператора с разделом «Сервер» страница выше окна (макет 87). */
     private float scroll, maxScroll;
+
+    /** Для автотеста: прокрутить страницу (блок «Перемещения» ниже раздела «Сервер»). */
+    void scrollTo(float value) {
+        scroll = Math.max(0, value);
+    }
     /** Кадр: сжатая раскладка, мышь, куда класть подсказку пояснения. */
     private boolean compactNow;
     private int mouseX, mouseY;
@@ -238,6 +243,8 @@ final class SettingsPage {
         // сервер: видит только оператор (макет 50, раздел «Сервер»)
         int leftBottom = y + ROW;
         if (works.repka.rysmap.client.ServerRules.op()) leftBottom = server(g, t, hits, lx, lw, y + ROW + 4, mx, my);
+        // «Перемещения» (0.2.0, макет Essentials 07): видит только оператор, когда на сервере есть «Места»
+        if (works.repka.rysmap.client.ServerRules.op()) leftBottom = PlacesSettings.draw(g, t, hits, lx, lw, leftBottom + 4, mx, my);
 
         // справа: образец (в сжатой раскладке его нет: настоящая миникарта видна за окном)
         int ry = top + 12;
@@ -278,6 +285,14 @@ final class SettingsPage {
         key(g, t, keyText(ClientEntry.ZOOM_IN) + " " + keyText(ClientEntry.ZOOM_OUT), "rysmap.settings.keys.zoom", rx, ry);
         ry += 12;
         key(g, t, keyText(ClientEntry.SHOW_POINTS), "rysmap.settings.keys.show_points", rx, ry);
+        ry += 12;
+        // колесо и свои клавиши на места (ядро 1.14): окно «Клавиши» ядра
+        key(g, t, keyText(works.repka.ryscore.action.Actions.WHEEL), "rysmap.settings.keys.wheel", rx, ry);
+        String wheelKeys = Component.translatable("rysmap.settings.keys.actions").getString();
+        float wkw = Draw.labelWidth(wheelKeys, 11.5f, Weight.REGULAR);
+        boolean hotW = Kit.over(mx, my, (int) (rx + rw - wkw), ry, (int) wkw + 1, 9);
+        Draw.label(g, wheelKeys, rx + rw - wkw, ry + 4, 11.5f, Weight.REGULAR, hotW ? t.c("text.primary") : t.c("link"));
+        hits.add((int) (rx + rw - wkw), ry, (int) wkw + 1, 9, b -> works.repka.ryscore.action.Actions.openKeys(s));
         ry += 12 + 8;
 
         // данные

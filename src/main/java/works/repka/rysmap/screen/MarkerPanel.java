@@ -72,27 +72,36 @@ final class MarkerPanel {
             }
         }
 
-        // кнопки: главная широкая, остальные рядом под ней
-        List<MapApi.Action> actions = p.actions().size() > 3 ? p.actions().subList(0, 3) : p.actions();
+        // кнопки: главная широкая, остальные под ней рядами до трёх; если их больше трёх, первая (обычно «В путь»)
+        // идёт своим широким рядом (макет Essentials 04: «Телепорт», «В путь», «Изменить · Сюда · Удалить»)
+        List<MapApi.Action> actions = p.actions().size() > 6 ? p.actions().subList(0, 6) : p.actions();
         if (actions.isEmpty()) return;
         MapApi.Action primary = null;
         for (MapApi.Action a : actions) if (a.primary()) primary = a;
         List<MapApi.Action> rest = new java.util.ArrayList<>(actions);
         if (primary != null) rest.remove(primary);
+        List<List<MapApi.Action>> rows = new java.util.ArrayList<>();
+        if (rest.size() > 3) {
+            rows.add(List.of(rest.get(0)));
+            rows.add(rest.subList(1, rest.size()));
+        } else if (!rest.isEmpty()) {
+            rows.add(rest);
+        }
         int bottom = y + h - 6;
-        int ay = bottom - (rest.isEmpty() ? 0 : 14 + 4) - (primary != null ? 21 : 0);
+        int ay = bottom - rows.size() * (14 + 4) - (primary != null ? 21 : 0);
         Draw.rect(g, x + 1, ay - 6, w - 2, 1, t.c("panel.border"));
         if (primary != null) {
             MapApi.Action a = primary;
             PointWidgets.button(g, t, hits, ix, ay, iw, 21, a.label().getString(), null, 1, mx, my, () -> run(a));
             ay += 21 + 4;
         }
-        if (!rest.isEmpty()) {
-            int bw = (iw - 4 * (rest.size() - 1)) / rest.size();
-            for (int i = 0; i < rest.size(); i++) {
-                MapApi.Action a = rest.get(i);
-                PointWidgets.button(g, t, hits, ix + i * (bw + 4), ay, i == rest.size() - 1 ? iw - i * (bw + 4) : bw, 14, a.label().getString(), null, 0, mx, my, () -> run(a));
+        for (List<MapApi.Action> row : rows) {
+            int bw = (iw - 4 * (row.size() - 1)) / row.size();
+            for (int i = 0; i < row.size(); i++) {
+                MapApi.Action a = row.get(i);
+                PointWidgets.button(g, t, hits, ix + i * (bw + 4), ay, i == row.size() - 1 ? iw - i * (bw + 4) : bw, 14, a.label().getString(), null, 0, mx, my, () -> run(a));
             }
+            ay += 14 + 4;
         }
     }
 

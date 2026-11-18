@@ -66,6 +66,8 @@ public final class ClientEntry {
         SablePlots.setActive(ModList.get().isLoaded("sable"));
         MapApi.provide(new MapApiImpl());
         works.repka.rysmap.point.PointsLayer.register();
+        PlacesLayer.register();
+        PlaceActions.register();
         works.repka.rysmap.hud.Entities.register();
         PingsLayer.register();
         works.repka.rysmap.compat.Waystones.init();

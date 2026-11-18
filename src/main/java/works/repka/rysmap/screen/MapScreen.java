@@ -67,7 +67,12 @@ public final class MapScreen extends ScaledScreen {
     /** Открыта страница настроек вместо полотна (шестерёнка в шапке). */
     private @Nullable SettingsPage settings;
 
-    private record Menu(int x, int y, MapApi.Spot spot, List<MapApi.MenuItem> items) {}
+    /** Меню ПКМ или меню игрока (макет Essentials 06): заголовок «Kot_Boris · Барсуки · 92 м», подсказки справа («запрос»). */
+    private record Menu(int x, int y, MapApi.Spot spot, List<MapApi.MenuItem> items, @Nullable String title, java.util.Map<ResourceLocation, String> hints) {
+        Menu(int x, int y, MapApi.Spot spot, List<MapApi.MenuItem> items) {
+            this(x, y, spot, items, null, java.util.Map.of());
+        }
+    }
 
     /** Чужая вкладка окна ({@link MapApi#tab}) вместо карты или null. */
     private MapApi.@Nullable Tab tab;
@@ -142,6 +147,7 @@ public final class MapScreen extends ScaledScreen {
         ch = wh - HEADER;
         if (editor != null) for (works.repka.ryscore.ui.Field f : editor.fields()) addWidget(f);
         scanDimensions();
+        works.repka.rysmap.client.PlacesLayer.editor(this::editPlace);
     }
 
     private void scanDimensions() {
@@ -298,6 +304,11 @@ public final class MapScreen extends ScaledScreen {
         openSettings();
     }
 
+    /** Для автотеста: прокрутить страницу настроек. */
+    public void settingsScrollForTest(float value) {
+        if (settings != null) settings.scrollTo(value);
+    }
+
     private void sidebar(GuiGraphics g, Theme t, MapSession s, int mx, int my) {
         int top = wy + HEADER, bottom = wy + wh;
         if (compact() && !railOpen) {
@@ -381,7 +392,8 @@ public final class MapScreen extends ScaledScreen {
             default -> near;
         });
         deaths.sort(Comparator.comparingLong((PointStore.Point p) -> p.created).reversed());
-        int content = 0;
+        List<Object> placeRows = placeRows();
+        int content = placeRowsHeight(placeRows);
         if (!mine.isEmpty()) content += 10 + mine.size() * ROW;
         if (!deaths.isEmpty()) content += 10 + deaths.size() * ROW;
         if (content == 0) content = 12;
@@ -389,6 +401,7 @@ public final class MapScreen extends ScaledScreen {
         Draw.scissor(g, wx, listTop, wx + SIDEBAR - 1, listBottom);
         hits.clip(listTop, listBottom);
         float ly = listTop - scroll;
+        ly = drawPlaces(g, t, placeRows, x0, rw, ly, player, mx, my);
         if (mine.isEmpty() && deaths.isEmpty()) {
             Draw.label(g, Component.translatable("rysmap.screen.points.empty").getString(), x0 + 4, ly + 6, 11, Weight.REGULAR, t.c("text.dim"));
         }
@@ -820,12 +833,15 @@ public final class MapScreen extends ScaledScreen {
     void closeEditor() {
         if (editor != null) for (works.repka.ryscore.ui.Field f : editor.fields()) removeWidget(f);
         editor = null;
+        placeEditing = null;
+        placeEdited = null;
         setFocused(null);
     }
 
     void submitEditor() {
         MapSession s = ClientEntry.session();
         if (editor == null || s == null) return;
+        if (submitPlace()) return;
         boolean isNew = editor.editing == null;
         PointStore.Point p = editor.result();
         if (p == null) return;
@@ -1062,21 +1078,30 @@ public final class MapScreen extends ScaledScreen {
 
     private void menu(GuiGraphics g, Theme t, int mx, int my) {
         Menu m = menu;
-        int h = m.items.size() * MENU_ROW + 6;
-        int x = Math.min(m.x, width - MENU_W - 4), y = Math.min(m.y, height - h - 4);
+        int menuW = m.title != null || !m.hints.isEmpty() ? 150 : MENU_W;
+        int head = m.title != null ? 12 : 0;
+        int h = m.items.size() * MENU_ROW + 6 + head;
+        int x = Math.min(m.x, width - menuW - 4), y = Math.min(m.y, height - h - 4);
         g.pose().pushPose();
         g.pose().translate(0, 0, 400);
-        t.tooltipBox(g, x, y, MENU_W, h);
-        int ry = y + 3;
+        t.tooltipBox(g, x, y, menuW, h);
+        if (m.title != null) {
+            Draw.label(g, Draw.ellipsize(m.title, menuW - 12, 11, Weight.REGULAR), x + 6, y + 8, 11, Weight.REGULAR, t.c("text.muted"));
+            Draw.rect(g, x + 4, y + head + 1, menuW - 8, 1, t.c("panel.border"));
+        }
+        int ry = y + 3 + head;
         for (MapApi.MenuItem item : m.items) {
             boolean enabled = item.enabled(m.spot);
-            boolean hot = enabled && Kit.over(mx, my, x + 2, ry, MENU_W - 4, MENU_ROW);
-            if (hot) Draw.round(g, x + 2, ry, MENU_W - 4, MENU_ROW, 3, t.c("slot.hover"));
+            boolean hot = enabled && Kit.over(mx, my, x + 2, ry, menuW - 4, MENU_ROW);
+            if (hot) Draw.round(g, x + 2, ry, menuW - 4, MENU_ROW, 3, t.c("slot.hover"));
             int color = enabled ? t.c("text.primary") : t.c("text.muted");
             if (item.icon() != null) Icons.draw(g, item.icon(), x + 6, ry + 2.5f, 8, color);
-            Draw.label(g, Draw.ellipsize(item.label().getString(), MENU_W - 24, 12, Weight.REGULAR), x + 18, ry + MENU_ROW / 2f, 12, Weight.REGULAR, color);
+            String hint = m.hints.getOrDefault(item.id(), "");
+            float hw = hint.isEmpty() ? 0 : Draw.labelWidth(hint, 10.5f, Weight.REGULAR) + 6;
+            if (!hint.isEmpty()) Draw.label(g, hint, x + menuW - hw, ry + MENU_ROW / 2f, 10.5f, Weight.REGULAR, t.c("text.dim"));
+            Draw.label(g, Draw.ellipsize(item.label().getString(), menuW - 24 - hw, 12, Weight.REGULAR), x + 18, ry + MENU_ROW / 2f, 12, Weight.REGULAR, color);
             if (enabled) {
-                hits.add(x + 2, ry, MENU_W - 4, MENU_ROW, b -> {
+                hits.add(x + 2, ry, menuW - 4, MENU_ROW, b -> {
                     menu = null;
                     if (item.id().equals(PointsLayer.POINT_HERE)) {
                         // в окне карты «Точка здесь» открывает окно новой точки (макет 16)
@@ -1398,6 +1423,7 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     public void removed() {
+        works.repka.rysmap.client.PlacesLayer.editor(null);
         if (keysHintShown && !works.repka.rysmap.client.ClientConfig.get().keysHintSeen
             && !(Minecraft.getInstance().screen instanceof net.minecraft.client.gui.screens.options.controls.KeyBindsScreen)) {
             works.repka.rysmap.client.ClientConfig.get().keysHintSeen = true;
@@ -1720,8 +1746,9 @@ public final class MapScreen extends ScaledScreen {
         }
         works.repka.rysmap.hud.Entities.Dot d = lastHoverDot;
         if (d != null && d.player() && Math.abs(mx - sx(d.x())) <= 6 && Math.abs(my - sy(d.z())) <= 6) {
-            // клик по игроку: путь к месту, где он сейчас (Т2, макет 11)
-            MapApi.get().track(MapApi.Target.builder(dimension, d.x(), d.y(), d.z()).radius(4).label(Component.literal(d.name())).build());
+            // клик по игроку: меню «К игроку, Позвать, В путь, Пожаловаться» (макет Essentials 06); без «Мест» на сервере путь
+            if (works.repka.rysmap.client.PlacesClient.data().present) openPlayerMenu(d, (int) mx, (int) my);
+            else MapApi.get().track(MapApi.Target.builder(dimension, d.x(), d.y(), d.z()).radius(4).label(Component.literal(d.name())).build());
             return;
         }
         canvasClicked();
@@ -1809,6 +1836,220 @@ public final class MapScreen extends ScaledScreen {
     }
 
     /** Для автотеста: меню правой кнопки чуть правее и ниже середины полотна. */
+    /**
+     * Меню игрока (макет Essentials 06): чужому только запрос, своим по команде без запроса, если команда дала право
+     * {@code rysmap:team_tp}. «Пожаловаться» только с RYSHelm: открывает чат с {@code /report <ник> }.
+     */
+    void openPlayerMenu(works.repka.rysmap.hud.Entities.Dot d, int x, int y) {
+        var data = works.repka.rysmap.client.PlacesClient.data();
+        boolean team = d.kind() == works.repka.rysmap.hud.Entities.Kind.TEAM;
+        boolean direct = team && data.teamTp;
+        String req = Component.translatable(direct ? "rysmap.player.no_request" : "rysmap.player.request").getString();
+        java.util.Map<ResourceLocation, String> hints = new java.util.HashMap<>();
+        List<MapApi.MenuItem> items = new ArrayList<>();
+        ResourceLocation to = ResourceLocation.fromNamespaceAndPath("rysmap", "player_to"), here = ResourceLocation.fromNamespaceAndPath("rysmap", "player_here");
+        boolean can = data.allowed(works.repka.rysmap.places.PlaceRules.Fn.REQUEST);
+        String id = d.id().toString();
+        items.add(MapApi.MenuItem.builder(to, Component.translatable(direct ? "rysmap.player.to_team" : "rysmap.player.to")).icon(Icons.Shape.TELEPORT)
+            .enabled(sp -> can).run(sp -> works.repka.rysmap.client.PlacesClient.op("tpa", works.repka.rysmap.client.PlacesClient.obj("id", id))).build());
+        items.add(MapApi.MenuItem.builder(here, Component.translatable("rysmap.player.here")).icon(Icons.Shape.USERS)
+            .enabled(sp -> can).run(sp -> works.repka.rysmap.client.PlacesClient.op("tpahere", works.repka.rysmap.client.PlacesClient.obj("id", id))).build());
+        hints.put(to, req);
+        hints.put(here, req);
+        items.add(MapApi.MenuItem.builder(ResourceLocation.fromNamespaceAndPath("rysmap", "player_route"), Component.translatable("rysmap.place.route"))
+            .icon(Icons.Shape.TARGET).run(sp -> MapApi.get().track(MapApi.Target.builder(dimension, d.x(), d.y(), d.z()).radius(4).label(Component.literal(d.name())).build())).build());
+        items.add(MapApi.MenuItem.builder(ResourceLocation.fromNamespaceAndPath("rysmap", "player_msg"), Component.translatable("rysmap.player.message"))
+            .icon(Icons.Shape.CHAT).run(sp -> Minecraft.getInstance().setScreen(new net.minecraft.client.gui.screens.ChatScreen("/msg " + d.name() + " "))).build());
+        if (net.neoforged.fml.ModList.get().isLoaded("ryshelm")) {
+            ResourceLocation rep = ResourceLocation.fromNamespaceAndPath("rysmap", "player_report");
+            items.add(MapApi.MenuItem.builder(rep, Component.translatable("rysmap.player.report")).icon(Icons.Shape.FLAG)
+                .run(sp -> Minecraft.getInstance().setScreen(new net.minecraft.client.gui.screens.ChatScreen("/report " + d.name() + " "))).build());
+            hints.put(rep, "RYSHelm");
+        }
+        LocalPlayer me = Minecraft.getInstance().player;
+        String dist = me == null ? "" : " · " + Words.distance(Math.sqrt((d.x() - me.getX()) * (d.x() - me.getX()) + (d.z() - me.getZ()) * (d.z() - me.getZ())));
+        String title = d.name() + (team ? " · " + Component.translatable("rysmap.player.own_team").getString() : "") + dist;
+        int bx = (int) Math.floor(d.x()), bz = (int) Math.floor(d.z());
+        MapApi.Spot spot = new MapApi.Spot(dimension, bx, (int) Math.floor(d.y()), bz, Math.floorDiv(bx, 16), Math.floorDiv(bz, 16));
+        menu = new Menu(x, y, spot, items, title, hints);
+    }
+
+    /** Для автотеста: меню игрока у метки. */
+    public void playerMenuForTest(java.util.UUID id, String name, boolean team, double bx, double bz) {
+        works.repka.rysmap.hud.Entities.Dot d = new works.repka.rysmap.hud.Entities.Dot(id, bx, 64, bz,
+            team ? works.repka.rysmap.hud.Entities.Kind.TEAM : works.repka.rysmap.hud.Entities.Kind.PLAYER, name, null);
+        openPlayerMenu(d, (int) sx(bx) + 8, (int) sy(bz) - 4);
+    }
+
+    // ---- места (0.2.0, макет Essentials 04) ----
+
+    /** Какое место сервера правится в окне точки: null — своя точка, "" — новое место сервера. */
+    private @Nullable String placeEditing;
+    private works.repka.rysmap.client.PlacesClient.@Nullable Place placeEdited;
+    /** Раскрыт ли список мест сервера и «Назад» целиком. */
+    private boolean placesAll, backAll;
+
+    /** Окно правки места сервера: то же окно точки (имя, значок, цвет), итог уходит на сервер. */
+    public void editPlace(works.repka.rysmap.client.PlacesClient.@Nullable Place place, ResourceKey<Level> dim, int x, int y, int z) {
+        int ax = (int) sx(x + 0.5), ay = (int) sy(z + 0.5);
+        if (place == null) {
+            setEditor(new PointEditor(null, dim.location().toString(), x, y, z, Component.translatable("rysmap.place.new_name").getString(), 0, ax, ay));
+            placeEditing = "";
+        } else {
+            PointStore.Point tmp = new PointStore.Point();
+            tmp.dimension = dim.location().toString();
+            tmp.x = x;
+            tmp.y = y;
+            tmp.z = z;
+            tmp.name = place.name();
+            tmp.icon = place.icon();
+            tmp.color = place.color() < 0 ? 0 : place.color();
+            setEditor(new PointEditor(tmp, tmp.dimension, x, y, z, tmp.name, tmp.color, ax, ay));
+            placeEditing = place.name();
+        }
+        placeEdited = place;
+    }
+
+    /** Итог окна правки места сервера на сервер; false, если правится своя точка. */
+    private boolean submitPlace() {
+        if (placeEditing == null || editor == null) return false;
+        PointStore.Point p = editor.result();
+        if (p == null) return true;
+        if (placeEditing.isEmpty()) {
+            ResourceKey<Level> dim = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(p.dimension));
+            com.google.gson.JsonObject o = works.repka.rysmap.client.PlacesClient.at(dim, p.x + 0.5, p.y, p.z + 0.5);
+            o.addProperty("name", p.name);
+            o.addProperty("icon", p.icon);
+            o.addProperty("color", p.color);
+            o.addProperty("vis", "all");
+            works.repka.rysmap.client.PlacesClient.op("setwarp", o);
+        } else {
+            com.google.gson.JsonObject e = new com.google.gson.JsonObject();
+            e.addProperty("name", placeEditing);
+            e.addProperty("newName", p.name);
+            e.addProperty("icon", p.icon);
+            e.addProperty("color", p.color);
+            e.addProperty("note", placeEdited == null ? "" : placeEdited.note());
+            e.addProperty("vis", placeEdited == null ? "all" : placeEdited.vis());
+            works.repka.rysmap.client.PlacesClient.op("editwarp", e);
+        }
+        closeEditor();
+        return true;
+    }
+
+    /** Карта к месту и его панель. */
+    void goToPlace(works.repka.rysmap.client.PlacesClient.Place p) {
+        goTo(p.key(), p.x(), p.z(), null);
+        selected = null;
+        panelMarker = works.repka.rysmap.client.PlacesLayer.marker(p);
+    }
+
+    /** Для автотеста: открыть панель места по имени (дом, место сервера). */
+    public boolean placePanelForTest(String name) {
+        for (var p : works.repka.rysmap.client.PlacesLayer.all(works.repka.rysmap.client.PlacesClient.data())) {
+            if (p.name().equalsIgnoreCase(name) || works.repka.rysmap.client.PlacesLayer.name(p).equalsIgnoreCase(name)) {
+                goToPlace(p);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Строки «Мест» в списке сайдбара: дома, дом команды, места сервера (3 и «ещё N»), «Назад» (3 и «ещё N»). */
+    private List<Object> placeRows() {
+        var d = works.repka.rysmap.client.PlacesClient.data();
+        List<Object> rows = new ArrayList<>();
+        if (!d.present) return rows;
+        if (!d.homes.isEmpty()) {
+            rows.add(new PlaceHead(Component.translatable("rysmap.screen.places.homes").getString(),
+                Component.translatable("rysmap.screen.places.of", d.homes.size(), d.rules.homes).getString()));
+            rows.addAll(d.homes);
+        }
+        if (d.teamHome != null) {
+            rows.add(new PlaceHead(Component.translatable("rysmap.screen.places.team").getString(), ""));
+            rows.add(d.teamHome);
+        }
+        if (!d.places.isEmpty()) {
+            rows.add(new PlaceHead(Component.translatable("rysmap.screen.places.server").getString(), Integer.toString(d.places.size())));
+            List<works.repka.rysmap.client.PlacesClient.Place> list = new ArrayList<>(d.places);
+            LocalPlayer me = Minecraft.getInstance().player;
+            String here = me == null ? "" : me.level().dimension().location().toString();
+            list.sort(Comparator.comparing((works.repka.rysmap.client.PlacesClient.Place q) -> !q.dim().equals(here))
+                .thenComparingDouble(q -> me == null ? 0 : (q.x() - me.getX()) * (q.x() - me.getX()) + (q.z() - me.getZ()) * (q.z() - me.getZ())));
+            int show = placesAll ? list.size() : Math.min(3, list.size());
+            rows.addAll(list.subList(0, show));
+            if (list.size() > show) rows.add(new PlaceMore(list.size() - show, false));
+        }
+        if (!d.back.isEmpty()) {
+            rows.add(new PlaceHead(Component.translatable("rysmap.screen.places.back").getString(), Integer.toString(d.back.size())));
+            int show = backAll ? d.back.size() : Math.min(3, d.back.size());
+            rows.addAll(d.back.subList(0, show));
+            if (d.back.size() > show) rows.add(new PlaceMore(d.back.size() - show, true));
+        }
+        return rows;
+    }
+
+    private record PlaceHead(String title, String count) {}
+
+    private record PlaceMore(int n, boolean back) {}
+
+    private static int placeRowsHeight(List<Object> rows) {
+        int h = 0;
+        for (Object o : rows) h += o instanceof PlaceHead ? 10 : ROW;
+        return h;
+    }
+
+    private float drawPlaces(GuiGraphics g, Theme t, List<Object> rows, int x0, int rw, float y, @Nullable LocalPlayer player, int mx, int my) {
+        for (Object o : rows) {
+            int iy = Math.round(y);
+            if (o instanceof PlaceHead h) {
+                Draw.label(g, h.title(), x0 + 8, y + 3.5f + 2.75f, 11, Weight.REGULAR, t.c("text.dim"));
+                if (!h.count().isEmpty())
+                    Draw.label(g, h.count(), x0 + rw - 4 - Draw.labelWidth(h.count(), 11, Weight.REGULAR), y + 6.25f, 11, Weight.REGULAR, t.c("text.dim"));
+                y += 10;
+                continue;
+            }
+            boolean hot = Kit.over(mx, my, x0, iy, rw, ROW) && my >= listTop && my < listBottom;
+            if (o instanceof PlaceMore more) {
+                String txt = Component.translatable("rysmap.screen.places.more", more.n()).getString();
+                Draw.label(g, txt, x0 + 17, y + ROW / 2f, 12, Weight.REGULAR, hot ? t.c("text.primary") : t.c("link"));
+                hits.add(x0, iy, rw, ROW, b -> {
+                    if (more.back()) backAll = true;
+                    else placesAll = true;
+                });
+                y += ROW;
+                continue;
+            }
+            var p = (works.repka.rysmap.client.PlacesClient.Place) o;
+            MapApi.Marker pm = panelMarker;
+            boolean sel = pm != null && pm.id().equals(works.repka.rysmap.client.PlacesLayer.id(p));
+            if (sel) Draw.round(g, x0, y, rw, ROW, 3.5f, t.c("tab.active.bg"));
+            else if (hot) Draw.round(g, x0, y, rw, ROW, 3.5f, t.c("button.bg"));
+            Draw.disc(g, x0 + 8.5f, y + ROW / 2f, 4.5f, works.repka.rysmap.client.PlacesLayer.color(p));
+            Icons.draw(g, works.repka.rysmap.client.PlacesLayer.icon(p), x0 + 6f, y + ROW / 2f - 2.5f, 5, 0xFF15181F);
+            String dd;
+            if (player != null && player.level().dimension().location().toString().equals(p.dim())) {
+                double dx = player.getX() - p.x(), dz = player.getZ() - p.z();
+                dd = Words.distance(Math.sqrt(dx * dx + dz * dz));
+            } else {
+                dd = dimensionName(p.dim());
+            }
+            if (p.lock() != null) dd = Component.translatable("rysmap.screen.places.locked").getString();
+            float dw = Draw.labelWidth(dd, 11, Weight.REGULAR);
+            String nm = works.repka.rysmap.client.PlacesLayer.name(p);
+            if (p.kind().equals("back") && p.at() > 0) {
+                long ago = (System.currentTimeMillis() - p.at()) / 60_000;
+                if (ago < 60) nm = nm + " · " + Component.translatable("rysmap.screen.places.ago", Math.max(1, ago)).getString();
+            }
+            Draw.label(g, Draw.ellipsize(nm, rw - 22 - dw, 12.5f, Weight.REGULAR), x0 + 17, y + ROW / 2f, 12.5f, Weight.REGULAR,
+                sel || hot ? t.c("text.primary") : t.c("text.secondary"));
+            Draw.label(g, dd, x0 + rw - 4 - dw, y + ROW / 2f, 11, Weight.REGULAR, p.lock() != null ? t.c("state.warn") : t.c("text.muted"));
+            hits.add(x0, iy, rw, ROW, b -> goToPlace(p));
+            y += ROW;
+        }
+        return y;
+    }
+
     public void openMenuForTest() {
         openMenu(cx0 + cw / 2 + 30, cy0 + ch / 2 + 20);
     }

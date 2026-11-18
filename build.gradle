@@ -60,6 +60,8 @@ neoForge {
             if (project.findProperty('runDir') != null) systemProperty 'neoforge.enableGameTest', 'false'
             // сценарий migrate берёт настоящую карту FTB из fixtures (в git её нет)
             systemProperty 'rysmap.ftbFixture', project.findProperty('ftbFixture') ?: project.file('../../_shared/_saved/fixtures/ftb-2026-11-18/client/ftbchunks').absolutePath
+            // сценарий places: копия данных FTB Essentials для шага places
+            systemProperty 'rysmap.ftbEssentials', project.findProperty('ftbEssentials') ?: project.file('../../_shared/_saved/fixtures/ftb-2026-11-18/world/ftbessentials').absolutePath
             programArguments.addAll '--width', '1280', '--height', '800'
         }
     }

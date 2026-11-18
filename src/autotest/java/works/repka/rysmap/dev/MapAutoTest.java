@@ -179,6 +179,10 @@ public final class MapAutoTest {
             FixesAutoTest.build();
             return;
         }
+        if ("places".equals(System.getProperty("rysmap.autotest"))) {
+            PlacesAutoTest.build();
+            return;
+        }
         if ("labels".equals(System.getProperty("rysmap.autotest"))) {
             LabelsAutoTest.build();
             return;
