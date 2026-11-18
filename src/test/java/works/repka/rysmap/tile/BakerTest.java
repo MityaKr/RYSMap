@@ -40,6 +40,7 @@ class BakerTest {
         r.set(8, 8, 70, stone, plains, 0);   // выше северо-западного соседа: светлее
         r.set(10, 10, 60, stone, plains, 0); // ниже: темнее
         r.set(12, 12, 64, gone, plains, 0);
+        r.set(13, 12, 64, gone, plains, 0);
         r.set(3, 3, 62, sand, plains, RegionData.pack(3, 0));
         r.set(3, 4, 62, sand, plains, RegionData.pack(RegionData.WATER_UNKNOWN, 7));
         r.clear(1, 14);
@@ -53,7 +54,9 @@ class BakerTest {
         assertEquals(0x808080, rgb(px[RegionData.index(6, 6)]), "камень на ровном");
         assertTrue((rgb(px[RegionData.index(8, 8)]) & 0xFF) > 0x80, "выше соседа светлее");
         assertTrue((rgb(px[RegionData.index(10, 10)]) & 0xFF) < 0x80, "ниже соседа темнее");
-        assertEquals(0x222222, rgb(px[RegionData.index(12, 12)]), "блока нет в игре: цвет неизвестного");
+        assertEquals(0x222222, rgb(px[RegionData.index(13, 12)]), "блока нет в игре: цвет неизвестного");
+        assertEquals(Baker.hatch(0x222222) & 0xFFFFFF, rgb(px[RegionData.index(12, 12)]), "каждый четвёртый столбец по диагонали светлее: штриховка");
+        assertNotEquals(rgb(px[RegionData.index(12, 12)]), rgb(px[RegionData.index(13, 12)]));
         int shallow = rgb(px[RegionData.index(3, 3)]), deep = rgb(px[RegionData.index(3, 4)]);
         assertTrue((shallow & 0xFF) > 0x80 && (deep & 0xFF) > 0x80, "вода синяя");
         assertTrue(((deep >> 16) & 0xFF) < ((shallow >> 16) & 0xFF), "вода без глубины темнее мелкой");

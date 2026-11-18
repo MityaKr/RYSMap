@@ -21,6 +21,7 @@ public final class Baker {
     private Palette palette;
     private long version = Long.MIN_VALUE;
     private int[] blockArgb = new int[0], blockTint = new int[0];
+    private boolean[] blockUnknown = new boolean[0];
     private int[] grass = new int[0], foliage = new int[0], water = new int[0];
 
     public Baker(MapColors colors) {
@@ -65,7 +66,9 @@ public final class Baker {
         int block = r.block[i];
         int biome = r.biome[i] & 0xFF;
         int flags = r.flags[i] & 0xFF;
-        int base = block < blockArgb.length ? blockArgb[block] : colors.unknown();
+        boolean unknown = block >= blockArgb.length || blockUnknown[block];
+        // неизвестный блок (мод убран, цвета нет): токен map.unknown и редкая светлая штриховка, чтобы не слиться с фоном
+        int base = unknown ? (((lx + lz) & 3) == 0 ? hatch(colors.unknown()) : colors.unknown()) : blockArgb[block];
         int tint = block < blockTint.length ? blockTint[block] : MapColors.TINT_NONE;
         int rgb = switch (tint) {
             case MapColors.TINT_NONE -> base;
@@ -86,6 +89,11 @@ public final class Baker {
         return toAbgr(rgb);
     }
 
+    /** Светлая полоса штриховки неизвестного блока: тот же цвет, на пятую часть к белому. */
+    static int hatch(int argb) {
+        return mix(argb, 0xFFFFFF, 0.2f);
+    }
+
     private static int neighborHeight(RegionData r, Neighbors n, int lx, int lz) {
         if (lx >= 0 && lz >= 0) {
             if (!r.has(lx >> 4, lz >> 4)) return RegionData.NO_HEIGHT;
@@ -101,15 +109,18 @@ public final class Baker {
             version = v;
             blockArgb = new int[0];
             blockTint = new int[0];
+            blockUnknown = new boolean[0];
             grass = foliage = water = new int[0];
         }
         if (blockArgb.length < p.blockCount()) {
             int from = blockArgb.length;
             blockArgb = Arrays.copyOf(blockArgb, p.blockCount());
             blockTint = Arrays.copyOf(blockTint, p.blockCount());
+            blockUnknown = Arrays.copyOf(blockUnknown, p.blockCount());
             for (int id = from; id < p.blockCount(); id++) {
                 String name = p.blockName(id);
                 int c = colors.block(name);
+                blockUnknown[id] = c == 0;
                 blockArgb[id] = c == 0 ? colors.unknown() : c;
                 blockTint[id] = c == 0 ? MapColors.TINT_NONE : colors.tint(name);
             }

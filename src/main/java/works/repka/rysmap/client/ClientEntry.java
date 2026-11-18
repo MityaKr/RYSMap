@@ -214,11 +214,22 @@ public final class ClientEntry {
         return config;
     }
 
-    /** Полотно карты тёмное в любой теме: цвет неизвестного блока берётся из slate, если она есть. */
-    private static int unknownColor() {
+    /**
+     * Цвет неизвестного блока: токен {@code map.unknown} темы slate (полотно тёмное в любой теме). В ядре 1.11 его
+     * запасной равен {@code map.bg}, и блок сливался с неразведанным фоном; тогда берётся смесь {@code map.bg} и
+     * {@code text.muted} той же темы: серо-синий, заметный и на фоне, и среди травы. Пекарь добавляет редкую штриховку.
+     */
+    static int unknownColor() {
         Theme slate = null;
         for (Theme t : ThemeManager.all()) if (t.id.equals("ryscore:slate")) slate = t;
-        return (slate != null ? slate : ThemeManager.get()).c("map.unknown") | 0xFF000000;
+        Theme t = slate != null ? slate : ThemeManager.get();
+        int unknown = t.c("map.unknown") | 0xFF000000, bg = t.c("map.bg") | 0xFF000000;
+        if (distance(unknown, bg) < 48) unknown = works.repka.ryscore.ui.Draw.mix(bg, t.c("text.muted") | 0xFF000000, 0.45f) | 0xFF000000;
+        return unknown;
+    }
+
+    private static int distance(int a, int b) {
+        return Math.abs(((a >> 16) & 0xFF) - ((b >> 16) & 0xFF)) + Math.abs(((a >> 8) & 0xFF) - ((b >> 8) & 0xFF)) + Math.abs((a & 0xFF) - (b & 0xFF));
     }
 
     /** Из перехвата правок блоков. */
