@@ -2,7 +2,7 @@
 
 Собрана `_shared/tools/make-map.py` 2026-11-18. Руками не править: после структурных правок пересобрать.
 
-Java: 59 файлов, 10178 строк. Переводы: `src/main/resources/assets/rysmap/lang/en_us.json`, `src/main/resources/assets/rysmap/lang/ru_ru.json`.
+Java: 60 файлов, 10528 строк. Переводы: `src/main/resources/assets/rysmap/lang/en_us.json`, `src/main/resources/assets/rysmap/lang/ru_ru.json`.
 Читать сначала: `CLAUDE.md`, `README.md`.
 
 ## Точки входа
@@ -13,14 +13,15 @@ Java: 59 файлов, 10178 строк. Переводы: `src/main/resources/a
 - `docs/` — 1 файлов
 - `gradle/` — 2 файлов
 - `shots/` — 34 файлов
-- `src/` — 63 файлов
+- `src/` — 64 файлов
 
 ## `src/autotest/java` — пакет `works.repka.rysmap.dev`
 
-**(корень)** (4)
+**(корень)** (5)
 - `LabelsAutoTest` 165 — Подписи точек в мире (gradlew runAutotest -Pheap=3G --offline -Pautotest=labels): новый мир, десять точек по кругу радиусом 24 блока вокруг игрока, прицел на точку «Шахта», путь к …
-- `MapAutoTest` 259 — Проверка М1 в игре (gradlew runAutotest): новый мир, сканер у спавна и после перелёта, регионы на диске, повторный вход читает их без пересканирования, MapApi.drawTiles рисует фон.
+- `MapAutoTest` 272 — Проверка М1 в игре (gradlew runAutotest): новый мир, сканер у спавна и после перелёта, регионы на диске, повторный вход читает их без пересканирования, MapApi.drawTiles рисует фон.
 - `MigrateAutoTest` 219 — Серверная часть и переезд (gradlew runAutotest -Pautotest=migrate): встроенный сервер шлёт MapHello, папка карты встаёт на UUID мира; в мир кладётся ftbteams/ftbteams.snbt с id нас…
+- `ServerAutoTest` 337 — Вход на настоящий сервер RepYS с RYSClaims (gradlew runAutotest -Pautotest=server -PrunDir=run-repys -Pplan=): игровая папка это копия клиента сборки (моды в run-repys/mods, RYSCla…
 - `UiAutoTest` 246 — Снимки интерфейса (gradlew runAutotest -Pautotest=ui): миникарта рядом с макетом 01, окно карты рядом с 10, меню правой кнопки (17).
 
 ## `src/main/java` — пакет `works.repka.rysmap`
