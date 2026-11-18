@@ -95,6 +95,8 @@ public final class ClientEntry {
             if (e.getNewPlayer().level() instanceof ClientLevel level) ensure(level);
         });
         bus.addListener((ClientPlayerNetworkEvent.LoggingOut e) -> close());
+        bus.addListener(net.neoforged.neoforge.client.event.ClientChatReceivedEvent.class, works.repka.rysmap.point.ChatPoint::onChat);
+        bus.addListener(net.neoforged.neoforge.client.event.RegisterClientCommandsEvent.class, works.repka.rysmap.point.ChatPoint::register);
         bus.addListener((ChunkEvent.Load e) -> {
             if (e.getLevel() instanceof ClientLevel level) ensure(level).chunkLoaded(e.getChunk().getPos().x, e.getChunk().getPos().z);
         });

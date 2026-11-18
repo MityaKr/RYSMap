@@ -184,5 +184,8 @@
   "rysmap.settings.shape.square": "Square",
   "rysmap.settings.shape.circle": "Circle",
   "rysmap.settings.shape.north": "North up",
-  "rysmap.settings.shape.view": "Follow view"
+  "rysmap.settings.shape.view": "Follow view",
+  "rysmap.chat.point": "Point",
+  "rysmap.chat.add": "Click: add this point to your map",
+  "rysmap.point.chat": "To chat"
 }

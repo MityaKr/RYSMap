@@ -56,6 +56,15 @@ public final class QuickPointScreen extends ScaledScreen {
             Component.translatable("rysmap.point.numbered", n).getString(), n % 8));
     }
 
+    /** Окно новой точки с готовыми данными: ссылка точки в чате (макет 09b). */
+    public static void openAt(String dimension, int x, int y, int z, String name) {
+        Minecraft mc = Minecraft.getInstance();
+        MapSession s = ClientEntry.session();
+        if (mc.player == null || s == null) return;
+        int n = s.points().points().size() + 1;
+        mc.setScreen(new QuickPointScreen(dimension, x, y, z, name.length() > 32 ? name.substring(0, 32) : name, n % 8));
+    }
+
     @Override
     protected void init() {
         super.init();

@@ -608,7 +608,7 @@ public final class MapScreen extends ScaledScreen {
         return holder.unwrapKey().map(k -> Component.translatable("biome." + k.location().getNamespace() + "." + k.location().getPath()).getString()).orElse("");
     }
 
-    static String dimensionName(String id) {
+    public static String dimensionName(String id) {
         String key = "rysmap.dimension." + id.replace(':', '.').replace('/', '.');
         Component c = Component.translatable(key);
         String s = c.getString();

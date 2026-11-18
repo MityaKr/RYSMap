@@ -184,5 +184,8 @@
   "rysmap.settings.shape.square": "Квадрат",
   "rysmap.settings.shape.circle": "Круг",
   "rysmap.settings.shape.north": "Север сверху",
-  "rysmap.settings.shape.view": "По взгляду"
+  "rysmap.settings.shape.view": "По взгляду",
+  "rysmap.chat.point": "Точка",
+  "rysmap.chat.add": "Клик: добавить точку себе",
+  "rysmap.point.chat": "В чат"
 }

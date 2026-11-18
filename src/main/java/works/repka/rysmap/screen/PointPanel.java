@@ -155,9 +155,12 @@ final class PointPanel {
                 () -> works.repka.rysmap.client.ServerRules.teleport(dim, p.x, p.y, p.z));
             ay += 14 + 4;
         }
-        int half = (iw - 4) / 2;
-        PointWidgets.button(g, t, hits, ix, ay, half, 14, Component.translatable("rysmap.point.edit_short").getString(), null, 0, mx, my, () -> s.edit(p));
-        PointWidgets.button(g, t, hits, ix + half + 4, ay, iw - half - 4, 14, Component.translatable("rysmap.point.delete").getString(), null, 0, mx, my, () -> s.askDelete(p));
+        // «Изменить», «В чат», «Удалить» (макет 15)
+        int third = (iw - 8) / 3;
+        PointWidgets.button(g, t, hits, ix, ay, third, 14, Component.translatable("rysmap.point.edit_short").getString(), null, 0, mx, my, () -> s.edit(p));
+        PointWidgets.button(g, t, hits, ix + third + 4, ay, third, 14, Component.translatable("rysmap.point.chat").getString(), null, 0, mx, my,
+            () -> works.repka.rysmap.point.ChatPoint.send(p));
+        PointWidgets.button(g, t, hits, ix + 2 * third + 8, ay, iw - 2 * third - 8, 14, Component.translatable("rysmap.point.delete").getString(), null, 0, mx, my, () -> s.askDelete(p));
     }
 
     /** «5 минут», «2 часа», «3 дня». */
