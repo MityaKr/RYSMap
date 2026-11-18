@@ -282,6 +282,7 @@ public final class MapSession {
                 if (patches >= PATCHES_PER_FRAME) break;
                 results.poll();
                 tiles.accept(p);
+                overview.markStale(p.dimension(), p.chunkX() >> 5, p.chunkZ() >> 5);
                 patches++;
             } else {
                 results.poll();

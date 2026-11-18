@@ -44,6 +44,8 @@ public final class TileTextures {
     private static final int REQUESTED = 0, READY = 1, EMPTY = 2;
     private static final int MAX_IN_FLIGHT = 2;
     private static final long USED_NOW_NANOS = 100_000_000L;
+    /** Через сколько после правки региона перепекается устаревшая текстура: правки идут пачками, не печь на каждую. */
+    private static final long STALE_NANOS = 5_000_000_000L;
     private static final int GL_TEXTURE_2D = 3553, GL_RGBA = 6408, GL_UNSIGNED_BYTE = 5121;
 
     private static final class Tile {
@@ -52,6 +54,9 @@ public final class TileTextures {
         int state = REQUESTED;
         int glId = -1;
         long lastUsed;
+        /** Регион обновился, а текстура старая (дальний план): перепечь, когда пройдёт {@link #STALE_NANOS}. */
+        boolean stale;
+        long staleAt;
 
         Tile(String dimension, int x, int z, long now) {
             this.dimension = dimension;
@@ -180,6 +185,12 @@ public final class TileTextures {
         Tile t = map.get(key);
         if (t != null) {
             t.lastUsed = now;
+            // устаревшая текстура перепекается, пока её видно; старая рисуется до прихода новой (перепроверка 18.11, пункт 9)
+            if (t.stale && t.state != REQUESTED && now - t.staleAt > STALE_NANOS && inFlight < MAX_IN_FLIGHT) {
+                t.stale = false;
+                inFlight++;
+                source.request(dimension, rx, rz);
+            }
             return t;
         }
         if (inFlight >= MAX_IN_FLIGHT) return null;
@@ -339,6 +350,14 @@ public final class TileTextures {
             MemoryUtil.memFree(scratch);
             scratch = null;
         }
+    }
+
+    /** Регион обновился: текстуру этого региона перепечь (дальний план, куски туда не заливаются). */
+    public void markStale(String dimension, int regionX, int regionZ) {
+        Tile t = find(dimension, regionX, regionZ);
+        if (t == null || t.stale) return;
+        t.stale = true;
+        t.staleAt = System.nanoTime();
     }
 
     /** Множитель яркости следующих рисований (ночь): 1 без затемнения. */
