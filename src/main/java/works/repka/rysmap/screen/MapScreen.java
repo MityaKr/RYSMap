@@ -254,7 +254,7 @@ public final class MapScreen extends ScaledScreen {
                 if (hot) Draw.round(g, x0, y, rw, ROW, 3.5f, t.c("slot.hover"));
                 int fg = on ? t.c("text.secondary") : t.c("text.dim");
                 Icons.draw(g, layer.icon(), x0 + 4.5f, y + 3, 8, on ? t.c("text.muted") : t.c("text.dim"));
-                int count = Layers.markers(layer, dimension).size();
+                int count = layer instanceof works.repka.rysmap.hud.Entities.Layer el ? el.count(dimension) : Layers.markers(layer, dimension).size();
                 String ct = count > 0 ? Integer.toString(count) : "";
                 float ctw = Draw.labelWidth(ct, 11, Weight.REGULAR);
                 Draw.label(g, Draw.ellipsize(layer.name().getString(), rw - 30 - ctw, 12.5f, Weight.REGULAR), x0 + 17, y + ROW / 2f, 12.5f, Weight.REGULAR, hot ? t.c("text.primary") : fg);
@@ -394,6 +394,7 @@ public final class MapScreen extends ScaledScreen {
         areas(g);
         selectionLine(g, partial);
         MapApi.Marker hover = markers(g, canvas, mx, my);
+        works.repka.rysmap.hud.Entities.Dot hoverDot = hover == null ? entities(g, canvas, mx, my, partial) : null;
         player(g, partial);
         tools(g, t, mx, my);
         message(g, t, mx, my);
@@ -410,6 +411,16 @@ public final class MapScreen extends ScaledScreen {
                     // подсказка чужого слоя упала: показываем то, что есть
                 }
             }
+            tip = lines;
+        } else if (hoverDot != null && overCanvas) {
+            List<String> lines = new ArrayList<>();
+            lines.add(hoverDot.label());
+            LocalPlayer me = Minecraft.getInstance().player;
+            if (me != null && me.level().dimension().equals(dimension)) {
+                double dx = hoverDot.x() - me.getX(), dz = hoverDot.z() - me.getZ();
+                lines.add(Words.distance(Math.sqrt(dx * dx + dz * dz)) + " · " + Words.direction(dx, dz));
+            }
+            if (hoverDot.kind() == works.repka.rysmap.hud.Entities.Kind.TEAM) lines.add(Component.translatable("rysmap.entity.team").getString());
             tip = lines;
         } else if (overCanvas && !dragging) {
             int chx = Math.floorDiv((int) Math.floor(blockX(mx)), 16), chz = Math.floorDiv((int) Math.floor(blockZ(my)), 16);
@@ -771,6 +782,35 @@ public final class MapScreen extends ScaledScreen {
                 boolean hot = Math.abs(mx - x) <= 6 && Math.abs(my - y) <= 6;
                 if (hot) hover = m;
                 marker(g, canvas, m, x, y, hot || isSelectedMarker(m));
+            }
+        }
+        return hover;
+    }
+
+    /**
+     * Игроки и мобы на полотне: голова 10 с подписью имени у игрока, точка у моба. Возвращает сущность под курсором
+     * (игрок важнее моба).
+     */
+    private works.repka.rysmap.hud.Entities.@Nullable Dot entities(GuiGraphics g, Theme canvas, int mx, int my, float partial) {
+        int right = visibleRight();
+        double x0 = blockX(cx0), x1 = blockX(right), z0 = blockZ(cy0), z1 = blockZ(cy0 + ch);
+        works.repka.rysmap.hud.Entities.Dot hover = null;
+        float mobR = (float) Math.max(1.5, Math.min(3, zoom * 0.9));
+        for (works.repka.rysmap.hud.Entities.Dot d : works.repka.rysmap.hud.Entities.collect(dimension, x0, z0, x1, z1, partial)) {
+            float x = sx(d.x()), y = sy(d.z());
+            if (x < cx0 + 5 || x > right - 5 || y < cy0 + 5 || y > cy0 + ch - 5) continue;
+            if (d.player()) {
+                boolean hot = Math.abs(mx - x) <= 6 && Math.abs(my - y) <= 6;
+                if (hot) hover = d;
+                works.repka.rysmap.hud.Entities.head(g, d, x, y, 10);
+                String label = d.name();
+                float lw = Draw.labelWidth(label, 11, Weight.MEDIUM);
+                float ly = y + 6 + 1.5f;
+                Draw.round(g, x - lw / 2 - 3, ly, lw + 6, 8.5f, 2.5f, canvas.c("map.label.bg"));
+                Draw.label(g, label, x - lw / 2, ly + 4.25f, 11, Weight.MEDIUM, canvas.c("map.label.fg"));
+            } else {
+                if (hover == null && Math.abs(mx - x) <= 3 && Math.abs(my - y) <= 3) hover = d;
+                works.repka.rysmap.hud.Entities.mob(g, d, x, y, mobR);
             }
         }
         return hover;

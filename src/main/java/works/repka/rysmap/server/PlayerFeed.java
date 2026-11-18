@@ -36,7 +36,7 @@ final class PlayerFeed {
                 ServerPlayer p = all.get(j);
                 if (p.isSpectator() && !to.isSpectator()) continue;
                 boolean same = team[i] != null && Objects.equals(team[i], team[j]);
-                if (!same && !rules.players) continue;
+                if (!same && (!rules.players || p.isInvisible())) continue;
                 out.add(new MapNet.PlayerSpot(p.getUUID(), p.getGameProfile().getName(), p.level().dimension().location().toString(),
                     p.getBlockX(), p.getBlockY(), p.getBlockZ(), same));
             }

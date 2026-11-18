@@ -175,5 +175,8 @@
   "rysmap.settings.server.entities": "Other players and mobs",
   "rysmap.settings.server.entities.note": "your team is always shown",
   "rysmap.settings.server.players": "Players",
-  "rysmap.settings.server.mobs": "Mobs"
+  "rysmap.settings.server.mobs": "Mobs",
+  "rysmap.layer.players": "Players",
+  "rysmap.layer.mobs": "Mobs",
+  "rysmap.entity.team": "Your team"
 }

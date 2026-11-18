@@ -148,6 +148,7 @@ public final class Minimap {
 
         areas(g, dim, px, pz, ppb, x, y, size);
         markers(g, dim, px, pz, ppb, x, y, size, cx, cy);
+        entities(g, dim, px, pz, ppb, x, y, size, cx, cy, partial);
         target(g, t, dim, px, pz, ppb, x, y, size, cx, cy);
 
         // игрок: стрелка по взгляду, белая на тёмной подложке
@@ -230,6 +231,25 @@ public final class Minimap {
                 Draw.disc(g, sx, sy, 3.5f, m.color());
                 if (m.icon() != null) Icons.draw(g, m.icon(), sx - 2.5f, sy - 2.5f, 5, 0xFF101216);
                 drawn++;
+            }
+        }
+    }
+
+    /** Игроки и мобы (слои «Игроки» и «Мобы»): участник команды за краем прижат к рамке, остальные за краем не видны. */
+    private static void entities(GuiGraphics g, ResourceKey<Level> dim, double px, double pz, double ppb, int x, int y, int size, float cx, float cy, float partial) {
+        double half = size / 2.0 / ppb;
+        for (Entities.Dot d : Entities.collect(dim, px - half, pz - half, px + half, pz + half, partial)) {
+            float sx = (float) (cx + (d.x() - px) * ppb), sy = (float) (cy + (d.z() - pz) * ppb);
+            if (d.player()) {
+                boolean inside = sx >= x + 4 && sx <= x + size - 4 && sy >= y + 4 && sy <= y + size - 4;
+                if (!inside) {
+                    if (d.kind() != Entities.Kind.TEAM) continue;
+                    sx = Math.max(x + 4.5f, Math.min(x + size - 4.5f, sx));
+                    sy = Math.max(y + 4.5f, Math.min(y + size - 4.5f, sy));
+                }
+                Entities.head(g, d, sx, sy, 7);
+            } else if (sx >= x + 1.5f && sx <= x + size - 1.5f && sy >= y + 1.5f && sy <= y + size - 1.5f) {
+                Entities.mob(g, d, sx, sy, 1.5f);
             }
         }
     }

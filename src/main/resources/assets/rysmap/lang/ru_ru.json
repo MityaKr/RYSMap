@@ -175,5 +175,8 @@
   "rysmap.settings.server.entities": "Чужие игроки и мобы",
   "rysmap.settings.server.entities.note": "своя команда видна всегда",
   "rysmap.settings.server.players": "Игроки",
-  "rysmap.settings.server.mobs": "Мобы"
+  "rysmap.settings.server.mobs": "Мобы",
+  "rysmap.layer.players": "Игроки",
+  "rysmap.layer.mobs": "Мобы",
+  "rysmap.entity.team": "Твоя команда"
 }
