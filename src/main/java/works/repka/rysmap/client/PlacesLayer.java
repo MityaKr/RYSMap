@@ -273,6 +273,7 @@ public final class PlacesLayer implements MapApi.Layer {
             .run(s -> {
                 PlacesClient.Data d = PlacesClient.data();
                 JsonObject o = PlacesClient.at(s.dimension(), s.x() + 0.5, s.y(), s.z() + 0.5);
+                o.remove("y"); // высоты с карты нет: сервер посадит на поверхность
                 if (!d.homes.isEmpty() && d.rules.homes <= 1) o.addProperty("name", d.homes.get(0).name());
                 PlacesClient.op("sethome", o);
             }).build());

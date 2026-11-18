@@ -68,6 +68,8 @@ public final class Places {
     }
 
     static TravelApi.Spot spot(PlaceBook.Place p) {
+        // поставлено с карты: высота неизвестна, Travel садит на поверхность столбца
+        if (p.surface) return TravelApi.Spot.of(ResourceLocation.parse(p.dim), p.x, SafeSpot.NO_HINT, p.z);
         TravelApi.Spot s = TravelApi.Spot.of(ResourceLocation.parse(p.dim), p.x, p.y, p.z);
         return p.facing ? s.facing(p.yRot, p.xRot) : s;
     }

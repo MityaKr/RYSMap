@@ -209,8 +209,10 @@ public final class Travel implements TravelApi {
     }
 
     /** То же для случайного места: {@code retry} даёт следующий столбец, если этот не годится. */
-    Res go(ServerPlayer player, Trip trip, boolean column, @Nullable Done done, @Nullable IntFunction<int[]> retry) {
+    Res go(ServerPlayer player, Trip trip, boolean columnOnly, @Nullable Done done, @Nullable IntFunction<int[]> retry) {
         MinecraftServer server = player.getServer();
+        // высота SafeSpot.NO_HINT: место поставлено с карты, ищется посадка в столбце
+        boolean column = columnOnly || trip.spot().y() == SafeSpot.NO_HINT;
         if (server == null) return new Res(Result.denied(Component.empty()), "state");
         Reason reason = trip.reason();
         Component label = trip.label();
@@ -218,7 +220,8 @@ public final class Travel implements TravelApi {
         PlaceRules rules = MapServer.rules().places;
         PlaceRules.Fn fn = fn(reason);
         boolean staff = reason.equals(Reason.STAFF);
-        if (fn != null && !allowed(player, fn)) {
+        // запрос к игроку: право «кто» проверено у того, кто просил; переносят и того, кого позвали
+        if (fn != null && fn != PlaceRules.Fn.REQUEST && !allowed(player, fn)) {
             String code = rules.row(fn).who == PlaceRules.Who.OFF ? "off" : "ops";
             return new Res(Result.denied(Component.translatable("rysmap.travel." + code)), code);
         }
@@ -226,7 +229,7 @@ public final class Travel implements TravelApi {
             if (MapServer.rules().teleport == MapRules.Teleport.OFF) return new Res(Result.denied(Component.translatable("rysmap.tp.off")), "off");
             if (!MapServer.canTeleport(player)) return new Res(Result.denied(Component.translatable("rysmap.tp.ops")), "ops");
         }
-        if (fn != null && rules.pvpDelay > 0 && !trip.skipCooldown()) {
+        if (fn != null && rules.pvpDelay > 0 && !staff) {
             Long hurt = pvp.get(player.getUUID());
             long left = hurt == null ? 0 : hurt + rules.pvpDelay * 1000L - System.currentTimeMillis();
             if (left > 0) return new Res(Result.denied(Component.translatable("rysmap.travel.pvp", (left + 999) / 1000)), "pvp");

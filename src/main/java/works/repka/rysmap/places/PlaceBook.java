@@ -34,6 +34,8 @@ public final class PlaceBook {
         public float yRot, xRot;
         /** Задан ли взгляд (у части записей FTB его нет). */
         public boolean facing;
+        /** Поставлено с карты: высота неизвестна, телепорт садит на поверхность столбца. */
+        public boolean surface;
         /** Значок по именам значков точек ({@code flag}, {@code home}…). */
         public String icon = "flag";
         /** Номер цвета из двенадцати, -1 цвет измерения. */
@@ -55,6 +57,7 @@ public final class PlaceBook {
             p.yRot = yRot;
             p.xRot = xRot;
             p.facing = facing;
+            p.surface = surface;
             p.icon = icon;
             p.color = color;
             p.note = note;

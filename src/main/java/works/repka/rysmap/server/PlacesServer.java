@@ -68,6 +68,33 @@ public final class PlacesServer {
         works.repka.ryscore.migrate.Migrations.register(new works.repka.rysmap.migrate.PlacesStep());
         var bus = NeoForge.EVENT_BUS;
         bus.addListener((RegisterCommandsEvent e) -> PlaceCommands.register(e.getDispatcher(), ftbEssentials()));
+        // команды меняются: дом команды и права участников приходят им заново
+        TeamsApi.listen(new TeamsApi.Listener() {
+            @Override
+            public void onJoined(UUID team, UUID player, boolean carryProgress) {
+                dirtyAll = true;
+            }
+
+            @Override
+            public void onLeft(UUID team, UUID player, boolean keepCopy) {
+                dirtyAll = true;
+            }
+
+            @Override
+            public void onDisbanded(UUID team) {
+                dirtyAll = true;
+            }
+
+            @Override
+            public void onMerged(UUID from, UUID into) {
+                dirtyAll = true;
+            }
+
+            @Override
+            public void onRoleChanged(UUID team, UUID player) {
+                dirtyAll = true;
+            }
+        });
         bus.addListener((net.neoforged.neoforge.event.server.ServerStartingEvent e) -> {
             Requests.clear();
             DIRTY.clear();
@@ -368,8 +395,9 @@ public final class PlacesServer {
         place.dim = a.get("dim").getAsString();
         place.x = a.get("x").getAsDouble();
         place.z = a.get("z").getAsDouble();
-        // с карты высота бывает неизвестна: тогда высота поверхности ищется при телепорте (дом встаёт на землю)
+        // с карты высота неизвестна: место помечается «поверхность», телепорт ищет посадку в столбце (дом встаёт на землю)
         place.y = a.has("y") ? a.get("y").getAsDouble() : p.getY();
+        place.surface = !a.has("y");
         place.yRot = p.getYRot();
         place.xRot = p.getXRot();
         place.facing = false;

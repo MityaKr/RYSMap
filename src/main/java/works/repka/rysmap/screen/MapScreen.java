@@ -1918,6 +1918,7 @@ public final class MapScreen extends ScaledScreen {
         if (placeEditing.isEmpty()) {
             ResourceKey<Level> dim = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(p.dimension));
             com.google.gson.JsonObject o = works.repka.rysmap.client.PlacesClient.at(dim, p.x + 0.5, p.y, p.z + 0.5);
+            o.remove("y"); // высоты с карты нет: сервер посадит на поверхность
             o.addProperty("name", p.name);
             o.addProperty("icon", p.icon);
             o.addProperty("color", p.color);

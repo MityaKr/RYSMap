@@ -122,6 +122,7 @@ public final class PlaceStore extends SavedData {
         c.putFloat("yRot", p.yRot);
         c.putFloat("xRot", p.xRot);
         c.putBoolean("facing", p.facing);
+        if (p.surface) c.putBoolean("surface", true);
         c.putString("icon", p.icon);
         c.putInt("color", p.color);
         if (!p.note.isEmpty()) c.putString("note", p.note);
@@ -142,6 +143,7 @@ public final class PlaceStore extends SavedData {
         p.yRot = c.getFloat("yRot");
         p.xRot = c.getFloat("xRot");
         p.facing = c.getBoolean("facing");
+        p.surface = c.getBoolean("surface");
         p.icon = c.contains("icon") ? c.getString("icon") : "flag";
         p.color = c.contains("color") ? c.getInt("color") : -1;
         p.note = c.getString("note");
