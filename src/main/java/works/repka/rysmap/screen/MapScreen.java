@@ -76,6 +76,11 @@ public final class MapScreen extends ScaledScreen {
     private MapApi.@Nullable ModeView modeView;
     private final CanvasSurface surface = new CanvasSurface();
     private boolean modeMouse;
+    /** Длинный список точек (макет 25): раскрыт на всю высоту, порядок, свёрнутые группы, выбранные Shift+кликом. */
+    private boolean listExpanded;
+    private int listSort;
+    private final java.util.Set<String> collapsed = new java.util.HashSet<>();
+    private final java.util.Set<java.util.UUID> multi = new java.util.LinkedHashSet<>();
     /** «Поверхность | Пещеры» (М5) и этаж, который листается Ctrl+колесом. */
     boolean caves;
     int floor;
@@ -308,7 +313,7 @@ public final class MapScreen extends ScaledScreen {
 
         // слои
         List<MapApi.Layer> layers = MapApi.layers();
-        if (!layers.isEmpty()) {
+        if (!layers.isEmpty() && !listExpanded) {
             Kit.caps(g, t, Component.translatable("rysmap.screen.layers").getString(), wx + 9, y + 6 + 3.25f, 11, 0.44f);
             y += 15;
             for (MapApi.Layer layer : layers) {
@@ -330,7 +335,18 @@ public final class MapScreen extends ScaledScreen {
 
         // точки
         int footer = bottom - 24;
-        Kit.caps(g, t, Component.translatable("rysmap.screen.points").getString(), wx + 9, y + 6 + 3.25f, 11, 0.44f);
+        // заголовок «Точки»: клик раскрывает список на всю высоту; справа порядок
+        String ptitle = Component.translatable("rysmap.screen.points").getString();
+        boolean hotTitle = Kit.over(mx, my, wx + 4, y + 2, 60, 12);
+        Kit.capsColored(g, ptitle, wx + 9, y + 6 + 3.25f, 11, 0.44f, hotTitle ? t.c("text.primary") : t.c("text.dim"));
+        Icons.draw(g, listExpanded ? Icons.Shape.DOWN : Icons.Shape.UP, wx + 9 + Draw.labelWidth(ptitle.toUpperCase(java.util.Locale.ROOT), 11, Weight.MEDIUM) + ptitle.length() * 0.44f + 3, y + 6, 6, t.c("text.dim"));
+        hits.add(wx + 4, y + 2, 60, 12, b -> listExpanded = !listExpanded);
+        if (hotTitle) tip = List.of(Component.translatable(listExpanded ? "rysmap.list.collapse" : "rysmap.list.expand").getString());
+        String sortName = Component.translatable("rysmap.list.sort." + listSort).getString();
+        float sw = Draw.labelWidth(sortName, 11, Weight.REGULAR);
+        boolean hotSort = Kit.over(mx, my, (int) (wx + SIDEBAR - 9 - sw - 2), y + 2, (int) sw + 4, 12);
+        Draw.label(g, sortName, wx + SIDEBAR - 9 - sw, y + 6 + 3.25f, 11, Weight.REGULAR, hotSort ? t.c("text.primary") : t.c("link"));
+        hits.add((int) (wx + SIDEBAR - 9 - sw - 2), y + 2, (int) sw + 4, 12, b -> listSort = (listSort + 1) % 3);
         y += 15;
         listTop = y;
         listBottom = footer - 1;
@@ -342,7 +358,11 @@ public final class MapScreen extends ScaledScreen {
         }
         LocalPlayer player = Minecraft.getInstance().player;
         Comparator<PointStore.Point> near = Comparator.comparingDouble(p -> distance(player, p));
-        mine.sort(near);
+        mine.sort(switch (listSort) {
+            case 1 -> Comparator.comparing((PointStore.Point p) -> PointsLayer.name(p).toLowerCase(java.util.Locale.ROOT));
+            case 2 -> Comparator.comparingLong((PointStore.Point p) -> p.created).reversed();
+            default -> near;
+        });
         deaths.sort(Comparator.comparingLong((PointStore.Point p) -> p.created).reversed());
         int content = 0;
         if (!mine.isEmpty()) content += 10 + mine.size() * ROW;
@@ -362,20 +382,37 @@ public final class MapScreen extends ScaledScreen {
 
         // низ: «Точка здесь»
         Draw.rect(g, wx + 1, footer, SIDEBAR - 2, 1, t.c("panel.border"));
-        String label = Component.translatable("rysmap.screen.point_here").getString();
-        toolButton(g, t, wx + 6, footer + 5, SIDEBAR - 12, 14, Icons.Shape.PLUS, label, keyName(ClientEntry.NEW_POINT), true, mx, my, this::pointHere);
+        multi.removeIf(id -> s.points().find(id) == null);
+        if (!multi.isEmpty()) {
+            int half = (SIDEBAR - 12 - 3) / 2;
+            String hide = Component.translatable("rysmap.list.hide", multi.size()).getString();
+            String del = Component.translatable("rysmap.list.delete", multi.size()).getString();
+            toolButton(g, t, wx + 6, footer + 5, half, 14, Icons.Shape.EYE, hide, null, true, mx, my, this::hideMulti);
+            toolButton(g, t, wx + 6 + half + 3, footer + 5, SIDEBAR - 12 - half - 3, 14, null, del, null, true, mx, my, this::askDeleteMulti);
+        } else {
+            String label = Component.translatable("rysmap.screen.point_here").getString();
+            toolButton(g, t, wx + 6, footer + 5, SIDEBAR - 12, 14, Icons.Shape.PLUS, label, keyName(ClientEntry.NEW_POINT), true, mx, my, this::pointHere);
+        }
     }
 
     private float group(GuiGraphics g, Theme t, String title, List<PointStore.Point> points, int x0, int rw, float y, @Nullable LocalPlayer player, int mx, int my) {
         if (points.isEmpty()) return y;
-        Draw.label(g, title, x0 + 4, y + 3.5f + 2.75f, 11, Weight.REGULAR, t.c("text.dim"));
+        boolean folded = collapsed.contains(title);
+        int ty = Math.round(y);
+        boolean hotGroup = Kit.over(mx, my, x0, ty, rw, 10) && my >= listTop && my < listBottom;
+        Icons.draw(g, folded ? Icons.Shape.CHEVRON_RIGHT : Icons.Shape.CHEVRON_DOWN, x0 + 1, y + 2.5f, 6, t.c("text.dim"));
+        Draw.label(g, title, x0 + 8, y + 3.5f + 2.75f, 11, Weight.REGULAR, hotGroup ? t.c("text.primary") : t.c("text.dim"));
         String n = Integer.toString(points.size());
         Draw.label(g, n, x0 + rw - 4 - Draw.labelWidth(n, 11, Weight.REGULAR), y + 6.25f, 11, Weight.REGULAR, t.c("text.dim"));
+        hits.add(x0, ty, rw, 10, b -> {
+            if (!collapsed.remove(title)) collapsed.add(title);
+        });
         y += 10;
+        if (folded) return y;
         for (PointStore.Point p : points) {
             int iy = Math.round(y);
             boolean hot = Kit.over(mx, my, x0, iy, rw, ROW) && my >= listTop && my < listBottom;
-            boolean sel = isSelected(p);
+            boolean sel = isSelected(p) || multi.contains(p.id);
             if (sel) Draw.round(g, x0, y, rw, ROW, 3.5f, t.c("tab.active.bg"));
             else if (hot) Draw.round(g, x0, y, rw, ROW, 3.5f, t.c("button.bg"));
             Draw.disc(g, x0 + 8.5f, y + ROW / 2f, 4.5f, PointsLayer.color(p));
@@ -385,7 +422,16 @@ public final class MapScreen extends ScaledScreen {
             Draw.label(g, Draw.ellipsize(PointsLayer.name(p), rw - 22 - dw, 12.5f, Weight.REGULAR), x0 + 17, y + ROW / 2f, 12.5f, Weight.REGULAR,
                 sel || hot ? t.c("text.primary") : t.c("text.secondary"));
             if (!d.isEmpty()) Draw.label(g, d, x0 + rw - 4 - dw, y + ROW / 2f, 11, Weight.REGULAR, t.c("text.muted"));
-            hits.add(x0, iy, rw, ROW, b -> selectPoint(p, true));
+            hits.add(x0, iy, rw, ROW, b -> {
+                // Shift+клик выбирает несколько; обычный клик снимает выбор и открывает панель
+                if (hasShiftDown()) {
+                    if (!multi.remove(p.id)) multi.add(p.id);
+                    selected = null;
+                } else {
+                    multi.clear();
+                    selectPoint(p, true);
+                }
+            });
             y += ROW;
         }
         return y;
@@ -461,6 +507,12 @@ public final class MapScreen extends ScaledScreen {
         layer.draw(g, dim, centerX, centerZ, zoom, cx0, cy0, cw, ch, clips(r));
         layer.brightness(1f);
         if (far) regionGrid(g, canvas);
+        // подсветка биомов (М7, макет 20): карта приглушена, подходящие места цветом подсветки
+        MapApi.Highlight hl = caves ? null : s.syncHighlight();
+        if (hl != null) {
+            Draw.rect(g, cx0, cy0, cw - (int) r, ch - 1, 0x8C101216);
+            s.highlight.draw(g, dim, centerX, centerZ, zoom, cx0, cy0, cw, ch, clips(r));
+        }
         MapApi.ModeView view = modeView;
         if (view != null && safe(view::dimTiles, false)) Draw.rect(g, cx0, cy0, cw - (int) r, ch - 1, 0x99101216);
         if (view == null || safe(view::drawAreas, true)) areas(g);
@@ -477,6 +529,7 @@ public final class MapScreen extends ScaledScreen {
         works.repka.rysmap.hud.Entities.Dot hoverDot = hover == null ? entities(g, canvas, mx, my, partial) : null;
         player(g, partial);
         modes(g, t, mx, my);
+        highlightChip(g, t, mx, my);
         tools(g, t, mx, my);
         modePanel(g, t, mx, my);
         message(g, t, mx, my);
@@ -793,6 +846,41 @@ public final class MapScreen extends ScaledScreen {
             });
     }
 
+    /** Выбранные Shift+кликом: убрать с миникарты. */
+    private void hideMulti() {
+        MapSession s = ClientEntry.session();
+        if (s == null) return;
+        for (java.util.UUID id : multi) {
+            PointStore.Point p = s.points().find(id);
+            if (p != null) p.minimap = false;
+        }
+        pointsChanged();
+        multi.clear();
+    }
+
+    private void askDeleteMulti() {
+        int n = multi.size();
+        dialog = new Kit.Dialog(Component.translatable("rysmap.list.delete.title", n).getString())
+            .text(Component.translatable("rysmap.point.delete.text").getString())
+            .no(Component.translatable("rysmap.point.cancel").getString(), () -> dialog = null)
+            .yes(Component.translatable("rysmap.point.delete").getString(), () -> {
+                dialog = null;
+                MapSession s = ClientEntry.session();
+                if (s == null) return;
+                for (java.util.UUID id : new java.util.ArrayList<>(multi)) {
+                    PointStore.Point p = s.points().find(id);
+                    if (p != null) delete(p);
+                }
+                multi.clear();
+            });
+    }
+
+    /** Для автотеста: длинный список раскрыт и порядок. */
+    public void listForTest(boolean expanded, int sort) {
+        listExpanded = expanded;
+        listSort = sort;
+    }
+
     private void delete(PointStore.Point p) {
         MapSession s = ClientEntry.session();
         if (s == null) return;
@@ -962,6 +1050,24 @@ public final class MapScreen extends ScaledScreen {
             ry += MENU_ROW;
         }
         g.pose().popPose();
+    }
+
+    /** Плашка подсветки сверху полотна: «Подсветка: Равнины» и крестик, который её снимает. */
+    private void highlightChip(GuiGraphics g, Theme t, int mx, int my) {
+        MapApi.Highlight hl = MapApi.highlighted();
+        if (hl == null || caves) return;
+        String text = Component.translatable("rysmap.highlight", hl.title()).getString();
+        float tw = Draw.labelWidth(text, 12, Weight.MEDIUM);
+        int w = (int) Math.ceil(8 + 8 + 4 + tw + 6 + 10 + 4), h = 16;
+        int x = (int) (cx0 + (visibleRight() - cx0 - w) / 2f), y = cy0 + 6;
+        Draw.roundBox(g, x, y, w, h, 4.5f, Draw.alpha(t.c("panel.bg"), 0.94f), Draw.alpha(hl.color() | 0xFF000000, 0.8f));
+        Draw.disc(g, x + 10, y + h / 2f, 3.5f, hl.color() | 0xFF000000);
+        Draw.label(g, text, x + 18, y + h / 2f, 12, Weight.MEDIUM, t.c("text.primary"));
+        int crossX = x + w - 14;
+        boolean hot = Kit.over(mx, my, crossX - 2, y + 2, 12, 12);
+        Draw.cross(g, crossX, y + 5, hot ? t.c("text.primary") : t.c("text.muted"));
+        hits.add(x, y, w, h, b -> {});
+        hits.add(crossX - 2, y + 2, 12, 12, b -> MapApi.get().highlight(null));
     }
 
     /** С какого масштаба (единиц на блок) окно переходит на дальний план. */

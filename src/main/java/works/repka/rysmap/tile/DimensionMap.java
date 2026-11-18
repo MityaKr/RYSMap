@@ -165,6 +165,47 @@ public final class DimensionMap {
         return r.empty() ? null : baker.bakeRegion(r, palette, neighbors());
     }
 
+    /**
+     * Маска подсветки (М7, макет {@code 20}) региона стороной {@code side}: пиксель цвета {@code argb}, где в клетке есть
+     * столбец подходящего биома на подходящей высоте, иначе прозрачный. Биомы по id палитры, пусто: любые.
+     *
+     * @return null, если региона нет
+     */
+    public int @Nullable [] highlightRegion(int regionX, int regionZ, java.util.Set<String> biomes, int minY, int maxY, int argb, int side) throws IOException {
+        RegionData r = cache.peek(regionX, regionZ);
+        if (r == null) {
+            try {
+                r = RegionFile.readSurface(store.region(dimension, regionX, regionZ), regionX, regionZ);
+            } catch (RegionFile.BrokenException e) {
+                return null;
+            }
+            if (r == null) return null;
+        }
+        // номера палитры подходящих биомов
+        boolean[] ok = new boolean[256];
+        for (int i = 0; i < 256; i++) ok[i] = biomes.isEmpty() || biomes.contains(palette.biomeName(i));
+        int f = RegionData.SIZE / side;
+        int abgr = (argb & 0xFF00FF00) | ((argb >> 16) & 0xFF) | ((argb & 0xFF) << 16);
+        int[] out = new int[side * side];
+        boolean any = false;
+        for (int oy = 0; oy < side; oy++) {
+            for (int ox = 0; ox < side; ox++) {
+                search:
+                for (int y = 0; y < f; y++) {
+                    for (int x = 0; x < f; x++) {
+                        int lx = ox * f + x, lz = oy * f + y;
+                        int h = r.height(lx, lz);
+                        if (h == RegionData.NO_HEIGHT || h < minY || h > maxY || !ok[r.biome(lx, lz)]) continue;
+                        out[oy * side + ox] = abgr;
+                        any = true;
+                        break search;
+                    }
+                }
+            }
+        }
+        return any ? out : null;
+    }
+
     /** Пиксели одного чанка 16×16 (мировые координаты чанка) или null, если регион не в памяти. */
     public int @Nullable [] bakeChunk(int chunkX, int chunkZ) {
         RegionData r = cache.peek(chunkX >> 5, chunkZ >> 5);

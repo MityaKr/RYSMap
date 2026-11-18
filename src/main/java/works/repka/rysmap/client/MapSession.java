@@ -58,6 +58,9 @@ public final class MapSession {
     /** Дальний план (М6): регион уменьшен до 64×64, потолок 256 текстур (4 МБ видеопамяти). */
     public final TileTextures overview;
     public static final int OVERVIEW_SIDE = 64;
+    /** Подсветка биомов и высот (М7): маска 128×128 на регион, по клетке 4×4 блока. */
+    public final TileTextures highlight;
+    private volatile works.repka.ryscore.map.MapApi.@Nullable Highlight highlightShown;
     private final works.repka.rysmap.point.PointStore points;
 
     private @Nullable String dimension;
@@ -85,6 +88,7 @@ public final class MapSession {
         this.worker = new MapWorker("RYSMap worker", t -> RYSMap.LOG.error("[rysmap] сбой задачи рабочего потока", t));
         this.tiles = new TileTextures(this::requestRegion, config.textures, config.textureIdleSeconds);
         this.overview = new TileTextures(this::requestOverview, 256, 30, OVERVIEW_SIDE);
+        this.highlight = new TileTextures(this::requestHighlight, 128, 20, 128);
         try {
             store.touch();
         } catch (IOException e) {
@@ -145,6 +149,7 @@ public final class MapSession {
         pinnedX = pinnedZ = Integer.MIN_VALUE;
         tiles.keepOnly(dim);
         overview.keepOnly(dim);
+        highlight.keepOnly(dim);
         if (old != null) worker.submit(() -> closeOthers(dim));
         RYSMap.LOG.info("[rysmap] измерение {}{}{}", dim, ceiling ? " (потолок: срез под потолком)" : "", noMap ? " (без карты)" : "");
     }
@@ -194,6 +199,7 @@ public final class MapSession {
         if (ticks % 20 == 0) {
             tiles.tick();
             overview.tick();
+            highlight.tick();
         }
         if (ticks % FLUSH_TICKS == 0) worker.submit(this::flushAll);
         if (noMap || dimension == null) return;
@@ -261,6 +267,9 @@ public final class MapSession {
             } else if (r instanceof Overview o) {
                 results.poll();
                 overview.accept(o.pixels());
+            } else if (r instanceof HighlightMask h) {
+                results.poll();
+                if (h.of() == highlightShown) highlight.accept(h.pixels());
             } else if (r instanceof Invalidate inv) {
                 results.poll();
                 tiles.invalidate(inv.dimension, inv.regionX, inv.regionZ);
@@ -366,6 +375,37 @@ public final class MapSession {
                 RYSMap.LOG.warn("[rysmap] регион {},{} {} не прочитался: {}", regionX, regionZ, dim, e.toString());
             }
             results.add(new TileTextures.Pixels(dim, regionX, regionZ, px));
+        });
+    }
+
+    private record HighlightMask(works.repka.ryscore.map.MapApi.Highlight of, TileTextures.Pixels pixels) {}
+
+    /** Подсветка сменилась (или снята): маски заказываются заново. Главный поток, перед рисованием. */
+    public works.repka.ryscore.map.MapApi.@Nullable Highlight syncHighlight() {
+        works.repka.ryscore.map.MapApi.Highlight now = works.repka.ryscore.map.MapApi.highlighted();
+        if (now != highlightShown) {
+            highlightShown = now;
+            highlight.invalidate();
+        }
+        return now;
+    }
+
+    private void requestHighlight(String dim, int regionX, int regionZ) {
+        works.repka.ryscore.map.MapApi.Highlight h = highlightShown;
+        if (h == null) {
+            results.add(new HighlightMask(null, new TileTextures.Pixels(dim, regionX, regionZ, null)));
+            return;
+        }
+        java.util.Set<String> biomes = new java.util.HashSet<>();
+        for (var k : h.biomes()) biomes.add(k.location().toString());
+        worker.submit(() -> {
+            int[] px = null;
+            try {
+                px = dim(dim).highlightRegion(regionX, regionZ, biomes, h.minY(), h.maxY(), (h.color() & 0xFFFFFF) | 0x99000000, 128);
+            } catch (IOException e) {
+                RYSMap.LOG.warn("[rysmap] регион {},{} {} не прочитался: {}", regionX, regionZ, dim, e.toString());
+            }
+            results.add(new HighlightMask(h, new TileTextures.Pixels(dim, regionX, regionZ, px)));
         });
     }
 
@@ -555,6 +595,7 @@ public final class MapSession {
         }, 10_000);
         tiles.close();
         overview.close();
+        highlight.close();
         results.clear();
         RYSMap.LOG.info("[rysmap] карта закрыта: снимков {}, среднее {} мкс, худший {} мкс; разбор в рабочем потоке {} мкс на чанк",
             snapCount, snapCount == 0 ? 0 : snapNanos / snapCount / 1000, snapMaxNanos / 1000, scanCount.get() == 0 ? 0 : scanNanos.get() / scanCount.get() / 1000);

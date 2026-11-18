@@ -201,5 +201,14 @@
   "rysmap.cave.wheel": "Этаж ниже и выше; Ctrl+колесо над картой",
   "rysmap.settings.night_caves": "Ночь и пещеры",
   "rysmap.settings.night": "Темнеть ночью",
-  "rysmap.settings.caves": "Пещеры под крышей"
+  "rysmap.settings.caves": "Пещеры под крышей",
+  "rysmap.list.expand": "Раскрыть список на всю высоту",
+  "rysmap.list.collapse": "Вернуть слои",
+  "rysmap.list.sort.0": "ближние",
+  "rysmap.list.sort.1": "по имени",
+  "rysmap.list.sort.2": "новые",
+  "rysmap.list.hide": "Скрыть %s",
+  "rysmap.list.delete": "Удалить %s",
+  "rysmap.list.delete.title": "Удалить точки: %s?",
+  "rysmap.highlight": "Подсветка: %s"
 }

@@ -267,6 +267,31 @@ final class FixesAutoTest {
             screen().markerPanelForTest(goal);
         }, 10);
         shot("map_marker_panel");
+        step("highlight", () -> {
+            screen().keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0);
+            screen().setZoom(1);
+            var biome = mc().level.getBiome(mc().player.blockPosition()).unwrapKey().orElseThrow();
+            MapApi.get().highlight(MapApi.Highlight.builder(ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "autotest_hl"),
+                Component.literal(biome.location().getPath())).biome(biome).color(0xFFE4B23C).build());
+        }, 60);
+        shot("map_highlight");
+        step("list", () -> {
+            MapApi.get().highlight(null);
+            for (int i = 0; i < 14; i++) {
+                works.repka.rysmap.point.PointStore.Point p = new works.repka.rysmap.point.PointStore.Point();
+                p.name = "Точка " + (char) ('А' + i);
+                p.x = baseX + i * 7 - 40;
+                p.y = 70;
+                p.z = baseZ - i * 5;
+                p.dimension = "minecraft:overworld";
+                p.created = 1_000_000L + i;
+                session().points().add(p);
+            }
+            session().savePoints();
+            screen().listForTest(true, 1);
+        }, 10);
+        shot("map_list");
+        step("list back", () -> screen().listForTest(false, 0), 2);
         step("settings", () -> {
             screen().keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0);
             screen().settingsForTest();

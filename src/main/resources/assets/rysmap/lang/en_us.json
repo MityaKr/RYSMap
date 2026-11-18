@@ -201,5 +201,14 @@
   "rysmap.cave.wheel": "Floor down and up; Ctrl+wheel over the map",
   "rysmap.settings.night_caves": "Night and caves",
   "rysmap.settings.night": "Darken at night",
-  "rysmap.settings.caves": "Caves under a roof"
+  "rysmap.settings.caves": "Caves under a roof",
+  "rysmap.list.expand": "Expand the list to full height",
+  "rysmap.list.collapse": "Show layers again",
+  "rysmap.list.sort.0": "nearest",
+  "rysmap.list.sort.1": "by name",
+  "rysmap.list.sort.2": "newest",
+  "rysmap.list.hide": "Hide %s",
+  "rysmap.list.delete": "Delete %s",
+  "rysmap.list.delete.title": "Delete %s points?",
+  "rysmap.highlight": "Highlight: %s"
 }
