@@ -149,8 +149,9 @@ final class PointPanel {
             int left = works.repka.rysmap.client.ServerRules.pauseLeft();
             String label = left > 0 ? Component.translatable("rysmap.point.teleport_in", works.repka.rysmap.client.ServerRules.clock(left)).getString()
                 : Component.translatable("rysmap.point.teleport").getString();
+            net.minecraft.resources.ResourceLocation loc = net.minecraft.resources.ResourceLocation.tryParse(p.dimension);
             net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dim = net.minecraft.resources.ResourceKey.create(
-                net.minecraft.core.registries.Registries.DIMENSION, net.minecraft.resources.ResourceLocation.parse(p.dimension));
+                net.minecraft.core.registries.Registries.DIMENSION, loc == null ? net.minecraft.resources.ResourceLocation.withDefaultNamespace("overworld") : loc);
             PointWidgets.button(g, t, hits, ix, ay, iw, 14, label, null, left > 0 ? 2 : 0, mx, my,
                 () -> works.repka.rysmap.client.ServerRules.teleport(dim, p.x, p.y, p.z));
             ay += 14 + 4;

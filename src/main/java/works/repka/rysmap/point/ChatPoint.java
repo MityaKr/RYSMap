@@ -31,8 +31,14 @@ public final class ChatPoint {
 
     /** Строка для чата. */
     public static String text(PointStore.Point p) {
-        return "[" + Component.translatable("rysmap.chat.point").getString() + ": " + PointsLayer.name(p) + " · " + Minimap.group(p.x) + " · "
-            + Minimap.group(p.y) + " · " + Minimap.group(p.z) + " · " + MapScreen.dimensionName(p.dimension) + "]";
+        // имя до 32 знаков, строка до 256: длиннее сообщение не кодируется и сервер отключает (перепроверка 18.11, пункт 7)
+        String name = PointsLayer.name(p).replace('[', '(').replace(']', ')').replace('·', '-');
+        if (name.length() > 32) name = name.substring(0, 31) + "…";
+        String dim = MapScreen.dimensionName(p.dimension);
+        if (dim.length() > 40) dim = dim.substring(0, 39) + "…";
+        String s = "[" + Component.translatable("rysmap.chat.point").getString() + ": " + name + " · " + Minimap.group(p.x) + " · "
+            + Minimap.group(p.y) + " · " + Minimap.group(p.z) + " · " + dim + "]";
+        return s.length() > 256 ? s.substring(0, 256) : s;
     }
 
     /** Отправить точку в чат от имени игрока. */
@@ -54,23 +60,23 @@ public final class ChatPoint {
         String plain = msg.getString();
         Matcher m = PATTERN.matcher(plain);
         if (!m.find()) return;
-        MutableComponent out = Component.empty();
-        int last = 0;
+        // само сообщение не трогается (цвета, чужие кнопки остаются, перепроверка 18.11, пункт 8): ссылка «+ точка»
+        // дописывается в конец, по одной на найденную точку, не больше трёх
+        MutableComponent out = msg.copy();
+        int added = 0;
         m.reset();
-        while (m.find()) {
+        while (m.find() && added < 3) {
             Parsed p = parse(m);
             if (p == null) continue;
-            out.append(plain.substring(last, m.start()));
             String dim = dimensionId(p.dimension());
-            String cmd = "/rysmap point " + p.x() + " " + p.y() + " " + p.z() + " " + StringArgumentType.escapeIfRequired(dim) + " " + p.name();
-            out.append(Component.literal(m.group()).withStyle(Style.EMPTY.withUnderlined(true).withColor(ChatFormatting.AQUA)
-                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, cmd))
+            String name = p.name().length() > 32 ? p.name().substring(0, 32) : p.name();
+            String cmd = "/rysmap point " + p.x() + " " + p.y() + " " + p.z() + " " + StringArgumentType.escapeIfRequired(dim) + " " + name;
+            out.append(Component.literal(" ")).append(Component.translatable("rysmap.chat.link", name).withStyle(Style.EMPTY.withUnderlined(true)
+                .withColor(ChatFormatting.AQUA).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, cmd))
                 .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.translatable("rysmap.chat.add")))));
-            last = m.end();
+            added++;
         }
-        out.append(plain.substring(last));
-        // текст сообщения целиком в одну строку: цвета ника и префиксов сервера уходят, ссылки важнее
-        e.setMessage(out);
+        if (added > 0) e.setMessage(out);
     }
 
     /** id измерения по видимому имени; неизвестное: текущее измерение игрока. */
@@ -91,7 +97,9 @@ public final class ChatPoint {
                 .then(Commands.argument("z", IntegerArgumentType.integer()).then(Commands.argument("dimension", StringArgumentType.string())
                     .then(Commands.argument("name", StringArgumentType.greedyString()).executes(c -> {
                         int x = IntegerArgumentType.getInteger(c, "x"), y = IntegerArgumentType.getInteger(c, "y"), z = IntegerArgumentType.getInteger(c, "z");
-                        String dim = StringArgumentType.getString(c, "dimension"), name = StringArgumentType.getString(c, "name");
+                        String raw = StringArgumentType.getString(c, "dimension"), name = StringArgumentType.getString(c, "name");
+                        // измерение из чужой строки: только правильный id, иначе текущее (перепроверка 18.11, пункт 12)
+                        String dim = net.minecraft.resources.ResourceLocation.tryParse(raw) == null ? dimensionId(null) : raw;
                         String n = name;
                         // окно открывается после закрытия чата
                         Minecraft.getInstance().tell(() -> works.repka.rysmap.screen.QuickPointScreen.openAt(dim, x, y, z, n));

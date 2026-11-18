@@ -271,5 +271,6 @@
   "rysmap.whatsnew.ok": "Got it",
   "rysmap.keys.hint": "New point, \"show all points\", land: no keys assigned.",
   "rysmap.keys.hint.link": "Keys: map settings",
-  "rysmap.tp.busy": "The place is still loading, wait a moment."
+  "rysmap.tp.busy": "The place is still loading, wait a moment.",
+  "rysmap.chat.link": "[+ point \"%s\"]"
 }
