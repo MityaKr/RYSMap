@@ -34,9 +34,11 @@ public final class ChunkSnapshot {
     final @Nullable PalettedContainer<BlockState>[] states;
     final @Nullable PalettedContainer<Holder<Biome>>[] biomes;
     public final int time;
+    /** Этажи пещер, которые надо снять с этого чанка (этап М5); пусто: только поверхность. */
+    public final int[] floors;
 
     @SuppressWarnings("unchecked")
-    private ChunkSnapshot(String dimension, LevelChunk chunk, Level level, boolean ceiling, int time) {
+    private ChunkSnapshot(String dimension, LevelChunk chunk, Level level, boolean ceiling, int time, int[] floors) {
         this.dimension = dimension;
         this.chunkX = chunk.getPos().x;
         this.chunkZ = chunk.getPos().z;
@@ -44,6 +46,7 @@ public final class ChunkSnapshot {
         this.minY = level.getMinBuildHeight();
         this.ceiling = ceiling;
         this.time = time;
+        this.floors = floors;
         this.top = Math.min(level.getMaxBuildHeight() - 1, minY + level.dimensionType().logicalHeight() - 1);
         LevelChunkSection[] sections = chunk.getSections();
         this.states = new PalettedContainer[sections.length];
@@ -68,17 +71,34 @@ public final class ChunkSnapshot {
         int lowest = Integer.MAX_VALUE;
         for (int i = from; i <= to; i++) {
             lowest = Math.min(lowest, (i + minSection) << 4);
-            LevelChunkSection s = sections[i];
-            if (s == null || s.hasOnlyAir()) continue;
-            states[i] = s.getStates().copy();
-            if (s.getBiomes() instanceof PalettedContainer<Holder<Biome>> b) biomes[i] = b.copy();
+            copy(sections, i);
+        }
+        // этажи: своя секция и секция под ней (пол может лежать ниже этажа)
+        for (int f : floors) {
+            for (int sec = f - 1; sec <= f; sec++) {
+                int i = sec - minSection;
+                if (i >= 0 && i < sections.length) copy(sections, i);
+            }
         }
         this.lowestCopied = lowest == Integer.MAX_VALUE ? minY : lowest;
     }
 
+    private void copy(LevelChunkSection[] sections, int i) {
+        if (states[i] != null) return;
+        LevelChunkSection s = sections[i];
+        if (s == null || s.hasOnlyAir()) return;
+        states[i] = s.getStates().copy();
+        if (s.getBiomes() instanceof PalettedContainer<Holder<Biome>> b) biomes[i] = b.copy();
+    }
+
     /** Снимает чанк. Только главный поток. */
     public static ChunkSnapshot capture(String dimension, LevelChunk chunk, Level level, boolean ceiling, int timeSeconds) {
-        return new ChunkSnapshot(dimension, chunk, level, ceiling, timeSeconds);
+        return new ChunkSnapshot(dimension, chunk, level, ceiling, timeSeconds, new int[0]);
+    }
+
+    /** Снимает чанк вместе с этажами пещер. Только главный поток. */
+    public static ChunkSnapshot capture(String dimension, LevelChunk chunk, Level level, boolean ceiling, int timeSeconds, int[] floors) {
+        return new ChunkSnapshot(dimension, chunk, level, ceiling, timeSeconds, floors);
     }
 
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();

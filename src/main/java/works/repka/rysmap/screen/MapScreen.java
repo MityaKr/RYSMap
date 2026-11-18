@@ -76,6 +76,9 @@ public final class MapScreen extends ScaledScreen {
     private MapApi.@Nullable ModeView modeView;
     private final CanvasSurface surface = new CanvasSurface();
     private boolean modeMouse;
+    /** «Поверхность | Пещеры» (М5) и этаж, который листается Ctrl+колесом. */
+    boolean caves;
+    int floor;
     /** Чужая метка с панелью ({@link MapApi.Marker#panel()}), открытая кликом. */
     private MapApi.@Nullable Marker panelMarker;
     /** Поиск в шапке (макет 14) и его место в прошлом кадре. */
@@ -95,11 +98,16 @@ public final class MapScreen extends ScaledScreen {
         this.centerZ = z;
     }
 
-    /** Открыть на игроке. */
+    /** Открыть на игроке; под землёй сразу на этаже игрока. */
     public static void open() {
         LocalPlayer p = Minecraft.getInstance().player;
-        if (p == null || ClientEntry.session() == null) return;
-        Minecraft.getInstance().setScreen(new MapScreen(p.level().dimension(), p.getX(), p.getZ()));
+        MapSession session = ClientEntry.session();
+        if (p == null || session == null) return;
+        MapScreen s = new MapScreen(p.level().dimension(), p.getX(), p.getZ());
+        Integer cave = session.caveFloor();
+        s.floor = works.repka.rysmap.scan.Floors.of(p.getBlockY());
+        s.caves = cave != null;
+        Minecraft.getInstance().setScreen(s);
     }
 
     /** Открыть на цели ({@link MapApi#open}). */
@@ -296,6 +304,7 @@ public final class MapScreen extends ScaledScreen {
         y += 20;
         Kit.dropdown(g, t, hits, dimDrop, wx + 7, y, SIDEBAR - 14, dimensionName(dimension.location().toString()), false, mx, my);
         y += Kit.DROP_H + 2;
+        y = caveSwitch(g, t, wx + 7, y + 3, SIDEBAR - 14, mx, my) + 2;
 
         // слои
         List<MapApi.Layer> layers = MapApi.layers();
@@ -443,7 +452,8 @@ public final class MapScreen extends ScaledScreen {
         float r = t.beveled() ? 0 : t.r("panel.radius");
         Draw.rect(g, cx0, cy0, cw - (int) r, ch - 1, canvas.c("map.bg"));
         Draw.round(g, cx0 + cw - 2 * r - 1, cy0, 2 * r, ch - 1, r - 1, canvas.c("map.bg"));
-        String dim = dimension.location().toString();
+        String dim = tileId();
+        s.viewFloor(caves && playerHere() ? floor : null);
         s.tiles.draw(g, dim, centerX, centerZ, zoom, cx0, cy0, cw, ch, clips(r));
         MapApi.ModeView view = modeView;
         if (view != null && safe(view::dimTiles, false)) Draw.rect(g, cx0, cy0, cw - (int) r, ch - 1, 0x99101216);
@@ -948,6 +958,78 @@ public final class MapScreen extends ScaledScreen {
         g.pose().popPose();
     }
 
+    // ---- этажи пещер (М5) ----
+
+    /** id тайлов полотна: поверхность или этаж. */
+    String tileId() {
+        String dim = dimension.location().toString();
+        return caves ? works.repka.rysmap.scan.Floors.id(dim, floor) : dim;
+    }
+
+    private boolean playerHere() {
+        LocalPlayer p = Minecraft.getInstance().player;
+        return p != null && p.level().dimension().equals(dimension);
+    }
+
+    void stepFloor(int d) {
+        MapSession s = ClientEntry.session();
+        int lo = s != null && playerHere() ? s.minFloor() : -4, hi = s != null && playerHere() ? s.maxFloor() : 19;
+        floor = Math.max(lo, Math.min(hi, floor + d));
+    }
+
+    /**
+     * «Поверхность | Пещеры» в сайдбаре (макеты {@code 21}, {@code 22}) и строка этажа со стрелками. В Нижнем мире
+     * «Срез | Этажи». Сервер может выключить пещеры: переключатель тогда серый с подсказкой. Возвращает низ.
+     */
+    private int caveSwitch(GuiGraphics g, Theme t, int x, int y, int w, int mx, int my) {
+        boolean allowed = works.repka.rysmap.client.ServerRules.cavesAllowed();
+        if (!allowed) caves = false;
+        MapSession s = ClientEntry.session();
+        boolean nether = s != null && playerHere() && s.ceiling();
+        String a = Component.translatable(nether ? "rysmap.cave.slice" : "rysmap.cave.surface").getString();
+        String b = Component.translatable(nether ? "rysmap.cave.floors" : "rysmap.cave.caves").getString();
+        int h = 16, half = (w - 4) / 2;
+        if (t.beveled()) t.input(g, x, y, w, h, false);
+        else Draw.roundBox(g, x, y, w, h, 4.5f, t.c("input.bg"), t.c("panel.border"));
+        cavePill(g, t, x + 2, y + 2, half, Icons.Shape.SUN, a, !caves, true, mx, my, () -> caves = false);
+        cavePill(g, t, x + 2 + half, y + 2, w - 4 - half, Icons.Shape.CAVE, b, caves, allowed, mx, my, () -> caves = true);
+        if (!allowed && Kit.over(mx, my, x + 2 + half, y + 2, w - 4 - half, h - 4))
+            tip = List.of(Component.translatable("rysmap.cave.off_server").getString());
+        y += h + 2;
+        if (!caves) return y;
+        String text = Component.translatable("rysmap.cave.floor_short", Minimap.group(floor),
+            Minimap.group(works.repka.rysmap.scan.Floors.bottom(floor)), Minimap.group(works.repka.rysmap.scan.Floors.top(floor))).getString();
+        Draw.label(g, Draw.ellipsize(text, w - 30, 11.5f, Weight.REGULAR), x + 2, y + 6, 11.5f, Weight.REGULAR, t.c("text.secondary"));
+        int bx = x + w - 26;
+        boolean hotDown = Kit.over(mx, my, bx, y, 12, 12), hotUp = Kit.over(mx, my, bx + 14, y, 12, 12);
+        Icons.draw(g, Icons.Shape.DOWN, bx + 2, y + 2, 8, hotDown ? t.c("text.primary") : t.c("text.muted"));
+        Icons.draw(g, Icons.Shape.UP, bx + 16, y + 2, 8, hotUp ? t.c("text.primary") : t.c("text.muted"));
+        hits.add(bx, y, 12, 12, btn -> stepFloor(-1));
+        hits.add(bx + 14, y, 12, 12, btn -> stepFloor(1));
+        if (hotDown || hotUp) tip = List.of(Component.translatable("rysmap.cave.wheel").getString());
+        return y + 13;
+    }
+
+    private void cavePill(GuiGraphics g, Theme t, int x, int y, int w, Icons.Shape icon, String label, boolean active, boolean enabled, int mx, int my, Runnable run) {
+        int h = 12;
+        boolean hot = enabled && Kit.over(mx, my, x, y, w, h);
+        if (active) Draw.round(g, x, y, w, h, 3.5f, t.c("filter.active.bg"));
+        else if (hot) Draw.round(g, x, y, w, h, 3.5f, Draw.alpha(t.c("filter.active.bg"), 0.5f));
+        int fg = !enabled ? t.c("text.dim") : active ? t.c("text.primary") : t.c("text.muted");
+        String shown = Draw.ellipsize(label, w - 14, 11.5f, active ? Weight.MEDIUM : Weight.REGULAR);
+        float tw = Draw.labelWidth(shown, 11.5f, active ? Weight.MEDIUM : Weight.REGULAR);
+        float cx = x + (w - tw - 9) / 2f;
+        Icons.draw(g, icon, cx, y + 2.5f, 7, fg);
+        Draw.label(g, shown, cx + 9, y + h / 2f, 11.5f, active ? Weight.MEDIUM : Weight.REGULAR, fg);
+        if (enabled) hits.add(x, y, w, h, b -> run.run());
+    }
+
+    /** Для автотеста: пещеры и этаж. */
+    public void cavesForTest(boolean on, int f) {
+        caves = on;
+        floor = f;
+    }
+
     // ---- вкладки и режимы модов (ядро 1.12) ----
 
     private static <T> T safe(java.util.function.Supplier<T> call, T fallback) {
@@ -1048,6 +1130,8 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     public void removed() {
+        MapSession session = ClientEntry.session();
+        if (session != null) session.viewFloor(null);
         setMode(null);
         setTab(null);
         super.removed();
@@ -1153,7 +1237,9 @@ public final class MapScreen extends ScaledScreen {
 
     /** Телепорт в столбец карты: место ищет сервер (макет {@code 15b}, этап М8). Отказ приходит строкой сообщения. */
     void teleport(ResourceKey<Level> dim, int x, int z) {
-        works.repka.rysmap.client.ServerRules.teleport(dim, x, works.repka.rysmap.server.SafeSpot.NO_HINT, z);
+        // в пещерах место ищется у пола показанного этажа
+        int hint = caves && dim.equals(dimension) ? works.repka.rysmap.scan.Floors.bottom(floor) + 1 : works.repka.rysmap.server.SafeSpot.NO_HINT;
+        works.repka.rysmap.client.ServerRules.teleport(dim, x, hint, z);
     }
 
     /** Телепорт прошёл: карта встаёт на игрока. */
@@ -1419,6 +1505,10 @@ public final class MapScreen extends ScaledScreen {
             return true;
         }
         if (!Kit.over(x, y, cx0, cy0, cw, ch) || scrollY == 0) return false;
+        if (caves && hasControlDown()) {
+            stepFloor(scrollY > 0 ? 1 : -1);
+            return true;
+        }
         zoomAt(x, y, scrollY > 0 ? 1 : -1);
         return true;
     }

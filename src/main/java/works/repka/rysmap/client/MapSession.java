@@ -59,6 +59,12 @@ public final class MapSession {
 
     private @Nullable String dimension;
     private boolean ceiling, noMap;
+    /** Этажи пещер (М5): какие снимаются сейчас, какой показывает миникарта (MIN: поверхность), какой листает окно карты. */
+    private int[] floors = new int[0];
+    private int caveFloor = Integer.MIN_VALUE;
+    private @Nullable Integer viewFloor;
+    private boolean underground;
+    private int minFloor, maxFloor;
     private int ticks;
     private int pinnedX = Integer.MIN_VALUE, pinnedZ = Integer.MIN_VALUE;
     private long colorsSeen = -1;
@@ -124,18 +130,25 @@ public final class MapSession {
         dimension = dim;
         ceiling = level.dimensionType().hasCeiling();
         noMap = config.noMapDimensions.contains(dim);
+        minFloor = level.getMinSection();
+        maxFloor = Math.min(level.getMaxSection() - 1, works.repka.rysmap.scan.Floors.of(level.getMinBuildHeight() + level.dimensionType().logicalHeight() - 1));
+        floors = new int[0];
+        caveFloor = Integer.MIN_VALUE;
+        viewFloor = null;
+        underground = false;
         queue.clear();
         dirty.clear();
         pinnedX = pinnedZ = Integer.MIN_VALUE;
         tiles.keepOnly(dim);
-        if (old != null) worker.submit(() -> closeDimension(old));
+        if (old != null) worker.submit(() -> closeOthers(dim));
         RYSMap.LOG.info("[rysmap] измерение {}{}{}", dim, ceiling ? " (потолок: срез под потолком)" : "", noMap ? " (без карты)" : "");
     }
 
     public void chunkLoaded(int chunkX, int chunkZ) {
         if (noMap || dimension == null || SablePlots.isPlotChunk(chunkX, chunkZ)) return;
         queue.add(chunkX, chunkZ);
-        requestIndex(chunkX >> 5, chunkZ >> 5);
+        requestIndex(dimension, chunkX >> 5, chunkZ >> 5);
+        for (int f : floors) requestIndex(works.repka.rysmap.scan.Floors.id(dimension, f), chunkX >> 5, chunkZ >> 5);
     }
 
     public void chunkUnloaded(int chunkX, int chunkZ) {
@@ -147,8 +160,10 @@ public final class MapSession {
         if (noMap || dimension == null || level.dimension() == null) return;
         int cx = pos.getX() >> 4, cz = pos.getZ() >> 4;
         if (SablePlots.isPlotChunk(cx, cz)) return;
-        if (!ceiling) {
-            // глубоко под поверхностью правка карты не меняет: шахта под базой не перерисовывает чанк
+        boolean inFloor = false;
+        for (int f : floors) inFloor |= works.repka.rysmap.scan.Floors.of(pos.getY()) >= f - 1 && works.repka.rysmap.scan.Floors.of(pos.getY()) <= f;
+        if (!ceiling && !inFloor) {
+            // глубоко под поверхностью правка карты не меняет: шахта под базой не перерисовывает чанк (кроме снимаемых этажей)
             int surface = level.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ());
             if (pos.getY() < surface - ChunkSnapshot.BELOW) return;
         }
@@ -181,25 +196,37 @@ public final class MapSession {
             worker.submit(() -> dim(dim).pinAround(prx, prz));
         }
         if (ticks % DirtyColumns.PERIOD_TICKS == 0) dirty.drain(k -> queue.addUrgent(ChunkQueue.x(k), ChunkQueue.z(k)));
+        if (ticks % 10 == 0) updateFloors(level, player);
 
         long budget = config.scanBudgetMicros * 1000L;
         if (mc.getFps() < 40) budget /= 2;
         long start = System.nanoTime();
         ConcurrentHashMap<Long, int[]> index = index(dimension);
+        int[] fl = floors;
+        @SuppressWarnings("unchecked") ConcurrentHashMap<Long, int[]>[] floorIndex = new ConcurrentHashMap[fl.length];
+        for (int i = 0; i < fl.length; i++) floorIndex[i] = index(works.repka.rysmap.scan.Floors.id(dimension, fl[i]));
         int now = (int) (System.currentTimeMillis() / 1000);
         int rescan = config.rescanMinutes * 60;
         while (pending.get() < MAX_PENDING_SNAPSHOTS && System.nanoTime() - start < budget) {
-            long key = queue.pollNearest(pcx, pcz, k -> queue.isUrgent(k) || DimensionMap.scanned(index, ChunkQueue.x(k), ChunkQueue.z(k)) >= 0);
+            long key = queue.pollNearest(pcx, pcz, k -> queue.isUrgent(k) || indexReady(index, floorIndex, ChunkQueue.x(k), ChunkQueue.z(k)));
             if (key == Long.MIN_VALUE) break;
             int cx = ChunkQueue.x(key), cz = ChunkQueue.z(key);
-            if (!queue.isUrgent(key)) {
+            boolean urgent = queue.isUrgent(key);
+            // этажи, которым нужен снимок: при правке все снимаемые, иначе только давно не снятые
+            int[] want = new int[fl.length];
+            int nw = 0;
+            for (int i = 0; i < fl.length; i++) {
+                int sc = DimensionMap.scanned(floorIndex[i], cx, cz);
+                if (urgent || sc <= 0 || now - sc >= rescan) want[nw++] = fl[i];
+            }
+            if (!urgent) {
                 int scanned = DimensionMap.scanned(index, cx, cz);
-                if (scanned > 0 && now - scanned < rescan) continue;
+                if (scanned > 0 && now - scanned < rescan && nw == 0) continue;
             }
             ChunkAccess chunk = level.getChunkSource().getChunk(cx, cz, ChunkStatus.FULL, false);
             if (!(chunk instanceof LevelChunk lc) || lc.isEmpty()) continue;
             long t0 = System.nanoTime();
-            ChunkSnapshot snap = ChunkSnapshot.capture(dimension, lc, level, ceiling, now);
+            ChunkSnapshot snap = ChunkSnapshot.capture(dimension, lc, level, ceiling, now, java.util.Arrays.copyOf(want, nw));
             long dt = System.nanoTime() - t0;
             snapNanos += dt;
             snapCount++;
@@ -234,12 +261,76 @@ public final class MapSession {
         }
     }
 
+    private static boolean indexReady(ConcurrentHashMap<Long, int[]> surface, ConcurrentHashMap<Long, int[]>[] floors, int cx, int cz) {
+        if (DimensionMap.scanned(surface, cx, cz) < 0) return false;
+        for (ConcurrentHashMap<Long, int[]> f : floors) if (DimensionMap.scanned(f, cx, cz) < 0) return false;
+        return true;
+    }
+
+    // ---- этажи пещер (М5) ----
+
+    /**
+     * Какие этажи снимать: в измерении с потолком всегда этаж игрока и соседние, в остальных только под землёй (неба
+     * не видно и до поверхности больше 8 блоков; выход наверх при запасе меньше 4, чтобы не мигало). Этаж, который
+     * листает окно карты, снимается тоже. Сервер может выключить пещеры правилом, игрок настройкой.
+     */
+    private void updateFloors(ClientLevel level, LocalPlayer player) {
+        int[] next;
+        int show = Integer.MIN_VALUE;
+        boolean allowed = ServerRules.cavesAllowed() && config.caves;
+        if (allowed) {
+            int surface = level.getHeight(Heightmap.Types.WORLD_SURFACE, player.getBlockX(), player.getBlockZ());
+            int below = surface - player.getBlockY();
+            boolean sky = level.canSeeSky(player.blockPosition().above());
+            underground = !sky && (underground ? below >= 4 : below > 8);
+        } else {
+            underground = false;
+        }
+        java.util.TreeSet<Integer> set = new java.util.TreeSet<>();
+        if (allowed && (ceiling || underground)) {
+            int f = works.repka.rysmap.scan.Floors.of(player.getBlockY());
+            show = Math.max(minFloor, Math.min(maxFloor, f));
+            for (int d = -1; d <= 1; d++) if (f + d >= minFloor && f + d <= maxFloor) set.add(f + d);
+        }
+        if (allowed && viewFloor != null && viewFloor >= minFloor && viewFloor <= maxFloor) set.add(viewFloor);
+        next = set.stream().mapToInt(Integer::intValue).toArray();
+        caveFloor = show;
+        if (!java.util.Arrays.equals(next, floors)) {
+            floors = next;
+            // новые этажи: чанки рядом снова в очередь (недавно снятая поверхность не мешает, решает индекс этажа)
+            requeueLoaded(level, player.getBlockX() >> 4, player.getBlockZ() >> 4, Minecraft.getInstance().options.getEffectiveRenderDistance() + 1);
+        }
+    }
+
+    /** Этаж, который сейчас показывает миникарта, или null (поверхность). */
+    public @Nullable Integer caveFloor() {
+        return caveFloor == Integer.MIN_VALUE ? null : caveFloor;
+    }
+
+    /** Окно карты листает этаж (null: не листает); этот этаж тоже снимается вокруг игрока. */
+    public void viewFloor(@Nullable Integer floor) {
+        viewFloor = floor;
+    }
+
+    /** Пределы этажей текущего измерения игрока. */
+    public int minFloor() {
+        return minFloor;
+    }
+
+    public int maxFloor() {
+        return maxFloor;
+    }
+
+    /** Измерение с потолком (Нижний мир): поверхность это срез под потолком, этажи всегда. */
+    public boolean ceiling() {
+        return ceiling;
+    }
+
     private ConcurrentHashMap<Long, int[]> index(String dim) {
         return scanIndex.computeIfAbsent(dim, d -> new ConcurrentHashMap<>());
     }
 
-    private void requestIndex(int regionX, int regionZ) {
-        String dim = dimension;
+    private void requestIndex(String dim, int regionX, int regionZ) {
         long key = RegionData.key(regionX, regionZ) ^ ((long) dim.hashCode() << 17);
         if (index(dim).containsKey(RegionData.key(regionX, regionZ)) || !indexRequested.add(key)) return;
         worker.submit(() -> {
@@ -327,7 +418,9 @@ public final class MapSession {
         DimensionMap d = dims.get(id);
         if (d == null) {
             try {
-                d = new DimensionMap(store, id, ColorTable.INSTANCE, config.rawRegions, index(id), s -> RYSMap.LOG.warn("[rysmap] {}", s));
+                // у этажа свой маленький кэш: этажей снимается несколько сразу
+                int cap = works.repka.rysmap.scan.Floors.floor(id) == null ? config.rawRegions : Math.max(3, config.rawRegions / 3);
+                d = new DimensionMap(store, id, ColorTable.INSTANCE, cap, index(id), s -> RYSMap.LOG.warn("[rysmap] {}", s));
             } catch (IOException e) {
                 throw new RuntimeException("папка карты " + id + " недоступна", e);
             }
@@ -341,13 +434,12 @@ public final class MapSession {
             long t0 = System.nanoTime();
             DimensionMap d = dim(snap.dimension);
             SurfaceScanner.scan(snap, d, ColorTable.INSTANCE);
-            // сам чанк и соседи с востока и юга: их тень смотрит на этот чанк
-            for (int dz = 0; dz <= 1; dz++) {
-                for (int dx = 0; dx <= 1; dx++) {
-                    int[] px = d.bakeChunk(snap.chunkX + dx, snap.chunkZ + dz);
-                    if (px != null && (dx == 0 && dz == 0 || hasChunk(d, snap.chunkX + dx, snap.chunkZ + dz)))
-                        results.add(new TileTextures.Patch(snap.dimension, snap.chunkX + dx, snap.chunkZ + dz, px));
-                }
+            patches(d, snap.dimension, snap.chunkX, snap.chunkZ);
+            for (int f : snap.floors) {
+                String id = works.repka.rysmap.scan.Floors.id(snap.dimension, f);
+                DimensionMap fd = dim(id);
+                works.repka.rysmap.scan.FloorScanner.scan(snap, f, fd, ColorTable.INSTANCE);
+                patches(fd, id, snap.chunkX, snap.chunkZ);
             }
             scanNanos.addAndGet(System.nanoTime() - t0);
             scanCount.incrementAndGet();
@@ -356,6 +448,17 @@ public final class MapSession {
             RYSMap.LOG.warn("[rysmap] чанк {},{} не записался: {}", snap.chunkX, snap.chunkZ, e.toString());
         } finally {
             pending.decrementAndGet();
+        }
+    }
+
+    /** Сам чанк и соседи с востока и юга: их тень смотрит на этот чанк. */
+    private void patches(DimensionMap d, String id, int chunkX, int chunkZ) {
+        for (int dz = 0; dz <= 1; dz++) {
+            for (int dx = 0; dx <= 1; dx++) {
+                int[] px = d.bakeChunk(chunkX + dx, chunkZ + dz);
+                if (px != null && (dx == 0 && dz == 0 || hasChunk(d, chunkX + dx, chunkZ + dz)))
+                    results.add(new TileTextures.Patch(id, chunkX + dx, chunkZ + dz, px));
+            }
         }
     }
 
@@ -384,6 +487,12 @@ public final class MapSession {
             }
         }
         if (!dims.isEmpty()) stats(null);
+    }
+
+    /** Переход в другое измерение: карты прежнего измерения и его этажей закрываются. */
+    private void closeOthers(String keep) {
+        for (String id : new java.util.ArrayList<>(dims.keySet()))
+            if (!works.repka.rysmap.scan.Floors.base(id).equals(keep)) closeDimension(id);
     }
 
     private void closeDimension(String id) {

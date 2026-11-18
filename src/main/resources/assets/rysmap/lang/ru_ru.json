@@ -190,5 +190,13 @@
   "rysmap.point.chat": "В чат",
   "rysmap.search.hint": "Точка, игрок, координаты",
   "rysmap.search.none": "Ничего не нашлось",
-  "rysmap.search.goto": "Перейти: X %s, Z %s"
+  "rysmap.search.goto": "Перейти: X %s, Z %s",
+  "rysmap.cave.floor": "Пещера · этаж %s · y %s…%s",
+  "rysmap.cave.floor_short": "Этаж %s · y %s…%s",
+  "rysmap.cave.surface": "Поверхность",
+  "rysmap.cave.caves": "Пещеры",
+  "rysmap.cave.slice": "Срез",
+  "rysmap.cave.floors": "Этажи",
+  "rysmap.cave.off_server": "Сервер выключил карту пещер",
+  "rysmap.cave.wheel": "Этаж ниже и выше; Ctrl+колесо над картой"
 }

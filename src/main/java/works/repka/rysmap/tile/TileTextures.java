@@ -281,7 +281,7 @@ public final class TileTextures {
     public void keepOnly(String dimension) {
         for (Iterator<Map.Entry<String, Long2ObjectOpenHashMap<Tile>>> it = tiles.entrySet().iterator(); it.hasNext(); ) {
             Map.Entry<String, Long2ObjectOpenHashMap<Tile>> e = it.next();
-            if (e.getKey().equals(dimension)) continue;
+            if (works.repka.rysmap.scan.Floors.base(e.getKey()).equals(dimension)) continue; // этажи того же измерения остаются
             for (Tile t : e.getValue().values()) release(t);
             it.remove();
         }

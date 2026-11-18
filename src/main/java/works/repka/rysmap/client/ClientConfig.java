@@ -50,6 +50,10 @@ public final class ClientConfig {
     public boolean minimapCircle;
     /** Миникарта поворачивается по взгляду (север уходит с верха, буква севера ходит по кромке). */
     public boolean minimapRotate;
+    /** Пещерный срез под крышей и этажи (М5). */
+    public boolean caves = true;
+    /** Карта темнеет ночью (М6). */
+    public boolean night = true;
     /** Сколько последних мест гибели хранить: 0 (не ставить), 1, 3, 5. Точки FTB не в счёт. */
     public int deathsKept = 3;
     /** Какие точки подписаны в мире: {@code goal} (цель и гибель), {@code nearby} (все рядом), {@code all} (все). */
@@ -98,6 +102,8 @@ public final class ClientConfig {
                 if (json.has("minimapCorner") && json.get("minimapCorner").isJsonPrimitive()) c.minimapCorner = json.get("minimapCorner").getAsString();
                 if (json.has("minimapCircle")) c.minimapCircle = json.get("minimapCircle").getAsBoolean();
                 if (json.has("minimapRotate")) c.minimapRotate = json.get("minimapRotate").getAsBoolean();
+                if (json.has("caves")) c.caves = json.get("caves").getAsBoolean();
+                if (json.has("night")) c.night = json.get("night").getAsBoolean();
                 c.deathsKept = clamp(json, "deathsKept", c.deathsKept, 0, 5);
                 if (c.deathsKept == 2 || c.deathsKept == 4) c.deathsKept = 3;
                 if (json.has("worldLabels") && json.get("worldLabels").isJsonPrimitive())
@@ -141,6 +147,8 @@ public final class ClientConfig {
         json.addProperty("minimapZoom", minimapZoom);
         json.addProperty("minimapCircle", minimapCircle);
         json.addProperty("minimapRotate", minimapRotate);
+        json.addProperty("caves", caves);
+        json.addProperty("night", night);
         if (minimapCorner != null) json.addProperty("minimapCorner", minimapCorner);
         else json.remove("minimapCorner");
         json.addProperty("deathsKept", deathsKept);

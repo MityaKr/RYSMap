@@ -202,6 +202,23 @@ final class FixesAutoTest {
         shot("circle_rotate");
         step("square rotate", () -> ClientConfig.get().minimapCircle = false, 10);
         shot("square_rotate");
+        // этажи пещер (М5): пещера на y −30…−27 под игроком
+        step("cave dig", () -> {
+            ClientConfig.get().minimapRotate = false;
+            ClientConfig.get().minimapCircle = false;
+            mc().player.connection.sendCommand("fill ~-8 -30 ~-8 ~8 -27 ~8 air");
+            mc().player.connection.sendCommand("fill ~-3 -30 ~-12 ~3 -28 ~-9 air");
+        }, 20);
+        step("cave enter", () -> mc().player.connection.sendCommand("tp @s ~ -30 ~ 0 10"), 20);
+        when("cave floor", () -> session().caveFloor() != null, () ->
+            check("под землёй миникарта на этаже игрока: " + session().caveFloor(), session().caveFloor() == works.repka.rysmap.scan.Floors.of(-30)), 120);
+        shot("cave_minimap");
+        step("cave map", () -> MapScreen.open(), 40);
+        shot("cave_map");
+        step("cave leave", () -> {
+            mc().setScreen(null);
+            mc().player.connection.sendCommand(String.format(java.util.Locale.ROOT, "tp @s %d 120 %d 0 10", baseX, baseZ));
+        }, 40);
         step("map", () -> {
             ClientConfig.get().minimapRotate = false;
             ClientConfig.get().minimapSize = 0;

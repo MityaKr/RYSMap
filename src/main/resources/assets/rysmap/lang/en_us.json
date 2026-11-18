@@ -190,5 +190,13 @@
   "rysmap.point.chat": "To chat",
   "rysmap.search.hint": "Point, player, coordinates",
   "rysmap.search.none": "Nothing found",
-  "rysmap.search.goto": "Go to X %s, Z %s"
+  "rysmap.search.goto": "Go to X %s, Z %s",
+  "rysmap.cave.floor": "Cave · floor %s · y %s…%s",
+  "rysmap.cave.floor_short": "Floor %s · y %s…%s",
+  "rysmap.cave.surface": "Surface",
+  "rysmap.cave.caves": "Caves",
+  "rysmap.cave.slice": "Slice",
+  "rysmap.cave.floors": "Floors",
+  "rysmap.cave.off_server": "The server turned the cave map off",
+  "rysmap.cave.wheel": "Floor down and up; Ctrl+wheel over the map"
 }

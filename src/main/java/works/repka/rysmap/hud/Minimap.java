@@ -209,6 +209,8 @@ public final class Minimap {
         }
 
         String dimId = dim.location().toString();
+        Integer cave = session.caveFloor();
+        if (cave != null) dimId = works.repka.rysmap.scan.Floors.id(dimId, cave); // под землёй и в Нижнем мире этаж игрока
         float[] shape = rounded(x, y, size, r);
         if (!v.rotate) {
             session.tiles.draw(g, dimId, px, pz, ppb, x, y, size, size, shape);
@@ -372,6 +374,9 @@ public final class Minimap {
                 // строка мода упала: в этом кадре её просто нет
             }
         }
+        MapSession session = ClientEntry.session();
+        Integer cave = session == null ? null : session.caveFloor();
+        if (cave != null && out.size() < 4) out.add(new Line(0xFFAAB4C4, Icons.Shape.CAVE, floorText(cave), false));
         if (MapApi.get() instanceof MapApiImpl api && api.tracked() != null && out.size() < 4) {
             MapApi.Target target = api.tracked();
             if (target.dimension().equals(p.level().dimension())) {
@@ -385,6 +390,12 @@ public final class Minimap {
             }
         }
         return out;
+    }
+
+    /** «Пещера · этаж −3 · y −48…−33». */
+    public static String floorText(int floor) {
+        return Component.translatable("rysmap.cave.floor", group(floor), group(works.repka.rysmap.scan.Floors.bottom(floor)),
+            group(works.repka.rysmap.scan.Floors.top(floor))).getString();
     }
 
     private static void plate(GuiGraphics g, Theme t, List<Line> lines, int x, int y, int w, int h, float r) {
