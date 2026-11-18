@@ -15,6 +15,7 @@ import works.repka.rysmap.client.MapSession;
  */
 public final class MapApiImpl implements MapApi {
     private @Nullable Target tracked;
+    private java.util.@Nullable UUID trackedPoint;
 
     @Override
     public boolean present() {
@@ -29,6 +30,17 @@ public final class MapApiImpl implements MapApi {
     @Override
     public void track(@Nullable Target target) {
         tracked = target;
+        trackedPoint = null;
+    }
+
+    /** «В путь» к своей точке: цель запоминает id точки, чтобы панель показала «Снять путь». */
+    public void trackPoint(java.util.UUID point, Target target) {
+        tracked = target;
+        trackedPoint = point;
+    }
+
+    public boolean tracking(java.util.UUID point) {
+        return tracked != null && point.equals(trackedPoint);
     }
 
     public @Nullable Target tracked() {

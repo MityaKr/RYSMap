@@ -96,6 +96,14 @@ final class UiAutoTest {
         }
     }
 
+    private static List<PointStore.Point> readPoints() {
+        try {
+            return PointStore.load(session().store.root().resolve("points.json")).points();
+        } catch (java.io.IOException e) {
+            return List.of();
+        }
+    }
+
     private static void point(String name, String icon, int color, int dx, int dz) {
         PointStore.Point p = new PointStore.Point();
         p.name = name;
@@ -189,6 +197,45 @@ final class UiAutoTest {
             else check("окно карты открыто", false);
         }, 10);
         shot("map_menu");
+        // окна точки (этап 3): панель, новая точка, правка, удаление, место гибели, окно клавиши
+        step("panel", () -> {
+            MapScreen s = (MapScreen) mc().screen;
+            s.keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0); // меню правой кнопки закрывается Esc
+            check("точка Шахта выбрана", s.selectForTest("Шахта"));
+        }, 20);
+        shot("point_panel");
+        step("new point", () -> ((MapScreen) mc().screen).newPointForTest(), 10);
+        shot("point_new");
+        step("new point enter", () -> mc().screen.keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER, 0, 0), 5);
+        step("new point check", () -> {
+            PointStore.Point p = session().points().points().stream().filter(q -> q.name.equals("Дубрава")).findFirst().orElse(null);
+            check("новая точка Дубрава поставлена со звездой и цветом 2", p != null && p.icon.equals("star") && p.color == 2);
+            ((MapScreen) mc().screen).editForTest();
+            ((MapScreen) mc().screen).editorNameForTest("Дубрава старая");
+        }, 10);
+        shot("point_edit");
+        step("edit enter", () -> mc().screen.keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER, 0, 0), 5);
+        step("edit check", () -> {
+            check("правка сохранила имя", session().points().points().stream().anyMatch(q -> q.name.equals("Дубрава старая")));
+            ((MapScreen) mc().screen).deleteForTest();
+        }, 10);
+        shot("point_delete");
+        step("delete", () -> ((MapScreen) mc().screen).confirmDeleteForTest(), 5);
+        step("delete check", () -> {
+            check("точка удалена", session().points().points().stream().noneMatch(q -> q.name.startsWith("Дубрава")));
+            check("points.json на диске без неё", readPoints().stream().noneMatch(q -> q.name.startsWith("Дубрава")) && readPoints().size() == 4);
+            works.repka.rysmap.point.PointsLayer.died();
+            ((MapScreen) mc().screen).selectDeathForTest();
+        }, 20);
+        shot("point_death");
+        step("quick", () -> {
+            mc().setScreen(null);
+            works.repka.rysmap.screen.QuickPointScreen.open();
+        }, 15);
+        shot("quick_point");
+        step("quick enter", () -> mc().screen.keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER, 0, 0), 5);
+        step("quick check", () -> check("окно клавиши поставило точку: " + session().points().points().size(),
+            mc().screen == null && session().points().points().size() == 6), 2);
         step("finish", () -> {
             mc().setScreen(null);
             RYSMap.LOG.info(MapAutoTest.failures == 0 ? "[autotest] PASS" : "[autotest] FAILED: {}", MapAutoTest.failures);

@@ -100,6 +100,7 @@ public final class ClientEntry {
                 ensure(mc.level);
                 session.tick(mc);
                 while (OPEN.consumeClick()) if (mc.screen == null) MapScreen.open();
+                while (NEW_POINT.consumeClick()) if (mc.screen == null) works.repka.rysmap.screen.QuickPointScreen.open();
                 while (ZOOM_IN.consumeClick()) Minimap.zoom(1);
                 while (ZOOM_OUT.consumeClick()) Minimap.zoom(-1);
             }

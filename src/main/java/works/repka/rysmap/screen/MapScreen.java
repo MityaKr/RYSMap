@@ -60,6 +60,10 @@ public final class MapScreen extends ScaledScreen {
     private final List<String> dimensions = new ArrayList<>();
     private int listTop, listBottom;
     private @Nullable List<String> tip;
+    /** Выбранная точка: панель справа и пунктир от игрока. */
+    private java.util.@Nullable UUID selected;
+    private @Nullable PointEditor editor;
+    private Kit.@Nullable Dialog dialog;
 
     private record Menu(int x, int y, MapApi.Spot spot, List<MapApi.MenuItem> items) {}
 
@@ -96,6 +100,7 @@ public final class MapScreen extends ScaledScreen {
         cy0 = wy + HEADER;
         cw = ww - SIDEBAR;
         ch = wh - HEADER;
+        if (editor != null) for (works.repka.ryscore.ui.Field f : editor.fields()) addWidget(f);
         scanDimensions();
     }
 
@@ -134,8 +139,15 @@ public final class MapScreen extends ScaledScreen {
         if (s == null) return;
 
         canvas(g, t, canvas, s, mx, my, partial);
+        PointStore.Point sel = selectedPoint();
+        if (sel != null) {
+            @SuppressWarnings("unchecked") List<String>[] panelTip = new List[1];
+            PointPanel.draw(g, t, hits, this, sel, mx, my, panelTip);
+            if (panelTip[0] != null) tip = panelTip[0];
+        }
         sidebar(g, t, s, mx, my);
         header(g, t, s, mx, my);
+        if (editor != null) editor.draw(g, t, hits, this, mx, my);
 
         if (dimDrop.open) {
             List<Kit.Option> options = new ArrayList<>();
@@ -147,7 +159,8 @@ public final class MapScreen extends ScaledScreen {
             Kit.dropdownList(g, t, hits, dimDrop, options, selected, SIDEBAR - 14, mx, my, i -> switchTo(dimensions.get(i)));
         }
         if (menu != null) menu(g, t, mx, my);
-        else if (tip != null && !dimDrop.open) Kit.tooltip(g, t, tip, mx, my);
+        else if (tip != null && !dimDrop.open && dialog == null && (editor == null || !editor.over(mx, my))) Kit.tooltip(g, t, tip, mx, my);
+        if (dialog != null) Kit.dialog(g, t, hits, dialog, mx, my);
     }
 
     private void header(GuiGraphics g, Theme t, MapSession s, int mx, int my) {
@@ -378,15 +391,23 @@ public final class MapScreen extends ScaledScreen {
         return out;
     }
 
+    /** Правый край видимого полотна: открытая панель точки закрывает его часть. */
+    int visibleRight() {
+        return cx0 + cw - (selectedPoint() != null ? PointPanel.W : 0);
+    }
+
     private boolean overTools(int mx, int my) {
-        return Kit.over(mx, my, cx0 + cw - 6 - TOOL * 3 - 6, cy0 + 6, TOOL * 3 + 6, TOOL)
+        int right = visibleRight();
+        return Kit.over(mx, my, right - 6 - TOOL * 3 - 6, cy0 + 6, TOOL * 3 + 6, TOOL)
             || Kit.over(mx, my, cx0 + 6, cy0 + ch - 6 - TOOL, 170, TOOL)
-            || Kit.over(mx, my, cx0 + cw - 6 - 110, cy0 + ch - 6 - TOOL, 110, TOOL);
+            || Kit.over(mx, my, right - 6 - 110, cy0 + ch - 6 - TOOL, 110, TOOL)
+            || mx >= right;
     }
 
     private void tools(GuiGraphics g, Theme t, int mx, int my) {
         // справа сверху: справка, минус, плюс
-        int y = cy0 + 6, x = cx0 + cw - 6 - TOOL;
+        int right = visibleRight();
+        int y = cy0 + 6, x = right - 6 - TOOL;
         square(g, t, x, y, Icons.Shape.PLUS, mx, my, () -> zoomAt(cx0 + cw / 2.0, cy0 + ch / 2.0, 1));
         x -= TOOL + 3;
         square(g, t, x, y, Icons.Shape.MINUS, mx, my, () -> zoomAt(cx0 + cw / 2.0, cy0 + ch / 2.0, -1));
@@ -399,30 +420,38 @@ public final class MapScreen extends ScaledScreen {
         int by = cy0 + ch - 6 - TOOL;
         int bw = toolButton(g, t, cx0 + 6, by, 0, TOOL, Icons.Shape.TARGET, Component.translatable("rysmap.screen.to_me").getString(),
             Component.translatable("rysmap.screen.key.space").getString(), false, mx, my, this::toPlayer);
-        boolean overCanvas = Kit.over(mx, my, cx0, cy0, cw, ch);
-        if (overCanvas) {
-            int bx = (int) Math.floor(blockX(mx)), bz = (int) Math.floor(blockZ(my));
-            String biome = biome(bx, bz);
-            float w = 5 + coordWidth("X", bx) + 5 + coordWidth("Z", bz) + 5 + (biome.isEmpty() ? 0 : 5 + Draw.labelWidth(biome, 12, Weight.REGULAR) + 5);
-            int px = cx0 + 6 + bw + 3;
-            pill(g, t, px, by, w, TOOL);
-            float cx = px + 5;
-            cx = coord(g, t, "X", bx, cx, by + TOOL / 2f) + 5;
-            cx = coord(g, t, "Z", bz, cx, by + TOOL / 2f) + 5;
-            if (!biome.isEmpty()) {
-                Draw.rect(g, (int) cx, by + 3, 1, TOOL - 6, t.c("panel.border"));
-                Draw.label(g, biome, cx + 5, by + TOOL / 2f, 12, Weight.REGULAR, t.c("text.muted"));
-            }
-        }
-
-        // справа снизу: линейка
+        // справа снизу: линейка; координаты под курсором не заходят на неё (при открытой панели биом прячется первым)
         int blocks = SCALE_STEPS[0];
         for (int step : SCALE_STEPS) if (step * zoom <= 100) blocks = step;
         float bar = (float) (blocks * zoom);
         String label = Words.plural(blocks, "rysmap.screen.blocks");
         float lw = Draw.labelWidth(label, 11.5f, Weight.REGULAR);
         float w = 5 + bar + 4 + lw + 5;
-        float sx = cx0 + cw - 6 - w;
+        float sx = right - 6 - w;
+        boolean overCanvas = Kit.over(mx, my, cx0, cy0, right - cx0, ch);
+        int px = cx0 + 6 + bw + 3;
+        if (overCanvas) {
+            int bx = (int) Math.floor(blockX(mx)), bz = (int) Math.floor(blockZ(my));
+            String biome = biome(bx, bz);
+            float base = 5 + coordWidth("X", bx) + 5 + coordWidth("Z", bz) + 5;
+            float cwid = base + (biome.isEmpty() ? 0 : 5 + Draw.labelWidth(biome, 12, Weight.REGULAR) + 5);
+            if (px + cwid > sx - 4) {
+                biome = "";
+                cwid = base;
+            }
+            if (px + cwid <= right - 6) {
+                pill(g, t, px, by, cwid, TOOL);
+                float cx = px + 5;
+                cx = coord(g, t, "X", bx, cx, by + TOOL / 2f) + 5;
+                cx = coord(g, t, "Z", bz, cx, by + TOOL / 2f) + 5;
+                if (!biome.isEmpty()) {
+                    Draw.rect(g, (int) cx, by + 3, 1, TOOL - 6, t.c("panel.border"));
+                    Draw.label(g, biome, cx + 5, by + TOOL / 2f, 12, Weight.REGULAR, t.c("text.muted"));
+                }
+                if (px + cwid > sx - 4) return;
+            }
+        }
+        if (sx < px) return;
         pill(g, t, sx, by, w, TOOL);
         int lc = t.c("text.secondary");
         float ly = by + TOOL / 2f + 1.5f;
@@ -493,22 +522,198 @@ public final class MapScreen extends ScaledScreen {
         }
     }
 
-    /** Для окна точки (этап 3): выбранная точка. */
     boolean isSelected(PointStore.Point p) {
-        return false;
+        return p.id.equals(selected);
     }
 
-    /** Выбор точки из списка или с полотна: карта встаёт на точку. */
+    /** Выбранная точка или null (её удалили или выбора нет). */
+    @Nullable
+    PointStore.Point selectedPoint() {
+        MapSession s = ClientEntry.session();
+        if (selected == null || s == null) return null;
+        PointStore.Point p = s.points().find(selected);
+        if (p == null) selected = null;
+        return p;
+    }
+
+    void select(java.util.@Nullable UUID id) {
+        selected = id;
+    }
+
+    /** Выбор точки из списка или с полотна: панель справа; из списка карта встаёт на точку левее панели. */
     void selectPoint(PointStore.Point p, boolean center) {
+        selected = p.id;
         if (center) {
             switchTo(p.dimension);
-            centerX = p.x + 0.5;
+            centerX = p.x + 0.5 + PointPanel.W / 2.0 / zoom;
             centerZ = p.z + 0.5;
         }
     }
 
     /** Пунктир от игрока к выбранной точке (макет {@code 15}). */
-    private void selectionLine(GuiGraphics g, float partial) {}
+    private void selectionLine(GuiGraphics g, float partial) {
+        PointStore.Point p = selectedPoint();
+        LocalPlayer pl = Minecraft.getInstance().player;
+        if (p == null || pl == null || !p.dimension.equals(dimension.location().toString()) || !pl.level().dimension().equals(dimension)) return;
+        float x0 = sx(pl.getX()), y0 = sy(pl.getZ()), x1 = sx(p.x + 0.5), y1 = sy(p.z + 0.5);
+        float[] c = clipLine(x0, y0, x1, y1, cx0, cy0, visibleRight(), cy0 + ch);
+        if (c != null) Draw.dashed(g, c[0], c[1], c[2], c[3], 1f, 3, 2.5f, 0xE6F7F8FB);
+    }
+
+    /** Отрезок, обрезанный прямоугольником (Лианг и Барски), или null. */
+    private static float @Nullable [] clipLine(float x0, float y0, float x1, float y1, float minX, float minY, float maxX, float maxY) {
+        float t0 = 0, t1 = 1, dx = x1 - x0, dy = y1 - y0;
+        float[] p = {-dx, dx, -dy, dy}, q = {x0 - minX, maxX - x0, y0 - minY, maxY - y0};
+        for (int i = 0; i < 4; i++) {
+            if (p[i] == 0) {
+                if (q[i] < 0) return null;
+                continue;
+            }
+            float r = q[i] / p[i];
+            if (p[i] < 0) t0 = Math.max(t0, r);
+            else t1 = Math.min(t1, r);
+            if (t0 > t1) return null;
+        }
+        return new float[]{x0 + t0 * dx, y0 + t0 * dy, x0 + t1 * dx, y0 + t1 * dy};
+    }
+
+    // ---- окна точки ----
+
+    /** Окно новой точки у места {@code spot}, рядом с экранной точкой {@code ax, ay}. */
+    void openEditor(MapApi.Spot spot, int ax, int ay) {
+        MapSession s = ClientEntry.session();
+        if (s == null) return;
+        int n = s.points().points().size() + 1;
+        setEditor(new PointEditor(null, spot.dimension().location().toString(), spot.x(), spot.y(), spot.z(),
+            Component.translatable("rysmap.point.numbered", n).getString(), n % PointStore.COLORS, ax, ay));
+    }
+
+    void edit(PointStore.Point p) {
+        setEditor(new PointEditor(p, p.dimension, p.x, p.y, p.z, p.name, p.color, (int) sx(p.x + 0.5), (int) sy(p.z + 0.5)));
+    }
+
+    private void setEditor(PointEditor e) {
+        closeEditor();
+        editor = e;
+        for (works.repka.ryscore.ui.Field f : e.fields()) addWidget(f);
+        setFocused(e.name);
+    }
+
+    void closeEditor() {
+        if (editor != null) for (works.repka.ryscore.ui.Field f : editor.fields()) removeWidget(f);
+        editor = null;
+        setFocused(null);
+    }
+
+    void submitEditor() {
+        MapSession s = ClientEntry.session();
+        if (editor == null || s == null) return;
+        boolean isNew = editor.editing == null;
+        PointStore.Point p = editor.result();
+        if (p == null) return;
+        if (isNew) s.points().add(p);
+        else s.points().changed();
+        s.savePoints();
+        if (MapApi.get() instanceof works.repka.rysmap.api.MapApiImpl api && api.tracking(p.id)) trackOn(p);
+        closeEditor();
+        selected = p.id;
+    }
+
+    void pointsChanged() {
+        MapSession s = ClientEntry.session();
+        if (s == null) return;
+        s.points().changed();
+        s.savePoints();
+    }
+
+    /** «В путь» и «Снять путь». */
+    void track(PointStore.Point p) {
+        if (MapApi.get() instanceof works.repka.rysmap.api.MapApiImpl api && api.tracking(p.id)) api.track(null);
+        else trackOn(p);
+    }
+
+    private static void trackOn(PointStore.Point p) {
+        ResourceLocation loc = ResourceLocation.tryParse(p.dimension);
+        if (loc == null || !(MapApi.get() instanceof works.repka.rysmap.api.MapApiImpl api)) return;
+        api.trackPoint(p.id, MapApi.Target.builder(ResourceKey.create(Registries.DIMENSION, loc), p.x + 0.5, p.y, p.z + 0.5)
+            .label(Component.literal(PointsLayer.name(p))).build());
+    }
+
+    void askDelete(PointStore.Point p) {
+        dialog = new Kit.Dialog(Component.translatable("rysmap.point.delete.title", PointsLayer.name(p)).getString())
+            .text(Component.translatable("rysmap.point.delete.text").getString())
+            .no(Component.translatable("rysmap.point.cancel").getString(), () -> dialog = null)
+            .yes(Component.translatable("rysmap.point.delete").getString(), () -> {
+                dialog = null;
+                delete(p);
+            });
+    }
+
+    private void delete(PointStore.Point p) {
+        MapSession s = ClientEntry.session();
+        if (s == null) return;
+        if (MapApi.get() instanceof works.repka.rysmap.api.MapApiImpl api && api.tracking(p.id)) api.track(null);
+        s.points().remove(p.id);
+        s.savePoints();
+        selected = null;
+    }
+
+    /** Для автотеста: ответ «Удалить» в окне-вопросе. */
+    public void confirmDeleteForTest() {
+        PointStore.Point p = selectedPoint();
+        dialog = null;
+        if (p != null) delete(p);
+    }
+
+    /** Для автотеста: выбрать последнее место гибели. */
+    public boolean selectDeathForTest() {
+        MapSession s = ClientEntry.session();
+        if (s == null) return false;
+        PointStore.Point last = null;
+        for (PointStore.Point p : s.points().points()) if (p.death()) last = p;
+        if (last != null) selectPoint(last, true);
+        return last != null;
+    }
+
+    /** Для автотеста: поле имени окна точки. */
+    public void editorNameForTest(String name) {
+        if (editor != null) editor.name.setValue(name);
+    }
+
+    /** Для автотеста: выбрать первую точку с таким именем, открыть правку или новую точку. */
+    public boolean selectForTest(String name) {
+        MapSession s = ClientEntry.session();
+        if (s == null) return false;
+        for (PointStore.Point p : s.points().points()) {
+            if (p.name.equals(name)) {
+                selectPoint(p, true);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public void newPointForTest() {
+        int ax = cx0 + cw / 2 + 40, ay = cy0 + ch / 2 - 30;
+        int bx = (int) Math.floor(blockX(ax)), bz = (int) Math.floor(blockZ(ay));
+        openEditor(new MapApi.Spot(dimension, bx, 70, bz, bx >> 4, bz >> 4), ax, ay);
+        if (editor != null) {
+            editor.name.setValue("Дубрава");
+            editor.icon = "star";
+            editor.color = 2;
+        }
+    }
+
+    public void editForTest() {
+        PointStore.Point p = selectedPoint();
+        if (p != null) edit(p);
+    }
+
+    public void deleteForTest() {
+        PointStore.Point p = selectedPoint();
+        if (p != null) askDelete(p);
+    }
+
 
     private @Nullable MapApi.Marker markers(GuiGraphics g, Theme canvas, int mx, int my) {
         MapApi.Marker hover = null;
@@ -525,7 +730,7 @@ public final class MapScreen extends ScaledScreen {
     }
 
     boolean isSelectedMarker(MapApi.Marker m) {
-        return false;
+        return m.id().equals(selected);
     }
 
     /** Метка: круг 11 с тёмной кромкой и значком, под ней подпись на плашке (макет {@code .wp}, {@code .wl}). */
@@ -569,6 +774,11 @@ public final class MapScreen extends ScaledScreen {
             if (enabled) {
                 hits.add(x + 2, ry, MENU_W - 4, MENU_ROW, b -> {
                     menu = null;
+                    if (item.id().equals(PointsLayer.POINT_HERE)) {
+                        // в окне карты «Точка здесь» открывает окно новой точки (макет 16)
+                        openEditor(m.spot, (int) sx(m.spot.x() + 0.5), (int) sy(m.spot.z() + 0.5));
+                        return;
+                    }
                     try {
                         item.run(m.spot);
                     } catch (Throwable e) {
@@ -628,12 +838,17 @@ public final class MapScreen extends ScaledScreen {
         }
     }
 
-    /** «Точка здесь»: в окне карты это место игрока (этап 3 откроет окно новой точки). */
+    /** «Точка здесь» в сайдбаре: окно новой точки на месте игрока. */
     void pointHere() {
         LocalPlayer p = Minecraft.getInstance().player;
         if (p == null) return;
         MapApi.Spot spot = new MapApi.Spot(p.level().dimension(), p.getBlockX(), p.getBlockY(), p.getBlockZ(), p.getBlockX() >> 4, p.getBlockZ() >> 4);
-        for (MapApi.MenuItem item : MapApi.menus()) if (item.id().equals(PointsLayer.POINT_HERE)) item.run(spot);
+        float ax = sx(p.getX()), ay = sy(p.getZ());
+        if (!p.level().dimension().equals(dimension) || ax < cx0 || ax > cx0 + cw || ay < cy0 || ay > cy0 + ch) {
+            ax = cx0 + 20;
+            ay = cy0 + ch / 2f;
+        }
+        openEditor(spot, (int) ax, (int) ay);
     }
 
     private void zoomAt(double x, double y, int dir) {
@@ -646,6 +861,23 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     protected boolean onClick(double x, double y, int button) {
+        if (dialog != null) {
+            hits.click(x, y, button);
+            return true;
+        }
+        if (editor != null && editor.over(x, y)) {
+            for (works.repka.ryscore.ui.Field f : editor.fields()) {
+                if (f.isMouseOver(x, y)) {
+                    for (works.repka.ryscore.ui.Field o : editor.fields()) o.setFocused(false);
+                    f.setFocused(true);
+                    setFocused(f);
+                    f.mouseClicked(x, y, button);
+                    return true;
+                }
+            }
+            hits.click(x, y, button);
+            return true;
+        }
         if (menu != null) {
             hits.click(x, y, button);
             menu = null;
@@ -690,13 +922,21 @@ public final class MapScreen extends ScaledScreen {
         canvasClicked();
     }
 
-    /** Своя реакция на метку (точки открывают панель на этапе 3); true, если обработано. */
+    /** Свои точки открывают панель; true, если обработано. */
     boolean markerClicked(MapApi.Layer layer, MapApi.Marker m) {
-        return false;
+        if (!layer.id().equals(PointsLayer.ID)) return false;
+        MapSession s = ClientEntry.session();
+        PointStore.Point p = s == null ? null : s.points().find(m.id());
+        if (p == null) return false;
+        selectPoint(p, false);
+        return true;
     }
 
-    /** Клик по пустому месту полотна. */
-    void canvasClicked() {}
+    /** Клик по пустому месту полотна: закрыть окно точки, иначе снять выбор. */
+    void canvasClicked() {
+        if (editor != null) closeEditor();
+        else selected = null;
+    }
 
     @Override
     protected boolean onDrag(double x, double y, int button, double dx, double dy) {
@@ -751,7 +991,32 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
+        if (dialog != null) return dialog.keyPressed(key);
+        if (editor != null) {
+            if (key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER) {
+                submitEditor();
+                return true;
+            }
+            if (key == GLFW.GLFW_KEY_ESCAPE) {
+                closeEditor();
+                return true;
+            }
+            if (key == GLFW.GLFW_KEY_TAB) {
+                editor.tab(this, hasShiftDown());
+                return true;
+            }
+            for (works.repka.ryscore.ui.Field f : editor.fields()) {
+                if (f.isFocused()) {
+                    f.keyPressed(key, scan, modifiers);
+                    return true;
+                }
+            }
+        }
         if (dimDrop.keyPressed(key)) return true;
+        if (key == GLFW.GLFW_KEY_ESCAPE && selected != null) {
+            selected = null;
+            return true;
+        }
         if (key == GLFW.GLFW_KEY_ESCAPE && menu != null) {
             menu = null;
             return true;
