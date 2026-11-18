@@ -27,8 +27,8 @@ import works.repka.rysmap.hud.Minimap;
 /**
  * Страница настроек карты внутри окна (макет {@code 50}, урезано по плану 13.2): слева «Миникарта» (показывать, угол,
  * размер, приближение) и «В мире» (места гибели, подписи точек в мире, их дальность); справа живой образец миникарты, клавиши со ссылкой на настройки игры и
- * сведения о данных (размер карты мира, переезд из FTB). Форма, поворот, строки под картой и раздел
- * «Сервер» идут во втором выпуске. Всё пишется в {@code config/rysmap/client.json} сразу.
+ * сведения о данных (размер карты мира, переезд из FTB). Оператор видит раздел «Сервер»: правила карты на сервере
+ * (миникарта, пещеры, телепорт и пауза, чужие игроки и мобы). Форма, поворот и строки под картой идут позже. Всё пишется в {@code config/rysmap/client.json} сразу.
  */
 final class SettingsPage {
     private static final int ROW = 19, SEG_H = 18;
@@ -152,6 +152,9 @@ final class SettingsPage {
             c.save();
         });
 
+        // сервер: видит только оператор (макет 50, раздел «Сервер»)
+        if (works.repka.rysmap.client.ServerRules.op()) server(g, t, hits, lx, lw, y + ROW + 8, mx, my);
+
         // справа: образец
         int ry = top + 12;
         Kit.caps(g, t, Component.translatable("rysmap.settings.preview").getString(), rx, ry + 2, 11, 0.44f);
@@ -214,6 +217,68 @@ final class SettingsPage {
                 c.minimapCorner = corners[i] == Anchors.mapCorner() ? null : corners[i].name();
                 c.save();
             });
+        }
+    }
+
+    /** Паузы между телепортами, секунды. */
+    private static final int[] PAUSES = {0, 30, 60, 300, 900};
+
+    /**
+     * Раздел «Сервер»: миникарта и пещеры у игроков, кто телепортируется с карты и пауза, чужие игроки и мобы на карте.
+     * Каждое нажатие сразу уходит на сервер, сервер пишет файл и рассылает правила всем.
+     */
+    private static void server(GuiGraphics g, Theme t, Kit.Hits hits, int lx, int lw, int y, int mx, int my) {
+        works.repka.rysmap.net.MapNet.Rules r = works.repka.rysmap.client.ServerRules.rules();
+        if (r == null) return;
+        Kit.caps(g, t, Component.translatable("rysmap.settings.server").getString(), lx, y + 4, 11, 0.44f);
+        String only = Component.translatable("rysmap.settings.server.note").getString();
+        Draw.label(g, only, lx + lw - Draw.labelWidth(only, 11, Weight.REGULAR), y + 4, 11, Weight.REGULAR, t.c("text.muted"));
+        y += 10;
+        label(g, t, "rysmap.settings.server.maps", null, lx, y);
+        pills(g, t, hits, lx + lw, y, new String[]{Component.translatable("rysmap.settings.server.minimap").getString(),
+            Component.translatable("rysmap.settings.server.caves").getString()}, new boolean[]{r.minimap(), r.caves()}, mx, my, i -> {
+            if (i == 0) send(r, r.teleport(), r.pause(), !r.minimap(), r.caves(), r.players(), r.mobs());
+            else send(r, r.teleport(), r.pause(), r.minimap(), !r.caves(), r.players(), r.mobs());
+        });
+        y += ROW + 2;
+        label(g, t, "rysmap.settings.server.teleport", "rysmap.settings.server.teleport.note", lx, y);
+        String[] modes = {Component.translatable("rysmap.settings.server.teleport.off").getString(),
+            Component.translatable("rysmap.settings.server.teleport.ops").getString(),
+            Component.translatable("rysmap.settings.server.teleport.all").getString()};
+        segmented(g, t, hits, lx + lw, y, modes, r.teleport(), mx, my, i -> send(r, i, r.pause(), r.minimap(), r.caves(), r.players(), r.mobs()));
+        y += ROW + 2;
+        label(g, t, "rysmap.settings.server.pause", "rysmap.settings.server.pause.note", lx, y);
+        String[] pauses = new String[PAUSES.length];
+        int ps = -1;
+        for (int i = 0; i < PAUSES.length; i++) {
+            pauses[i] = PAUSES[i] == 0 ? Component.translatable("rysmap.settings.server.pause.none").getString()
+                : PAUSES[i] < 60 ? Component.translatable("rysmap.settings.server.pause.s", PAUSES[i]).getString()
+                : Component.translatable("rysmap.settings.server.pause.m", PAUSES[i] / 60).getString();
+            if (PAUSES[i] == r.pause()) ps = i;
+        }
+        segmented(g, t, hits, lx + lw, y, pauses, ps, mx, my, i -> send(r, r.teleport(), PAUSES[i], r.minimap(), r.caves(), r.players(), r.mobs()));
+        y += ROW + 2;
+        label(g, t, "rysmap.settings.server.entities", "rysmap.settings.server.entities.note", lx, y);
+        pills(g, t, hits, lx + lw, y, new String[]{Component.translatable("rysmap.settings.server.players").getString(),
+            Component.translatable("rysmap.settings.server.mobs").getString()}, new boolean[]{r.players(), r.mobs()}, mx, my, i -> {
+            if (i == 0) send(r, r.teleport(), r.pause(), r.minimap(), r.caves(), !r.players(), r.mobs());
+            else send(r, r.teleport(), r.pause(), r.minimap(), r.caves(), r.players(), !r.mobs());
+        });
+    }
+
+    private static void send(works.repka.rysmap.net.MapNet.Rules r, int teleport, int pause, boolean minimap, boolean caves, boolean players, boolean mobs) {
+        works.repka.rysmap.client.ServerRules.setRules(teleport, pause, minimap, caves, players, mobs);
+    }
+
+    /** Ряд независимых выключателей справа до {@code right} (макет 50: «Миникарта», «Пещеры»). */
+    private static void pills(GuiGraphics g, Theme t, Kit.Hits hits, int right, int y, String[] options, boolean[] on, int mx, int my,
+                              java.util.function.IntConsumer toggle) {
+        float w = 0;
+        for (int i = 0; i < options.length; i++) w += Draw.labelWidth(options[i], 12.5f, on[i] ? Weight.MEDIUM : Weight.REGULAR) + 12 + (i > 0 ? 4 : 0);
+        int px = (int) (right - Math.ceil(w));
+        for (int i = 0; i < options.length; i++) {
+            int index = i;
+            px += Kit.pill(g, t, hits, px, y + 2, options[i], on[i], mx, my, () -> toggle.accept(index)) + 4;
         }
     }
 

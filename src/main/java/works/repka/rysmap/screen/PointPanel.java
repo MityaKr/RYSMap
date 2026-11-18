@@ -21,7 +21,7 @@ import works.repka.rysmap.point.PointsLayer;
  * Панель точки справа (макеты {@code 15}, {@code 18}), 180 единиц: значок, имя, кто это; карточка «Координаты» с
  * копированием, «Отсюда» с расстоянием и стороной света, «Измерение», место портала в другом измерении; «На миникарте», «В мире всегда»;
  * внизу «В путь», «Изменить», «Удалить» (с вопросом). У места гибели строка «Прошло» с подсказкой, почему срок вещей
- * не показан. «В мире всегда» включает подпись точки в мире в любом режиме. «Телепорт» и «В чат» идут во втором выпуске.
+ * не показан. «В мире всегда» включает подпись точки в мире в любом режиме. «Телепорт» есть, если сервер его разрешил этому игроку; «В чат» идёт позже.
  */
 final class PointPanel {
     static final int W = 180;
@@ -136,13 +136,25 @@ final class PointPanel {
         }
 
         // действия
-        int actTop = y + h - 6 - 14 - 4 - 21 - 6;
+        boolean tp = works.repka.rysmap.client.ServerRules.teleportAllowed();
+        int actTop = y + h - 6 - 14 - 4 - 21 - 6 - (tp ? 14 + 4 : 0);
         Draw.rect(g, x + 1, actTop, W - 2, 1, t.c("panel.border"));
         int ay = actTop + 6;
         boolean tracked = MapApi.get() instanceof works.repka.rysmap.api.MapApiImpl api && api.tracking(p.id);
         String go = Component.translatable(tracked ? "rysmap.point.stop" : "rysmap.point.go").getString();
         PointWidgets.button(g, t, hits, ix, ay, iw, 21, go, null, tracked ? 0 : 1, mx, my, () -> s.track(p));
         ay += 21 + 4;
+        if (tp) {
+            // телепорт к точке (макет 15b): во время паузы кнопка серая с отсчётом
+            int left = works.repka.rysmap.client.ServerRules.pauseLeft();
+            String label = left > 0 ? Component.translatable("rysmap.point.teleport_in", works.repka.rysmap.client.ServerRules.clock(left)).getString()
+                : Component.translatable("rysmap.point.teleport").getString();
+            net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dim = net.minecraft.resources.ResourceKey.create(
+                net.minecraft.core.registries.Registries.DIMENSION, net.minecraft.resources.ResourceLocation.parse(p.dimension));
+            PointWidgets.button(g, t, hits, ix, ay, iw, 14, label, null, left > 0 ? 2 : 0, mx, my,
+                () -> works.repka.rysmap.client.ServerRules.teleport(dim, p.x, p.y, p.z));
+            ay += 14 + 4;
+        }
         int half = (iw - 4) / 2;
         PointWidgets.button(g, t, hits, ix, ay, half, 14, Component.translatable("rysmap.point.edit_short").getString(), null, 0, mx, my, () -> s.edit(p));
         PointWidgets.button(g, t, hits, ix + half + 4, ay, iw - half - 4, 14, Component.translatable("rysmap.point.delete").getString(), null, 0, mx, my, () -> s.askDelete(p));

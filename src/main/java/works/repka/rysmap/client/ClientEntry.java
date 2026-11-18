@@ -49,6 +49,8 @@ public final class ClientEntry {
     public static final KeyMapping NEW_POINT = new KeyMapping("key.rysmap.new_point", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), CATEGORY);
     /** Держать: подписи всех точек рядом раскрыты (решение автора 18.11: по умолчанию без клавиши, обычно `). */
     public static final KeyMapping SHOW_POINTS = new KeyMapping("key.rysmap.show_points", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), CATEGORY);
+    /** Телепорт туда, где курсор, в окне карты (этап М8): T, только над картой, поэтому с чатом не спорит. */
+    public static final KeyMapping TELEPORT = new KeyMapping("key.rysmap.teleport", KeyConflictContext.GUI, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_T, CATEGORY);
     public static final KeyMapping ZOOM_OUT = new KeyMapping("key.rysmap.zoom_out", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_MINUS, CATEGORY);
     private static @Nullable MapSession session;
     private static ClientConfig config = new ClientConfig();
@@ -71,6 +73,7 @@ public final class ClientEntry {
             e.register(ZOOM_OUT);
             e.register(NEW_POINT);
             e.register(SHOW_POINTS);
+            e.register(TELEPORT);
         });
         modBus.addListener((RegisterGuiLayersEvent e) -> {
             e.registerBelow(VanillaGuiLayers.CHAT, ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "minimap"), Minimap::render);
@@ -210,6 +213,7 @@ public final class ClientEntry {
         works.repka.rysmap.migrate.FtbMapStep.host(null);
         if (s != null) s.close();
         Layers.clear();
+        ServerRules.reset();
         if (MapApi.get() instanceof MapApiImpl api) api.track(null);
     }
 

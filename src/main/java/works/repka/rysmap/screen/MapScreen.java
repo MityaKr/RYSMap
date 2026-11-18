@@ -69,6 +69,10 @@ public final class MapScreen extends ScaledScreen {
 
     private record Menu(int x, int y, MapApi.Spot spot, List<MapApi.MenuItem> items) {}
 
+    /** Мышь в прошлом кадре, единицы окна: клавиша T телепортирует под курсор. */
+    private int lastMx = -1, lastMy = -1;
+    static final ResourceLocation TELEPORT_ITEM = ResourceLocation.fromNamespaceAndPath("rysmap", "teleport");
+
     private MapScreen(ResourceKey<Level> dimension, double x, double z) {
         super(Component.translatable("rysmap.screen.title"));
         this.dimension = dimension;
@@ -131,6 +135,8 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     protected void draw(GuiGraphics g, int mx, int my, float partial) {
+        lastMx = mx;
+        lastMy = my;
         hits.clear();
         tip = null;
         Theme t = ThemeManager.get();
@@ -390,6 +396,7 @@ public final class MapScreen extends ScaledScreen {
         MapApi.Marker hover = markers(g, canvas, mx, my);
         player(g, partial);
         tools(g, t, mx, my);
+        message(g, t, mx, my);
 
         boolean overCanvas = Kit.over(mx, my, cx0, cy0, cw, ch) && menu == null && !dimDrop.open && !overTools(mx, my);
         if (hover != null && overCanvas) {
@@ -831,6 +838,46 @@ public final class MapScreen extends ScaledScreen {
         g.pose().popPose();
     }
 
+    // ---- телепорт и строка сообщения ----
+
+    /** Телепорт в столбец карты: место ищет сервер (макет {@code 15b}, этап М8). Отказ приходит строкой сообщения. */
+    void teleport(ResourceKey<Level> dim, int x, int z) {
+        works.repka.rysmap.client.ServerRules.teleport(dim, x, works.repka.rysmap.server.SafeSpot.NO_HINT, z);
+    }
+
+    /** Телепорт прошёл: карта встаёт на игрока. */
+    public void arrived() {
+        toPlayer();
+    }
+
+    /** Строка сообщения внизу полотна (макет {@code 24}): значок, заголовок жирным, пояснение, крестик. Одна за раз. */
+    private void message(GuiGraphics g, Theme t, int mx, int my) {
+        works.repka.rysmap.client.ServerRules.Message m = works.repka.rysmap.client.ServerRules.message();
+        if (m == null) return;
+        String title = m.title().getString(), text = m.text().getString();
+        float size = 12.5f;
+        int right = visibleRight();
+        float maxW = Math.min(360, right - cx0 - 24);
+        float tw = Draw.labelWidth(title, size, Weight.SEMIBOLD);
+        String body = Draw.ellipsize(text, Math.max(20, maxW - 8 - 12 - tw - 4 - 16), size, Weight.REGULAR);
+        float bw = Draw.labelWidth(body, size, Weight.REGULAR);
+        int w = (int) Math.ceil(8 + 12 + tw + 4 + bw + 6 + 10 + 6);
+        int h = 18;
+        int x = (int) (cx0 + (right - cx0 - w) / 2f), y = cy0 + ch - 6 - TOOL - 4 - h;
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 300);
+        Draw.roundBox(g, x, y, w, h, 5, t.c("tooltip.bg"), t.c("panel.border"));
+        float cy = y + h / 2f;
+        Icons.draw(g, Icons.Shape.WARN, x + 7, cy - 4, 8, t.c("state.warn"));
+        Draw.label(g, title, x + 20, cy, size, Weight.SEMIBOLD, t.c("text.primary"));
+        Draw.label(g, body, x + 20 + tw + 4, cy, size, Weight.REGULAR, t.c("text.secondary"));
+        int crossX = x + w - 6 - 8;
+        boolean hot = Kit.over(mx, my, crossX - 2, y + 3, 12, 12);
+        Draw.cross(g, crossX, (int) cy - 3, hot ? t.c("text.primary") : t.c("text.muted"));
+        hits.add(crossX - 2, y + 3, 12, 12, b -> works.repka.rysmap.client.ServerRules.closeMessage());
+        g.pose().popPose();
+    }
+
     // ---- координаты ----
 
     float sx(double blockX) {
@@ -1029,6 +1076,10 @@ public final class MapScreen extends ScaledScreen {
                 // пункт чужого мода упал на вопросе: не показываем
             }
         }
+        if (works.repka.rysmap.client.ServerRules.teleportAllowed()) {
+            items.add(MapApi.MenuItem.builder(TELEPORT_ITEM, Component.translatable("rysmap.menu.teleport"))
+                .icon(Icons.Shape.NAV).order(900).run(s -> teleport(s.dimension(), s.x(), s.z())).build());
+        }
         items.add(MapApi.MenuItem.builder(ResourceLocation.fromNamespaceAndPath("rysmap", "copy"), Component.translatable("rysmap.menu.copy"))
             .icon(Icons.Shape.COPY).order(1000).run(s -> Minecraft.getInstance().keyboardHandler.setClipboard(s.x() + " " + s.y() + " " + s.z())).build());
         menu = new Menu(x, y, spot, items);
@@ -1080,6 +1131,10 @@ public final class MapScreen extends ScaledScreen {
         }
         if (key == GLFW.GLFW_KEY_SPACE) {
             toPlayer();
+            return true;
+        }
+        if (ClientEntry.TELEPORT.matches(key, scan) && menu == null && Kit.over(lastMx, lastMy, cx0, cy0, visibleRight() - cx0, ch) && !overTools(lastMx, lastMy)) {
+            teleport(dimension, (int) Math.floor(blockX(lastMx)), (int) Math.floor(blockZ(lastMy)));
             return true;
         }
         if (ClientEntry.OPEN.matches(key, scan)) {

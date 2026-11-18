@@ -130,9 +130,22 @@ public final class Minimap {
         double ppb = ZOOM[ClientConfig.get().minimapZoom] / UiScale.pixels();
         ResourceKey<Level> dim = p.level().dimension();
         Draw.round(g, x, y, size, size, r, t.c("map.bg"));
+        float cx = x + size / 2f, cy = y + size / 2f;
+        if (!works.repka.rysmap.client.ServerRules.minimapAllowed()) {
+            // сервер выключил миникарту: в рамке причина, а не чёрный квадрат (макет 04)
+            List<String> why = Draw.wrapLabel(Component.translatable("rysmap.minimap.off_server").getString(), size - 12, 11, Type.Weight.REGULAR, 4);
+            float ty = cy - (why.size() - 1) * 6.5f / 2f;
+            for (String line : why) {
+                Draw.label(g, line, cx - Draw.labelWidth(line, 11, Type.Weight.REGULAR) / 2f, ty, 11, Type.Weight.REGULAR, t.c("hud.muted"));
+                ty += 6.5f;
+            }
+            frame(g, t, x, y, size, r);
+            north(g, t, cx, y);
+            plate(g, t, lines, x, y + size + GAP, size, plateH, r);
+            return;
+        }
         session.tiles.draw(g, dim.location().toString(), px, pz, ppb, x, y, size, size, rounded(x, y, size, r));
 
-        float cx = x + size / 2f, cy = y + size / 2f;
         areas(g, dim, px, pz, ppb, x, y, size);
         markers(g, dim, px, pz, ppb, x, y, size, cx, cy);
         target(g, t, dim, px, pz, ppb, x, y, size, cx, cy);
@@ -142,6 +155,12 @@ public final class Minimap {
         Draw.disc(g, cx, cy, 4.5f, 0xB0101216);
         Icons.drawRotated(g, Icons.Shape.NAV, cx - 5, cy - 5, 10, yaw + 180f, 0xFFF7F8FB);
 
+        frame(g, t, x, y, size, r);
+        north(g, t, cx, y);
+        plate(g, t, lines, x, y + size + GAP, size, plateH, r);
+    }
+
+    private static void frame(GuiGraphics g, Theme t, int x, int y, int size, float r) {
         if (t.beveled()) {
             Draw.rect(g, x - 1, y - 1, size + 2, 1, t.c("hud.map.border"));
             Draw.rect(g, x - 1, y + size, size + 2, 1, t.c("hud.map.border"));
@@ -152,8 +171,6 @@ public final class Minimap {
             Draw.roundBorder(g, x - 1, y - 1, size + 2, size + 2, r + 1, t.c("hud.bg"), 1.25f);
             Draw.roundBorder(g, x - 1.5f, y - 1.5f, size + 3, size + 3, r + 1.5f, t.c("hud.map.border"), 0.5f);
         }
-        north(g, t, cx, y);
-        plate(g, t, lines, x, y + size + GAP, size, plateH, r);
     }
 
     /**
