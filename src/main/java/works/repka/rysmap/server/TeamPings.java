@@ -19,6 +19,7 @@ import works.repka.rysmap.net.MapNet;
  */
 public final class TeamPings {
     private static final long COOLDOWN_MS = 3000;
+    private static final java.util.Set<String> KINDS = java.util.Set.of("here", "danger", "resource", "help");
     private static final Map<UUID, Long> LAST = new HashMap<>();
 
     private TeamPings() {}
@@ -32,7 +33,8 @@ public final class TeamPings {
         Long last = LAST.get(player.getUUID());
         if (last != null && now - last < COOLDOWN_MS) return;
         LAST.put(player.getUUID(), now);
-        String kind = ping.kind().isEmpty() ? "here" : ping.kind();
+        // вид пинга только из известных RYSTeams; чужая строка от клиента становится «здесь» (перепроверка 18.11, пункт 10)
+        String kind = KINDS.contains(ping.kind()) ? ping.kind() : "here";
         String by = player.getGameProfile().getName();
         TeamsApi teams = TeamsApi.get();
         try {

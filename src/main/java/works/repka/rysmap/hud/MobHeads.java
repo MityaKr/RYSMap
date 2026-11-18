@@ -101,6 +101,7 @@ public final class MobHeads {
         // туман прошлого кадра мира не должен ложиться на голову; мир перед своим кадром ставит туман сам
         net.minecraft.client.renderer.FogRenderer.setupNoFog();
         TextureTarget target = new TextureTarget(SIZE, SIZE, true, Minecraft.ON_OSX);
+        boolean ok = false;
         target.setClearColor(0f, 0f, 0f, 0f);
         target.clear(Minecraft.ON_OSX);
         target.bindWrite(true);
@@ -123,7 +124,11 @@ public final class MobHeads {
             RenderSystem.runAsFancy(() -> d.render(entity, 0, 0, 0, 0f, 1f, pose, buffers, 15728880));
             buffers.endBatch();
             d.setRenderShadow(true);
+            ok = true;
         } finally {
+            // рендер упал: текстура не нужна; сущность-образец в мир не добавлялась, но помечается удалённой
+            if (!ok) target.destroyBuffers();
+            entity.discard();
             mv.popMatrix();
             RenderSystem.applyModelViewMatrix();
             RenderSystem.restoreProjectionMatrix();
