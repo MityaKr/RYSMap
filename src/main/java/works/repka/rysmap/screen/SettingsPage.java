@@ -146,6 +146,15 @@ final class SettingsPage {
             else c.caves = !c.caves;
             c.save();
         });
+        y += ROW + 2;
+
+        // мобы и чужие игроки: только показанный слой или все (просьба автора 18.11)
+        label(g, t, "rysmap.settings.entities", "rysmap.settings.entities.note", lx, y);
+        String[] layersOpt = {Component.translatable("rysmap.settings.entities.current").getString(), Component.translatable("rysmap.settings.entities.all").getString()};
+        segmented(g, t, hits, lx + lw, y, layersOpt, c.entitiesAllLayers ? 1 : 0, mx, my, i -> {
+            c.entitiesAllLayers = i == 1;
+            c.save();
+        });
         y += ROW + 4;
 
         // места гибели

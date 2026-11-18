@@ -244,7 +244,7 @@ public final class Minimap {
 
         session.tiles.brightness(1f);
         markers(g, dim, v);
-        entities(g, dim, v, partial);
+        entities(g, dim, v, partial, cave);
         target(g, t, dim, v);
 
         // игрок: стрелка по взгляду (при повороте карты всегда вверх), белая на тёмной подложке
@@ -343,21 +343,31 @@ public final class Minimap {
     }
 
     /** Игроки и мобы (слои «Игроки» и «Мобы»): участник команды за краем прижат к рамке, остальные за краем не видны. */
-    private static void entities(GuiGraphics g, ResourceKey<Level> dim, View v, float partial) {
+    private static void entities(GuiGraphics g, ResourceKey<Level> dim, View v, float partial, @org.jetbrains.annotations.Nullable Integer floor) {
         double reach = v.reachBlocks();
-        for (Entities.Dot d : Entities.collect(dim, v.px - reach, v.pz - reach, v.px + reach, v.pz + reach, partial)) {
+        List<Entities.Dot> dots = Entities.collect(dim, v.px - reach, v.pz - reach, v.px + reach, v.pz + reach, partial, floor);
+        // мобы пачкой под игроками
+        List<Entities.Dot> mobs = new ArrayList<>();
+        float[] xy = new float[dots.size() * 2];
+        for (Entities.Dot d : dots) {
+            if (d.player()) continue;
             float sx = v.sx(d.x(), d.z()), sy = v.sy(d.x(), d.z());
-            if (d.player()) {
-                if (!v.inside(sx, sy, 4)) {
-                    if (d.kind() != Entities.Kind.TEAM) continue;
-                    float[] c = v.clamp(sx, sy, 4.5f);
-                    sx = c[0];
-                    sy = c[1];
-                }
-                Entities.head(g, d, sx, sy, 7);
-            } else if (v.inside(sx, sy, 1.5f)) {
-                Entities.mob(g, d, sx, sy, 1.5f);
+            if (!v.inside(sx, sy, 3f)) continue;
+            xy[mobs.size() * 2] = sx;
+            xy[mobs.size() * 2 + 1] = sy;
+            mobs.add(d);
+        }
+        Entities.mobs(g, mobs, xy, 5f);
+        for (Entities.Dot d : dots) {
+            if (!d.player()) continue;
+            float sx = v.sx(d.x(), d.z()), sy = v.sy(d.x(), d.z());
+            if (!v.inside(sx, sy, 4)) {
+                if (d.kind() != Entities.Kind.TEAM) continue;
+                float[] c = v.clamp(sx, sy, 4.5f);
+                sx = c[0];
+                sy = c[1];
             }
+            Entities.head(g, d, sx, sy, 7);
         }
     }
 

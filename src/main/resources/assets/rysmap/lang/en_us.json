@@ -221,5 +221,9 @@
   "rysmap.ping.kind.loot": "loot",
   "rysmap.entity.track": "Click: path to the player",
   "rysmap.ping.kind.resource": "resource",
-  "rysmap.ping.kind.mark": "mark"
+  "rysmap.ping.kind.mark": "mark",
+  "rysmap.settings.entities": "Mobs and other players",
+  "rysmap.settings.entities.note": "your team is shown on any layer",
+  "rysmap.settings.entities.current": "Current layer",
+  "rysmap.settings.entities.all": "All layers"
 }

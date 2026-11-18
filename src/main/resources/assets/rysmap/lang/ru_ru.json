@@ -221,5 +221,9 @@
   "rysmap.ping.kind.loot": "добыча",
   "rysmap.entity.track": "Клик: путь к игроку",
   "rysmap.ping.kind.resource": "ресурс",
-  "rysmap.ping.kind.mark": "метка"
+  "rysmap.ping.kind.mark": "метка",
+  "rysmap.settings.entities": "Мобы и чужие игроки",
+  "rysmap.settings.entities.note": "своя команда видна на любом слое",
+  "rysmap.settings.entities.current": "Текущий слой",
+  "rysmap.settings.entities.all": "Все слои"
 }

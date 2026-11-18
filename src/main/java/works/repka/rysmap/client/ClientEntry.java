@@ -125,7 +125,10 @@ public final class ClientEntry {
         });
         bus.addListener(net.neoforged.neoforge.client.event.RenderLevelStageEvent.class, works.repka.rysmap.hud.WorldLabels::capture);
         bus.addListener((RenderFrameEvent.Pre e) -> {
-            if (session != null) session.frame();
+            if (session != null) {
+                session.frame();
+                works.repka.rysmap.hud.MobHeads.frame();
+            }
         });
         bus.addListener((CustomizeGuiOverlayEvent.DebugText e) -> {
             if (session != null && Minecraft.getInstance().getDebugOverlay().showDebugScreen()) e.getRight().add(session.debugLine());
@@ -220,6 +223,7 @@ public final class ClientEntry {
         Layers.clear();
         ServerRules.reset();
         PingsLayer.clear();
+        works.repka.rysmap.hud.MobHeads.clear();
         if (MapApi.get() instanceof MapApiImpl api) api.track(null);
     }
 

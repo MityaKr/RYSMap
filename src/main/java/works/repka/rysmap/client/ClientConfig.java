@@ -52,6 +52,8 @@ public final class ClientConfig {
     public boolean minimapRotate;
     /** Пещерный срез под крышей и этажи (М5). */
     public boolean caves = true;
+    /** Мобы и чужие игроки на всех слоях (ложь: только на показанном этаже или у поверхности). */
+    public boolean entitiesAllLayers;
     /** Карта темнеет ночью (М6). */
     public boolean night = true;
     /** Сколько последних мест гибели хранить: 0 (не ставить), 1, 3, 5. Точки FTB не в счёт. */
@@ -104,6 +106,7 @@ public final class ClientConfig {
                 if (json.has("minimapRotate")) c.minimapRotate = json.get("minimapRotate").getAsBoolean();
                 if (json.has("caves")) c.caves = json.get("caves").getAsBoolean();
                 if (json.has("night")) c.night = json.get("night").getAsBoolean();
+                if (json.has("entitiesAllLayers")) c.entitiesAllLayers = json.get("entitiesAllLayers").getAsBoolean();
                 c.deathsKept = clamp(json, "deathsKept", c.deathsKept, 0, 5);
                 if (c.deathsKept == 2 || c.deathsKept == 4) c.deathsKept = 3;
                 if (json.has("worldLabels") && json.get("worldLabels").isJsonPrimitive())
@@ -149,6 +152,7 @@ public final class ClientConfig {
         json.addProperty("minimapRotate", minimapRotate);
         json.addProperty("caves", caves);
         json.addProperty("night", night);
+        json.addProperty("entitiesAllLayers", entitiesAllLayers);
         if (minimapCorner != null) json.addProperty("minimapCorner", minimapCorner);
         else json.remove("minimapCorner");
         json.addProperty("deathsKept", deathsKept);

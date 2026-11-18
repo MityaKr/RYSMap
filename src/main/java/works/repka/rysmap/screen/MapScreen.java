@@ -339,7 +339,7 @@ public final class MapScreen extends ScaledScreen {
                 if (hot) Draw.round(g, x0, y, rw, ROW, 3.5f, t.c("slot.hover"));
                 int fg = on ? t.c("text.secondary") : t.c("text.dim");
                 Icons.draw(g, layer.icon(), x0 + 4.5f, y + 3, 8, on ? t.c("text.muted") : t.c("text.dim"));
-                int count = layer instanceof works.repka.rysmap.hud.Entities.Layer el ? el.count(dimension) : Layers.markers(layer, dimension).size();
+                int count = layer instanceof works.repka.rysmap.hud.Entities.Layer el ? el.count(dimension, caves ? floor : null) : Layers.markers(layer, dimension).size();
                 String ct = count > 0 ? Integer.toString(count) : "";
                 float ctw = Draw.labelWidth(ct, 11, Weight.REGULAR);
                 Draw.label(g, Draw.ellipsize(layer.name().getString(), rw - 30 - ctw, 12.5f, Weight.REGULAR), x0 + 17, y + ROW / 2f, 12.5f, Weight.REGULAR, hot ? t.c("text.primary") : fg);
@@ -999,8 +999,22 @@ public final class MapScreen extends ScaledScreen {
         int right = visibleRight();
         double x0 = blockX(cx0), x1 = blockX(right), z0 = blockZ(cy0), z1 = blockZ(cy0 + ch);
         works.repka.rysmap.hud.Entities.Dot hover = null;
-        float mobR = (float) Math.max(1.5, Math.min(3, zoom * 0.9));
-        for (works.repka.rysmap.hud.Entities.Dot d : works.repka.rysmap.hud.Entities.collect(dimension, x0, z0, x1, z1, partial)) {
+        float mobSize = (float) Math.max(5, Math.min(9, zoom * 3));
+        List<works.repka.rysmap.hud.Entities.Dot> all = works.repka.rysmap.hud.Entities.collect(dimension, x0, z0, x1, z1, partial, caves ? floor : null);
+        // мобы пачкой (головы по типу), потом игроки с подписями
+        List<works.repka.rysmap.hud.Entities.Dot> mobs = new ArrayList<>();
+        float[] xy = new float[all.size() * 2];
+        for (works.repka.rysmap.hud.Entities.Dot d : all) {
+            if (d.player()) continue;
+            float x = sx(d.x()), y = sy(d.z());
+            if (x < cx0 + 5 || x > right - 5 || y < cy0 + 5 || y > cy0 + ch - 5) continue;
+            xy[mobs.size() * 2] = x;
+            xy[mobs.size() * 2 + 1] = y;
+            mobs.add(d);
+            if (hover == null && Math.abs(mx - x) <= mobSize / 2 + 1 && Math.abs(my - y) <= mobSize / 2 + 1) hover = d;
+        }
+        works.repka.rysmap.hud.Entities.mobs(g, mobs, xy, mobSize);
+        for (works.repka.rysmap.hud.Entities.Dot d : all) {
             float x = sx(d.x()), y = sy(d.z());
             if (x < cx0 + 5 || x > right - 5 || y < cy0 + 5 || y > cy0 + ch - 5) continue;
             if (d.player()) {
@@ -1012,9 +1026,6 @@ public final class MapScreen extends ScaledScreen {
                 float ly = y + 6 + 1.5f;
                 Draw.round(g, x - lw / 2 - 3, ly, lw + 6, 8.5f, 2.5f, canvas.c("map.label.bg"));
                 Draw.label(g, label, x - lw / 2, ly + 4.25f, 11, Weight.MEDIUM, canvas.c("map.label.fg"));
-            } else {
-                if (hover == null && Math.abs(mx - x) <= 3 && Math.abs(my - y) <= 3) hover = d;
-                works.repka.rysmap.hud.Entities.mob(g, d, x, y, mobR);
             }
         }
         return hover;

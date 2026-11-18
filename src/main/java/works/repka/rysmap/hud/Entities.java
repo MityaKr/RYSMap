@@ -91,8 +91,8 @@ public final class Entities {
         @Override public Collection<MapApi.Marker> markers(ResourceKey<Level> dimension) { return List.of(); }
 
         /** Число в списке слоёв: сколько сейчас видно в измерении. */
-        public int count(ResourceKey<Level> dimension) {
-            return collect(dimension, -3e7, -3e7, 3e7, 3e7, 1f, id.equals(PLAYERS), id.equals(MOBS)).size();
+        public int count(ResourceKey<Level> dimension, @Nullable Integer floor) {
+            return collect(dimension, -3e7, -3e7, 3e7, 3e7, 1f, id.equals(PLAYERS), id.equals(MOBS), floor).size();
         }
     }
 
@@ -101,13 +101,35 @@ public final class Entities {
         return l != null && Layers.visible(l);
     }
 
-    /** Что видно в прямоугольнике блоков сейчас по глазам слоёв и правилам сервера. */
+    /** Что видно в прямоугольнике блоков сейчас по глазам слоёв и правилам сервера; слой: поверхность. */
     public static List<Dot> collect(ResourceKey<Level> dimension, double minX, double minZ, double maxX, double maxZ, float partial) {
-        return collect(dimension, minX, minZ, maxX, maxZ, partial, shown(PLAYERS), shown(MOBS));
+        return collect(dimension, minX, minZ, maxX, maxZ, partial, shown(PLAYERS), shown(MOBS), null);
+    }
+
+    /**
+     * То же для показанного слоя: {@code floor} этаж пещер или null (поверхность). При настройке «Мобы и чужие игроки:
+     * текущий слой» (по умолчанию) мобы и чужие игроки видны только на высотах этого слоя: на этаже в его 16 блоках
+     * (с запасом в блок), на поверхности у поверхности (не ниже 12 блоков под верхним блоком столбца или под открытым
+     * небом), в Нижнем мире на срезе в 24 блоках от игрока. Участники своей команды видны на любом слое: их ищут.
+     */
+    public static List<Dot> collect(ResourceKey<Level> dimension, double minX, double minZ, double maxX, double maxZ, float partial,
+                                    @Nullable Integer floor) {
+        return collect(dimension, minX, minZ, maxX, maxZ, partial, shown(PLAYERS), shown(MOBS), floor);
+    }
+
+    /** Подходит ли место сущности к показанному слою. */
+    static boolean onLayer(net.minecraft.client.multiplayer.ClientLevel level, double x, double y, double z, @Nullable Integer floor, double playerY) {
+        if (works.repka.rysmap.client.ClientConfig.get().entitiesAllLayers) return true;
+        if (floor != null) return y >= works.repka.rysmap.scan.Floors.bottom(floor) - 1 && y <= works.repka.rysmap.scan.Floors.top(floor) + 1;
+        if (level.dimensionType().hasCeiling()) return Math.abs(y - playerY) <= 24;
+        int bx = Mth.floor(x), bz = Mth.floor(z);
+        int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, bx, bz);
+        if (y >= top - 12) return true;
+        return level.canSeeSky(net.minecraft.core.BlockPos.containing(x, y + 1, z));
     }
 
     static List<Dot> collect(ResourceKey<Level> dimension, double minX, double minZ, double maxX, double maxZ, float partial,
-                             boolean players, boolean mobs) {
+                             boolean players, boolean mobs, @Nullable Integer floor) {
         Minecraft mc = Minecraft.getInstance();
         List<Dot> out = new ArrayList<>();
         if (mc.level == null || mc.player == null) return out;
@@ -124,6 +146,7 @@ public final class Entities {
                     if (!team && !others) continue;
                     double x = Mth.lerp(partial, p.xo, p.getX()), z = Mth.lerp(partial, p.zo, p.getZ());
                     seen.add(p.getUUID());
+                    if (!team && !onLayer(mc.level, x, p.getY(), z, floor, mc.player.getY())) continue;
                     if (x < minX || x > maxX || z < minZ || z > maxZ) {
                         // за краем рисуется только участник команды (миникарта прижимает его к рамке)
                         if (!team) continue;
@@ -137,6 +160,9 @@ public final class Entities {
                 if (!s.team() && !others) continue;
                 double x = s.x() + 0.5, z = s.z() + 0.5;
                 if (!s.team() && (x < minX || x > maxX || z < minZ || z > maxZ)) continue;
+                // дальний чужой игрок: высоту слоя проверить можно только на этаже (столбец у клиента не загружен)
+                if (!s.team() && floor != null && !works.repka.rysmap.client.ClientConfig.get().entitiesAllLayers
+                    && (s.y() < works.repka.rysmap.scan.Floors.bottom(floor) - 1 || s.y() > works.repka.rysmap.scan.Floors.top(floor) + 1)) continue;
                 out.add(new Dot(s.id(), x, s.y(), z, s.team() ? Kind.TEAM : Kind.PLAYER, s.name(), null));
             }
         }
@@ -146,6 +172,7 @@ public final class Entities {
                 if (!(e instanceof Mob) || e.isInvisible() || !e.isAlive()) continue;
                 double x = Mth.lerp(partial, e.xo, e.getX()), z = Mth.lerp(partial, e.zo, e.getZ());
                 if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+                if (!onLayer(mc.level, x, e.getY(), z, floor, mc.player.getY())) continue;
                 out.add(new Dot(e.getUUID(), x, e.getY(), z, e instanceof Enemy ? Kind.HOSTILE : Kind.PASSIVE, "", e));
                 if (++n >= MOB_LIMIT) break;
             }
@@ -182,10 +209,36 @@ public final class Entities {
         Draw.ring(g, cx, cy, r + 1 + t * r * 1.6f, 1f, Draw.alpha(color | 0xFF000000, 1f - t));
     }
 
-    /** Точка моба: кружок с тёмной кромкой. */
+    /** Точка моба: кружок с тёмной кромкой (запасной вид, пока голова не испечена или не печётся). */
     public static void mob(GuiGraphics g, Dot d, float x, float y, float r) {
         Draw.disc(g, x, y, r + 0.6f, 0xCC101216);
         Draw.disc(g, x, y, r, d.kind() == Kind.HOSTILE ? HOSTILE : PASSIVE);
+    }
+
+    /**
+     * Мобы пачкой: голова моба ({@link MobHeads}) в рамке цвета «враждебный / мирный», без головы точка. Рамки идут
+     * общей пачкой ядра, головы одним вызовом отрисовки на тип моба.
+     *
+     * @param xy места на экране по паре чисел на моба
+     */
+    public static void mobs(GuiGraphics g, List<Dot> dots, float[] xy, float size) {
+        if (dots.isEmpty()) return;
+        java.util.Map<Integer, MobHeads.Batch> heads = new java.util.HashMap<>();
+        float half = size / 2f;
+        for (int i = 0; i < dots.size(); i++) {
+            Dot d = dots.get(i);
+            float x = xy[i * 2], y = xy[i * 2 + 1];
+            int tex = d.entity() == null ? -1 : MobHeads.texture(d.entity().getType());
+            if (tex < 0) {
+                mob(g, d, x, y, Math.max(1.5f, size * 0.28f));
+                continue;
+            }
+            int rim = d.kind() == Kind.HOSTILE ? HOSTILE : PASSIVE;
+            Draw.round(g, x - half - 1f, y - half - 1f, size + 2f, size + 2f, 1.5f, 0xE0101216);
+            Draw.round(g, x - half - 0.6f, y - half - 0.6f, size + 1.2f, size + 1.2f, 1.2f, rim);
+            heads.computeIfAbsent(tex, k -> new MobHeads.Batch()).add(x - half, y - half, size);
+        }
+        if (!heads.isEmpty()) MobHeads.draw(g, heads);
     }
 
     /** Голова игрока размером {@code size} в рамке: синей у своей команды, серой у чужих. */
