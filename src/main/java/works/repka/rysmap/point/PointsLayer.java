@@ -25,7 +25,8 @@ import works.repka.rysmap.client.MapSession;
  */
 public final class PointsLayer implements MapApi.Layer {
     public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "points");
-    private static final int DEATH_COLOR = 0xFFE5484D;
+    public static final ResourceLocation POINT_HERE = ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "point_here");
+    public static final int DEATH_COLOR = 0xFFE36B6B;
 
     @Override
     public ResourceLocation id() {
@@ -62,8 +63,8 @@ public final class PointsLayer implements MapApi.Layer {
         for (PointStore.Point p : s.points().points()) {
             if (!p.dimension.equals(dim)) continue;
             boolean death = p.death();
-            int color = death ? DEATH_COLOR : 0xFF000000 | PointStore.PALETTE[Math.floorMod(p.color, PointStore.COLORS)];
-            String name = p.name.isEmpty() ? Component.translatable(death ? "rysmap.point.death" : "rysmap.point.unnamed").getString() : p.name;
+            int color = color(p);
+            String name = name(p);
             out.add(MapApi.Marker.builder(p.id).pos(dimension, p.x + 0.5, p.y, p.z + 0.5)
                 .kind(death ? MapApi.Kind.ALERT : MapApi.Kind.POINT).icon(icon(p.icon)).color(color)
                 .label(Component.literal(name)).minimap(p.minimap)
@@ -73,21 +74,46 @@ public final class PointsLayer implements MapApi.Layer {
         return out;
     }
 
-    static Icons.Shape icon(String name) {
+    /** Значки точек по порядку окна точки (макет {@code 16}): имя в {@code points.json} и контур ядра. */
+    public static final java.util.List<String> ICONS = java.util.List.of(
+        "flag", "home", "star", "pick", "chest", "anchor", "key", "eye", "skull", "spark", "shield", "book", "compass", "target", "users", "map");
+
+    public static Icons.Shape icon(String name) {
         return switch (name) {
             case "home" -> Icons.Shape.HOME;
             case "skull" -> Icons.Shape.SKULL;
             case "pick" -> Icons.Shape.PICK;
             case "star" -> Icons.Shape.STAR;
+            case "chest" -> Icons.Shape.ARCHIVE;
+            case "anchor" -> Icons.Shape.ANCHOR;
+            case "key" -> Icons.Shape.KEY;
+            case "eye" -> Icons.Shape.EYE;
+            case "spark" -> Icons.Shape.SPARK;
+            case "shield" -> Icons.Shape.SHIELD;
+            case "book" -> Icons.Shape.BOOK;
+            case "compass" -> Icons.Shape.COMPASS;
+            case "target" -> Icons.Shape.TARGET;
+            case "users" -> Icons.Shape.USERS;
+            case "map" -> Icons.Shape.MAP;
             default -> Icons.Shape.FLAG;
         };
+    }
+
+    /** Цвет точки ARGB: место гибели красное, остальные из двенадцати. */
+    public static int color(PointStore.Point p) {
+        return p.death() ? DEATH_COLOR : 0xFF000000 | PointStore.PALETTE[Math.floorMod(p.color, PointStore.COLORS)];
+    }
+
+    /** Имя для показа: пустое имя заменяется словом. */
+    public static String name(PointStore.Point p) {
+        return p.name.isEmpty() ? Component.translatable(p.death() ? "rysmap.point.death" : "rysmap.point.unnamed").getString() : p.name;
     }
 
     /** Слой и пункты меню: при запуске клиента. */
     public static void register() {
         MapApi api = MapApi.get();
         api.layer(new PointsLayer());
-        api.menu(MapApi.MenuItem.builder(ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "point_here"), Component.translatable("rysmap.menu.point_here"))
+        api.menu(MapApi.MenuItem.builder(POINT_HERE, Component.translatable("rysmap.menu.point_here"))
             .icon(Icons.Shape.FLAG).order(0).run(spot -> {
                 MapSession s = ClientEntry.session();
                 if (s == null) return;

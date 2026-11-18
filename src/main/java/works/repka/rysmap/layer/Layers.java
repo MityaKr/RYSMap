@@ -119,6 +119,54 @@ public final class Layers {
         }
     }
 
+    /**
+     * Области слоя в окне: заливка чанков и обводка по краю группы (сосед другой группы или пустой). Чанки берутся из
+     * кэша по регионам в прямоугольнике {@code cx0..cx1, cz0..cz1}; экранное место чанка {@code ox + chunkX·16·ppb}.
+     * Всё обрезается по {@code clipX0..clipY1}. Обводка уходит одним вызовом {@link works.repka.ryscore.ui.Draw#lines}.
+     */
+    public static void drawAreas(net.minecraft.client.gui.GuiGraphics g, MapApi.Layer layer, ResourceKey<Level> dimension, int cx0, int cz0, int cx1, int cz1,
+                                 double ox, double oz, double ppb, float clipX0, float clipY0, float clipX1, float clipY1) {
+        it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<AreaChunk> chunks = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        for (int rz = cz0 >> 5; rz <= cz1 >> 5; rz++)
+            for (int rx = cx0 >> 5; rx <= cx1 >> 5; rx++)
+                for (AreaChunk c : areas(layer, dimension, rx, rz))
+                    if (c.chunkX() >= cx0 && c.chunkX() <= cx1 && c.chunkZ() >= cz0 && c.chunkZ() <= cz1) chunks.put(RegionData.key(c.chunkX(), c.chunkZ()), c);
+        if (chunks.isEmpty()) return;
+        float side = (float) (16 * ppb);
+        float[] xy = new float[chunks.size() * 16];
+        int[] colors = new int[chunks.size() * 4];
+        int n = 0;
+        for (AreaChunk c : chunks.values()) {
+            float sx0 = (float) (ox + c.chunkX() * 16 * ppb), sy0 = (float) (oz + c.chunkZ() * 16 * ppb);
+            float sx1 = sx0 + side, sy1 = sy0 + side;
+            float fx0 = Math.max(sx0, clipX0), fy0 = Math.max(sy0, clipY0), fx1 = Math.min(sx1, clipX1), fy1 = Math.min(sy1, clipY1);
+            if (fx1 <= fx0 || fy1 <= fy0) continue;
+            float a = c.style() == MapApi.AreaStyle.FILL ? 0.22f : 0.12f;
+            works.repka.ryscore.ui.Draw.round(g, fx0, fy0, fx1 - fx0, fy1 - fy0, 0, works.repka.ryscore.ui.Draw.alpha(c.color(), a));
+            // край группы: сверху, снизу, слева, справа
+            int[][] dirs = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}};
+            for (int[] d : dirs) {
+                AreaChunk nb = chunks.get(RegionData.key(c.chunkX() + d[0], c.chunkZ() + d[1]));
+                if (nb != null && nb.group() == c.group()) continue;
+                float lx0, ly0, lx1, ly1;
+                if (d[1] != 0) {
+                    float yy = d[1] < 0 ? sy0 + 0.5f : sy1 - 0.5f;
+                    if (yy < clipY0 || yy > clipY1) continue;
+                    lx0 = fx0; lx1 = fx1; ly0 = ly1 = yy;
+                } else {
+                    float xx = d[0] < 0 ? sx0 + 0.5f : sx1 - 0.5f;
+                    if (xx < clipX0 || xx > clipX1) continue;
+                    ly0 = fy0; ly1 = fy1; lx0 = lx1 = xx;
+                }
+                if (n * 4 + 4 > xy.length) break;
+                xy[n * 4] = lx0; xy[n * 4 + 1] = ly0; xy[n * 4 + 2] = lx1; xy[n * 4 + 3] = ly1;
+                colors[n] = c.style() == MapApi.AreaStyle.DASHED ? works.repka.ryscore.ui.Draw.alpha(c.color(), 0.7f) : c.color();
+                n++;
+            }
+        }
+        if (n > 0) works.repka.ryscore.ui.Draw.lines(g, xy, colors, n, 1f);
+    }
+
     private static void broken(MapApi.Layer layer, Throwable t) {
         if (BROKEN.add(layer.id())) RYSMap.LOG.error("[rysmap] слой {} упал и выключен до перезапуска", layer.id(), t);
     }

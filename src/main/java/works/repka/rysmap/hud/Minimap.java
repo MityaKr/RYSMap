@@ -51,10 +51,22 @@ public final class Minimap {
             || ClientEntry.session() == null || !ClientConfig.get().minimap;
     }
 
+    private static long frameNanos, frames;
+
     public static void render(GuiGraphics parent, DeltaTracker delta) {
         Minecraft mc = Minecraft.getInstance();
         if (hidden(mc)) return;
+        long t0 = System.nanoTime();
         UiScale.render(parent, g -> draw(g, mc, delta.getGameTimeDeltaPartialTick(false)));
+        frameNanos += System.nanoTime() - t0;
+        frames++;
+    }
+
+    /** Средняя цена кадра миникарты на процессоре, мкс (замер автотеста; сбрасывается вызовом). */
+    public static long frameMicrosAndReset() {
+        long out = frames == 0 ? 0 : frameNanos / frames / 1000;
+        frameNanos = frames = 0;
+        return out;
     }
 
     public static void zoom(int step) {
@@ -110,7 +122,9 @@ public final class Minimap {
             Draw.rect(g, x - 1, y, 1, size, t.c("hud.map.border"));
             Draw.rect(g, x + size, y, 1, size, t.c("hud.map.border"));
         } else {
-            Draw.roundBorder(g, x, y, size, size, r, t.c("hud.map.border"));
+            // макет 01: кольцо 2 px цвета плашки и тонкая рамка снаружи
+            Draw.roundBorder(g, x - 1, y - 1, size + 2, size + 2, r + 1, t.c("hud.bg"), 1.25f);
+            Draw.roundBorder(g, x - 1.5f, y - 1.5f, size + 3, size + 3, r + 1.5f, t.c("hud.map.border"), 0.5f);
         }
         plate(g, t, lines, x, y + size + GAP, size, plateH, r);
     }
@@ -137,24 +151,10 @@ public final class Minimap {
         double half = size / 2.0 / ppb;
         int cx0 = (int) Math.floor((px - half) / 16), cx1 = (int) Math.floor((px + half) / 16);
         int cz0 = (int) Math.floor((pz - half) / 16), cz1 = (int) Math.floor((pz + half) / 16);
+        double ox = x + size / 2.0 - px * ppb, oz = y + size / 2.0 - pz * ppb;
         for (MapApi.Layer layer : Layers.shown()) {
             if (layer.areas() == null) continue;
-            for (int rz = cz0 >> 5; rz <= cz1 >> 5; rz++) {
-                for (int rx = cx0 >> 5; rx <= cx1 >> 5; rx++) {
-                    for (Layers.AreaChunk c : Layers.areas(layer, dim, rx, rz)) {
-                        if (c.chunkX() < cx0 || c.chunkX() > cx1 || c.chunkZ() < cz0 || c.chunkZ() > cz1) continue;
-                        float sx0 = (float) (x + size / 2.0 + (c.chunkX() * 16 - px) * ppb), sy0 = (float) (y + size / 2.0 + (c.chunkZ() * 16 - pz) * ppb);
-                        float sx1 = (float) (sx0 + 16 * ppb), sy1 = (float) (sy0 + 16 * ppb);
-                        sx0 = Math.max(sx0, x);
-                        sy0 = Math.max(sy0, y);
-                        sx1 = Math.min(sx1, x + size);
-                        sy1 = Math.min(sy1, y + size);
-                        if (sx1 <= sx0 || sy1 <= sy0) continue;
-                        int fill = c.style() == MapApi.AreaStyle.FILL ? Draw.alpha(c.color(), 0.28f) : Draw.alpha(c.color(), 0.14f);
-                        Draw.round(g, sx0, sy0, sx1 - sx0, sy1 - sy0, 0, fill);
-                    }
-                }
-            }
+            Layers.drawAreas(g, layer, dim, cx0 - 1, cz0 - 1, cx1 + 1, cz1 + 1, ox, oz, ppb, x, y, x + size, y + size);
         }
     }
 
@@ -225,7 +225,10 @@ public final class Minimap {
         else Draw.roundBox(g, x, y, w, h, r, t.c("hud.bg"), t.c("hud.border"));
         float ly = y + 2 + LINE / 2f;
         LocalPlayer p = Minecraft.getInstance().player;
+        boolean first = true;
         for (Line line : lines) {
+            if (!first) Draw.round(g, x + 4, ly - LINE / 2f - 0.25f, w - 8, 0.5f, 0.02f, Draw.alpha(t.c("hud.border"), 0.8f));
+            first = false;
             if (line.coords && p != null) {
                 coord(g, t, "X", p.getBlockX(), x + 5, ly);
                 coord(g, t, "Y", p.getBlockY(), x + 5 + w / 3f, ly);

@@ -1,0 +1,198 @@
+package works.repka.rysmap.dev;
+
+import static works.repka.rysmap.dev.MapAutoTest.check;
+import static works.repka.rysmap.dev.MapAutoTest.mc;
+import static works.repka.rysmap.dev.MapAutoTest.session;
+import static works.repka.rysmap.dev.MapAutoTest.settled;
+import static works.repka.rysmap.dev.MapAutoTest.shot;
+import static works.repka.rysmap.dev.MapAutoTest.stats;
+import static works.repka.rysmap.dev.MapAutoTest.step;
+import static works.repka.rysmap.dev.MapAutoTest.when;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.Difficulty;
+import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelSettings;
+import net.minecraft.world.level.WorldDataConfiguration;
+import net.minecraft.world.level.levelgen.WorldOptions;
+import net.minecraft.world.level.levelgen.presets.WorldPresets;
+import works.repka.ryscore.map.MapApi;
+import works.repka.ryscore.ui.Icons;
+import works.repka.rysmap.RYSMap;
+import works.repka.rysmap.client.ClientConfig;
+import works.repka.rysmap.hud.Minimap;
+import works.repka.rysmap.layer.Layers;
+import works.repka.rysmap.point.PointStore;
+import works.repka.rysmap.screen.MapScreen;
+import works.repka.rysmap.tile.ColorTable;
+
+/**
+ * Снимки интерфейса ({@code gradlew runAutotest -Pautotest=ui}): миникарта рядом с макетом {@code 01}, окно карты рядом
+ * с {@code 10}, меню правой кнопки ({@code 17}). Слой автотеста даёт метку участника, цель, область, пункт меню и строку
+ * под миникартой; точки кладутся в {@code points.json} нового мира. Проверки: F1 и F3 прячут миникарту, слой виден,
+ * пункт меню и строка на месте, цена кадра миникарты.
+ */
+final class UiAutoTest {
+    static final ResourceLocation LAYER = ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "autotest");
+    private static int baseX, baseZ;
+
+    private UiAutoTest() {}
+
+    /** Слой «участника и участка» вокруг базы: как у RYSTeams и RYSClaims. */
+    static final class TestLayer implements MapApi.Layer {
+        @Override public ResourceLocation id() { return LAYER; }
+        @Override public Component name() { return Component.literal("Команда (тест)"); }
+        @Override public Icons.Shape icon() { return Icons.Shape.USERS; }
+        @Override public int order() { return 10; }
+        @Override public long revision() { return 1; }
+
+        @Override
+        public Collection<MapApi.Marker> markers(ResourceKey<Level> dimension) {
+            if (!dimension.equals(Level.OVERWORLD)) return List.of();
+            List<MapApi.Marker> out = new ArrayList<>();
+            out.add(MapApi.Marker.builder(UUID.nameUUIDFromBytes("lena".getBytes())).pos(dimension, baseX + 22, 70, baseZ + 6)
+                .kind(MapApi.Kind.PLAYER).icon(Icons.Shape.USERS).color(0xFFE58A6A).label(Component.literal("Lena_K")).build());
+            out.add(MapApi.Marker.builder(UUID.nameUUIDFromBytes("far".getBytes())).pos(dimension, baseX + 400, 70, baseZ - 30)
+                .kind(MapApi.Kind.PLAYER).icon(Icons.Shape.USERS).color(0xFF6FA8FF).label(Component.literal("Tor4ok")).build());
+            return out;
+        }
+
+        @Override
+        public MapApi.Areas areas() {
+            return new MapApi.Areas() {
+                @Override
+                public long revision(ResourceKey<Level> dimension, int regionX, int regionZ) {
+                    return 1;
+                }
+
+                @Override
+                public void fill(ResourceKey<Level> dimension, int regionX, int regionZ, MapApi.AreaSink sink) {
+                    int bx = Math.floorDiv(baseX, 16), bz = Math.floorDiv(baseZ, 16);
+                    for (int cz = bz - 2; cz <= bz + 1; cz++) {
+                        for (int cx = bx - 2; cx <= bx + 2; cx++) {
+                            if (cx >> 5 == regionX && cz >> 5 == regionZ) sink.chunk(cx, cz, 1, 0xFFE58A6A, MapApi.AreaStyle.FILL, false);
+                        }
+                    }
+                }
+
+                @Override
+                public List<Component> tooltip(ResourceKey<Level> dimension, int chunkX, int chunkZ) {
+                    int bx = Math.floorDiv(baseX, 16), bz = Math.floorDiv(baseZ, 16);
+                    if (chunkX < bx - 2 || chunkX > bx + 2 || chunkZ < bz - 2 || chunkZ > bz + 1) return null;
+                    return List.of(Component.literal("Репка · База"));
+                }
+            };
+        }
+    }
+
+    private static void point(String name, String icon, int color, int dx, int dz) {
+        PointStore.Point p = new PointStore.Point();
+        p.name = name;
+        p.icon = icon;
+        p.color = color;
+        p.x = baseX + dx;
+        p.y = 70;
+        p.z = baseZ + dz;
+        session().points().add(p);
+    }
+
+    static void build() {
+        MapAutoTest.prefix = "ui";
+        step("title", () -> {
+            mc().options.pauseOnLostFocus = false;
+            mc().options.onboardAccessibility = false;
+            mc().options.guiScale().set(2);
+            mc().options.tutorialStep = net.minecraft.client.tutorial.TutorialSteps.NONE;
+            mc().getTutorial().setStep(net.minecraft.client.tutorial.TutorialSteps.NONE);
+            mc().options.getSoundSourceOptionInstance(SoundSource.MASTER).set(0.0);
+            mc().resizeDisplay();
+            if (!(mc().screen instanceof TitleScreen)) mc().setScreen(new TitleScreen());
+        }, 30);
+        step("world", () -> {
+            MapAutoTest.world = "rysmap_ui_" + Long.toHexString(System.currentTimeMillis());
+            LevelSettings settings = new LevelSettings(MapAutoTest.world, GameType.CREATIVE, false, Difficulty.PEACEFUL, true, new GameRules(), WorldDataConfiguration.DEFAULT);
+            mc().createWorldOpenFlows().createFreshLevel(MapAutoTest.world, settings, new WorldOptions(42L, true, false),
+                r -> r.registryOrThrow(Registries.WORLD_PRESET).getHolderOrThrow(WorldPresets.NORMAL).value().createWorldDimensions(), mc().screen);
+        }, 10);
+        when("joined", () -> mc().player != null && mc().level != null && mc().screen == null && session() != null, () -> {
+            mc().player.getAbilities().flying = true;
+            mc().player.onUpdateAbilities();
+            mc().player.connection.sendCommand("gamerule doDaylightCycle false");
+            mc().player.connection.sendCommand("gamerule doWeatherCycle false");
+            mc().player.connection.sendCommand("time set noon");
+            mc().player.connection.sendCommand("tp @s ~ ~12 ~ 35 10");
+        }, 40);
+        when("colors", () -> ColorTable.INSTANCE.ready(), () -> {}, 2);
+        when("settled", MapAutoTest::settled, () -> {
+            stats("у спавна");
+            baseX = mc().player.getBlockX();
+            baseZ = mc().player.getBlockZ();
+            MapApi api = MapApi.get();
+            api.layer(new TestLayer());
+            api.status(ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "autotest_land"), 0,
+                () -> MapApi.Status.of(0xFFE58A6A, null, Component.literal("Репка · База")));
+            api.menu(MapApi.MenuItem.builder(ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "autotest_ping"), Component.literal("Пинг команде"))
+                .icon(Icons.Shape.SPARK).order(5).run(spot -> {}).build());
+            point("Дом", "home", 1, -14, -8);
+            point("Портал", "flag", 4, -18, -40);
+            point("Причал", "anchor", 5, -46, 30);
+            point("Шахта", "pick", 8, 60, -20);
+            session().savePoints();
+            api.track(MapApi.Target.builder(Level.OVERWORLD, baseX + 60.5, 70, baseZ - 19.5).label(Component.literal("Шахта")).build());
+        }, 40);
+        step("hud", () -> {
+            Minimap.frameMicrosAndReset();
+            check("слой автотеста виден", Layers.shown().stream().anyMatch(l -> l.id().equals(LAYER)));
+            check("пункт меню слоя зарегистрирован", MapApi.menus().stream().anyMatch(m -> m.id().getPath().equals("autotest_ping")));
+            check("строка под миникартой зарегистрирована", MapApi.statuses().stream().anyMatch(s -> s.id().getPath().equals("autotest_land")));
+            check("точки на месте: " + session().points().points().size(), session().points().points().size() == 4);
+        }, 40);
+        shot("hud");
+        step("frame", () -> {
+            long us = Minimap.frameMicrosAndReset();
+            RYSMap.LOG.info("[autotest] замер кадра миникарты: {} мкс на процессоре", us);
+            check("кадр миникарты дешевле 1 мс: " + us + " мкс", us < 1000);
+            mc().options.hideGui = true;
+        }, 2);
+        step("f1", () -> {
+            check("на F1 миникарта спрятана", Minimap.hidden(mc()));
+            mc().options.hideGui = false;
+            mc().getDebugOverlay().toggleOverlay();
+        }, 2);
+        step("f3", () -> {
+            check("на F3 миникарта спрятана", Minimap.hidden(mc()));
+            mc().getDebugOverlay().toggleOverlay();
+            check("без F1 и F3 миникарта видна", !Minimap.hidden(mc()));
+            ClientConfig.get().minimapSize = 128;
+            ClientConfig.get().minimapZoom = 2;
+        }, 20);
+        shot("hud_L_x2");
+        step("map open", () -> {
+            ClientConfig.get().minimapSize = 0;
+            ClientConfig.get().minimapZoom = 1;
+            MapScreen.open();
+        }, 80);
+        shot("map");
+        step("menu", () -> {
+            if (mc().screen instanceof MapScreen s) s.openMenuForTest();
+            else check("окно карты открыто", false);
+        }, 10);
+        shot("map_menu");
+        step("finish", () -> {
+            mc().setScreen(null);
+            RYSMap.LOG.info(MapAutoTest.failures == 0 ? "[autotest] PASS" : "[autotest] FAILED: {}", MapAutoTest.failures);
+            mc().stop();
+        }, 0);
+    }
+}

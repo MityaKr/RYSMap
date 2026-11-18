@@ -45,6 +45,8 @@ public final class ClientEntry {
     /** Окно карты: M, как у FTB Chunks (в RepYS на M ещё магнит EnderIO, план 12, «Клавиши»). */
     public static final KeyMapping OPEN = new KeyMapping("key.rysmap.open", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_M, CATEGORY);
     public static final KeyMapping ZOOM_IN = new KeyMapping("key.rysmap.zoom_in", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_EQUAL, CATEGORY);
+    /** Окно новой точки (макет 09): по умолчанию без клавиши, в RepYS J занята Mekanism (план 12, «Клавиши»). */
+    public static final KeyMapping NEW_POINT = new KeyMapping("key.rysmap.new_point", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), CATEGORY);
     public static final KeyMapping ZOOM_OUT = new KeyMapping("key.rysmap.zoom_out", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_MINUS, CATEGORY);
     private static @Nullable MapSession session;
     private static ClientConfig config = new ClientConfig();
@@ -60,6 +62,7 @@ public final class ClientEntry {
             e.register(OPEN);
             e.register(ZOOM_IN);
             e.register(ZOOM_OUT);
+            e.register(NEW_POINT);
         });
         modBus.addListener((RegisterGuiLayersEvent e) ->
             e.registerBelow(VanillaGuiLayers.CHAT, ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "minimap"), Minimap::render));

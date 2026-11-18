@@ -41,11 +41,12 @@ public final class MapAutoTest {
     private static final boolean ON = System.getProperty("rysmap.autotest") != null;
     private static final List<Step> STEPS = new ArrayList<>();
     private static boolean built;
-    private static int index, wait, failures, shots = 1, settle, stepTicks;
-    private static String world;
+    static int index, wait, failures, shots = 1, settle, stepTicks;
+    static String world;
     private static int spawnX, spawnZ;
     private static long firstSnapshots, firstScanned;
     private static boolean tilesDrawn;
+    static String prefix = "map";
 
     private MapAutoTest() {}
 
@@ -83,40 +84,40 @@ public final class MapAutoTest {
         index++;
     }
 
-    private static Minecraft mc() {
+    static Minecraft mc() {
         return Minecraft.getInstance();
     }
 
-    private static MapSession session() {
+    static MapSession session() {
         return ClientEntry.session();
     }
 
-    private static void step(String name, Runnable action, int pause) {
+    static void step(String name, Runnable action, int pause) {
         STEPS.add(new Step(name, () -> true, action, pause));
     }
 
-    private static void when(String name, BooleanSupplier ready, Runnable action, int pause) {
+    static void when(String name, BooleanSupplier ready, Runnable action, int pause) {
         STEPS.add(new Step(name, ready, action, pause));
     }
 
-    private static void check(String what, boolean ok) {
+    static void check(String what, boolean ok) {
         if (!ok) failures++;
         RYSMap.LOG.info("[autotest] {} {}", ok ? "OK  " : "FAIL", what);
     }
 
-    private static void shot(String name) {
-        step("shot " + name, () -> Screenshot.grab(mc().gameDirectory, String.format("map_%02d_%s.png", shots++, name), mc().getMainRenderTarget(), m -> {}), 4);
+    static void shot(String name) {
+        step("shot " + name, () -> Screenshot.grab(mc().gameDirectory, String.format("%s_%02d_%s.png", prefix, shots++, name), mc().getMainRenderTarget(), m -> {}), 4);
     }
 
     /** Сканер успокоился: очередь пуста 40 тиков подряд. */
-    private static boolean settled() {
+    static boolean settled() {
         MapSession s = session();
         if (s == null || !ColorTable.INSTANCE.ready()) return false;
         settle = s.queued() == 0 ? settle + 1 : 0;
         return settle > 40;
     }
 
-    private static void stats(String tag) {
+    static void stats(String tag) {
         MapSession s = session();
         Runtime rt = Runtime.getRuntime();
         RYSMap.LOG.info("[autotest] замер {}: снимков {}, главный поток в среднем {} мкс на чанк, худший {} мкс; рабочий поток {} мкс на чанк; "
@@ -149,6 +150,10 @@ public final class MapAutoTest {
     }
 
     private static void build() {
+        if ("ui".equals(System.getProperty("rysmap.autotest"))) {
+            UiAutoTest.build();
+            return;
+        }
         step("title", () -> {
             mc().options.pauseOnLostFocus = false;
             mc().options.onboardAccessibility = false;
