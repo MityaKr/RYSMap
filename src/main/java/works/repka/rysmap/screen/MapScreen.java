@@ -76,6 +76,8 @@ public final class MapScreen extends ScaledScreen {
     private MapApi.@Nullable ModeView modeView;
     private final CanvasSurface surface = new CanvasSurface();
     private boolean modeMouse;
+    /** Чужая метка с панелью ({@link MapApi.Marker#panel()}), открытая кликом. */
+    private MapApi.@Nullable Marker panelMarker;
     /** Поиск в шапке (макет 14) и его место в прошлом кадре. */
     private final MapSearch search = new MapSearch();
     private int searchX, searchY;
@@ -182,6 +184,8 @@ public final class MapScreen extends ScaledScreen {
         }
         canvas(g, t, canvas, s, mx, my, partial);
         PointStore.Point sel = selectedPoint();
+        MapApi.Panel foreign = sel == null ? markerPanel() : null;
+        if (foreign != null) MarkerPanel.draw(g, t, hits, this, panelMarker, foreign, mx, my);
         if (sel != null) {
             @SuppressWarnings("unchecked") List<String>[] panelTip = new List[1];
             PointPanel.draw(g, t, hits, this, sel, mx, my, panelTip);
@@ -517,7 +521,7 @@ public final class MapScreen extends ScaledScreen {
     int visibleRight() {
         MapApi.PanelView pv = modeView == null ? null : safe(modeView::panel, null);
         if (pv != null) return cx0 + cw - pv.width();
-        return cx0 + cw - (selectedPoint() != null ? PointPanel.W : 0);
+        return cx0 + cw - (selectedPoint() != null || markerPanel() != null ? PointPanel.W : 0);
     }
 
     private boolean overTools(int mx, int my) {
@@ -970,6 +974,19 @@ public final class MapScreen extends ScaledScreen {
         return out;
     }
 
+    /** Данные панели чужой метки этого кадра или null (метка в другом измерении, мод вернул null или упал). */
+    private MapApi.@Nullable Panel markerPanel() {
+        MapApi.Marker m = panelMarker;
+        if (m == null || m.panel() == null || !m.dimension().equals(dimension)) return null;
+        MapApi.Panel p = safe(() -> m.panel().get(), null);
+        if (p == null) panelMarker = null;
+        return p;
+    }
+
+    void closeMarkerPanel() {
+        panelMarker = null;
+    }
+
     MapApi.@Nullable Tab tab() {
         return tab;
     }
@@ -1325,6 +1342,11 @@ public final class MapScreen extends ScaledScreen {
             for (MapApi.Marker m : Layers.markers(layer, dimension)) {
                 if (Math.abs(mx - sx(m.x())) <= 6 && Math.abs(my - sy(m.z())) <= 6) {
                     if (markerClicked(layer, m)) return;
+                    if (m.panel() != null) {
+                        panelMarker = m;
+                        selected = null;
+                        return;
+                    }
                     if (m.click() != null) {
                         m.click().run();
                         return;
@@ -1348,7 +1370,16 @@ public final class MapScreen extends ScaledScreen {
     /** Клик по пустому месту полотна: закрыть окно точки, иначе снять выбор. */
     void canvasClicked() {
         if (editor != null) closeEditor();
-        else selected = null;
+        else {
+            selected = null;
+            panelMarker = null;
+        }
+    }
+
+    /** Для автотеста: открыть панель чужой метки. */
+    public void markerPanelForTest(MapApi.Marker m) {
+        selected = null;
+        panelMarker = m;
     }
 
     @Override
@@ -1486,6 +1517,10 @@ public final class MapScreen extends ScaledScreen {
         if (dimDrop.keyPressed(key)) return true;
         if (key == GLFW.GLFW_KEY_ESCAPE && modeView != null && selected == null && menu == null) {
             setMode(null);
+            return true;
+        }
+        if (key == GLFW.GLFW_KEY_ESCAPE && panelMarker != null) {
+            panelMarker = null;
             return true;
         }
         if (key == GLFW.GLFW_KEY_ESCAPE && selected != null) {

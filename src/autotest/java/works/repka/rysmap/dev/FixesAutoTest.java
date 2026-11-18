@@ -226,6 +226,20 @@ final class FixesAutoTest {
             check("поиск координат: " + first, first.contains("120"));
         }, 10);
         shot("map_search");
+        step("marker panel", () -> {
+            screen().keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0);
+            var p = mc().player;
+            MapApi.Marker goal = MapApi.Marker.builder(java.util.UUID.nameUUIDFromBytes("goal".getBytes())).pos(p.level().dimension(), p.getX() + 20, 64, p.getZ() - 10)
+                .kind(MapApi.Kind.GOAL).icon(Icons.Shape.TARGET).color(0xFFE4B23C).label(Component.literal("Найти деревню"))
+                .panel(() -> MapApi.Panel.builder(Component.literal("Найти деревню")).subtitle(Component.literal("Цель квеста"))
+                    .text(Component.literal("Деревня где-то в этом круге. Поговори с жителем."))
+                    .row(Component.literal("Глава"), Component.literal("Начало")).row(Component.literal("Награда"), Component.literal("8 изумрудов"))
+                    .note(Component.literal("Пример панели чужой метки из ядра 1.12"))
+                    .action(MapApi.Action.builder(Component.literal("Открыть квест"), () -> {}).primary(true).build())
+                    .action(MapApi.Action.builder(Component.literal("Сохранить точкой"), () -> {}).build()).build()).build();
+            screen().markerPanelForTest(goal);
+        }, 10);
+        shot("map_marker_panel");
         step("settings", () -> {
             screen().keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0);
             screen().settingsForTest();
