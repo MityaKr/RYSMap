@@ -267,6 +267,44 @@ final class FixesAutoTest {
             screen().markerPanelForTest(goal);
         }, 10);
         shot("map_marker_panel");
+        // соседи (Т3, Т5): цель квеста с районом и предметом, тревога базы, подпись тревоги в мире
+        step("neighbors", () -> {
+            screen().keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0);
+            screen().setZoom(2);
+            var p = mc().player;
+            var dim = p.level().dimension();
+            double gx = p.getX() + 30, gz = p.getZ() - 12, ax = p.getX() - 18, az = p.getZ() + 10;
+            MapApi.get().layer(new MapApi.Layer() {
+                @Override public ResourceLocation id() { return ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "autotest_goals"); }
+                @Override public Component name() { return Component.literal("Цели и тревоги (тест)"); }
+                @Override public Icons.Shape icon() { return Icons.Shape.TARGET; }
+                @Override public int order() { return 30; }
+                @Override public long revision() { return 1; }
+                @Override
+                public Collection<MapApi.Marker> markers(ResourceKey<Level> d) {
+                    if (!d.equals(dim)) return List.of();
+                    return List.of(
+                        MapApi.Marker.builder(java.util.UUID.nameUUIDFromBytes("goal2".getBytes())).pos(d, gx, 64, gz).kind(MapApi.Kind.GOAL)
+                            .item(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.EMERALD)).color(0xFFE4B23C)
+                            .label(Component.literal("Деревня")).radius(24).build(),
+                        MapApi.Marker.builder(java.util.UUID.nameUUIDFromBytes("alert".getBytes())).pos(d, ax, 64, az).kind(MapApi.Kind.ALERT)
+                            .icon(Icons.Shape.WARN).color(0xFFE5534B).label(Component.literal("Дробилка встала")).build());
+                }
+            });
+            works.repka.ryscore.world.Labels.source(new works.repka.ryscore.world.Labels.Source() {
+                @Override public ResourceLocation id() { return ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "autotest_alert"); }
+                @Override
+                public Collection<works.repka.ryscore.world.Labels.Label> labels(ResourceKey<Level> d) {
+                    return List.of(works.repka.ryscore.world.Labels.Label.builder(java.util.UUID.nameUUIDFromBytes("alert".getBytes()))
+                        .pos(d, ax, 66, az).kind(works.repka.ryscore.world.Labels.Kind.ALERT).icon(Icons.Shape.WARN).color(0xFFE5534B)
+                        .text(Component.literal("Дробилка встала")).build());
+                }
+            });
+        }, 20);
+        shot("map_neighbors");
+        step("neighbors hud", () -> mc().setScreen(null), 20);
+        shot("hud_neighbors");
+        step("neighbors back", () -> MapScreen.open(), 20);
         step("highlight", () -> {
             screen().keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0);
             screen().setZoom(1);
