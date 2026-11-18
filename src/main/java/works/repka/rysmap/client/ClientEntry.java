@@ -50,6 +50,10 @@ public final class ClientEntry {
     public static final KeyMapping ZOOM_OUT = new KeyMapping("key.rysmap.zoom_out", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_MINUS, CATEGORY);
     private static @Nullable MapSession session;
     private static ClientConfig config = new ClientConfig();
+    /** Что прислал сервер в MapHello этого входа: UUID мира и старый id FTB. */
+    private static java.util.@Nullable UUID helloWorld;
+    private static String helloFtb = "";
+    private static boolean migrationStarted;
 
     private ClientEntry() {}
 
@@ -58,6 +62,7 @@ public final class ClientEntry {
         SablePlots.setActive(ModList.get().isLoaded("sable"));
         MapApi.provide(new MapApiImpl());
         works.repka.rysmap.point.PointsLayer.register();
+        works.repka.ryscore.migrate.Migrations.register(new works.repka.rysmap.migrate.FtbMapStep());
         modBus.addListener((RegisterKeyMappingsEvent e) -> {
             e.register(OPEN);
             e.register(ZOOM_IN);
@@ -116,7 +121,7 @@ public final class ClientEntry {
         Minecraft mc = Minecraft.getInstance();
         if (session == null) {
             ColorTable.INSTANCE.setUnknown(unknownColor());
-            session = new MapSession(new MapStore(mc.gameDirectory.toPath().resolve("rysmap"), MapSession.keyFor(mc)), config);
+            session = new MapSession(new MapStore(maps(), MapSession.keyFor(mc, helloWorld)), config);
         }
         String dim = level.dimension().location().toString();
         if (!dim.equals(session.dimension())) {
@@ -126,9 +131,75 @@ public final class ClientEntry {
         return session;
     }
 
+    private static java.nio.file.Path maps() {
+        return Minecraft.getInstance().gameDirectory.toPath().resolve("rysmap");
+    }
+
+    /**
+     * MapHello от сервера: папка карты встаёт на UUID мира. Если сессия уже открыта под старым ключом (адрес или имя
+     * сохранения), она закрывается, её папка переезжает на новый ключ, новая сессия снова берёт загруженные чанки.
+     * Затем, если сервер знает старый id FTB, запускается шаг переезда {@code map} (флаг и отметку проверяет ядро).
+     */
+    public static void hello(java.util.UUID world, String ftbId) {
+        helloWorld = world;
+        helloFtb = ftbId == null ? "" : ftbId;
+        Minecraft mc = Minecraft.getInstance();
+        RYSMap.LOG.info("[rysmap] MapHello: мир {}, id FTB {}", world, helloFtb.isEmpty() ? "нет" : helloFtb);
+        if (mc.level == null) return;
+        works.repka.rysmap.world.WorldKey want0 = MapSession.keyFor(mc, world);
+        try {
+            MapStore.remember(maps(), MapSession.fallbackKey(mc).id(), want0.id());
+        } catch (java.io.IOException e) {
+            RYSMap.LOG.warn("[rysmap] keys.json не записался: {}", e.toString());
+        }
+        MapSession s = session;
+        if (s == null) {
+            ensure(mc.level);
+        } else {
+            works.repka.rysmap.world.WorldKey want = MapSession.keyFor(mc, world);
+            if (!s.store.key().id().equals(want.id())) rekey(mc, s, want);
+        }
+        startMigration(mc);
+    }
+
+    private static void rekey(Minecraft mc, MapSession old, works.repka.rysmap.world.WorldKey want) {
+        session = null;
+        old.close();
+        works.repka.rysmap.world.WorldKey key = want;
+        try {
+            RYSMap.LOG.info("[rysmap] ключ мира {} → {}: {}", old.store.key().id(), want.id(), MapStore.adopt(maps(), old.store.key(), want));
+        } catch (java.io.IOException e) {
+            // папка занята или нет прав: карта остаётся в старой папке, попытка повторится при следующем входе
+            RYSMap.LOG.warn("[rysmap] папка карты не переехала на {}: {}", want.id(), e.toString());
+            key = new works.repka.rysmap.world.WorldKey(old.store.key().id(), want.name());
+        }
+        session = new MapSession(new MapStore(maps(), key), config);
+        if (mc.level != null && mc.player != null) {
+            session.enterDimension(mc.level);
+            session.requeueLoaded(mc.level, mc.player.getBlockX() >> 4, mc.player.getBlockZ() >> 4, mc.options.getEffectiveRenderDistance() + 1);
+        }
+    }
+
+    private static void startMigration(Minecraft mc) {
+        MapSession s = session;
+        if (migrationStarted || helloFtb.isEmpty() || s == null || mc.player == null) return;
+        migrationStarted = true;
+        works.repka.rysmap.migrate.FtbMapStep.host(new FtbHost(s, mc.player.level().dimension().location().toString(),
+            mc.player.getBlockX(), mc.player.getBlockZ(), config.noMapDimensions));
+        works.repka.ryscore.migrate.Migrations.runClient(mc.gameDirectory.toPath(), s.store.root(),
+                java.util.Map.of(works.repka.rysmap.migrate.FtbMapStep.VALUE_FTB_ID, helloFtb))
+            .whenComplete((r, t) -> {
+                if (t != null) RYSMap.LOG.warn("[rysmap] переезд карты FTB не запустился", t);
+            });
+    }
+
     private static void close() {
         MapSession s = session;
         session = null;
+        helloWorld = null;
+        helloFtb = "";
+        migrationStarted = false;
+        works.repka.rysmap.migrate.FtbMapStep.host(null);
         if (s != null) s.close();
         Layers.clear();
         if (MapApi.get() instanceof MapApiImpl api) api.track(null);

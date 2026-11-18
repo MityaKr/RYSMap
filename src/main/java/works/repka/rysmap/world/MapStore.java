@@ -53,6 +53,68 @@ public final class MapStore {
         return dimension(dimensionId).resolve("palette.json");
     }
 
+    /**
+     * Переезд папки карты на новый ключ (UUID мира от сервера): папка старого ключа переименовывается, если папки
+     * нового ещё нет. Если есть обе, старая остаётся как есть (в лог), карта берётся из новой. Старый ключ дописывается
+     * в {@code world.json} нового ({@code "was"}).
+     *
+     * @return что случилось, строкой для лога
+     */
+    public static String adopt(Path mapsRoot, WorldKey from, WorldKey to) throws IOException {
+        if (from.id().equals(to.id())) return "ключ тот же";
+        Path src = mapsRoot.resolve(from.id()), dst = mapsRoot.resolve(to.id());
+        if (!Files.isDirectory(src)) return "старой папки нет";
+        if (Files.exists(dst)) return "папка " + to.id() + " уже есть, " + from.id() + " оставлена как есть";
+        Files.move(src, dst);
+        Path file = dst.resolve("world.json");
+        JsonObject json = new JsonObject();
+        if (Files.isRegularFile(file)) {
+            try {
+                json = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
+            } catch (RuntimeException ignored) {
+                json = new JsonObject();
+            }
+        }
+        com.google.gson.JsonArray was = json.has("was") && json.get("was").isJsonArray() ? json.getAsJsonArray("was") : new com.google.gson.JsonArray();
+        was.add(from.id());
+        json.add("was", was);
+        Files.writeString(file, GSON.toJson(json), StandardCharsets.UTF_8);
+        return "папка " + from.id() + " переехала в " + to.id();
+    }
+
+    /**
+     * Ключ по UUID мира, который уже приходил для этого адреса или сохранения ({@code rysmap/keys.json}): следующий
+     * вход сразу открывает папку {@code w-<uuid>}, не дожидаясь {@code MapHello}, и не плодит папку по адресу.
+     */
+    public static @org.jetbrains.annotations.Nullable String known(Path mapsRoot, String fallbackId) {
+        Path file = mapsRoot.resolve("keys.json");
+        if (!Files.isRegularFile(file)) return null;
+        try {
+            JsonObject json = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
+            return json.has(fallbackId) ? json.get(fallbackId).getAsString() : null;
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Запомнить, что адрес или сохранение {@code fallbackId} это мир {@code worldId}. */
+    public static void remember(Path mapsRoot, String fallbackId, String worldId) throws IOException {
+        Path file = mapsRoot.resolve("keys.json");
+        JsonObject json = new JsonObject();
+        if (Files.isRegularFile(file)) {
+            try {
+                json = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
+            } catch (RuntimeException ignored) {
+                json = new JsonObject();
+            }
+        }
+        if (json.has(fallbackId) && json.get(fallbackId).getAsString().equals(worldId)) return;
+        json.addProperty("v", VERSION);
+        json.addProperty(fallbackId, worldId);
+        Files.createDirectories(mapsRoot);
+        Files.writeString(file, GSON.toJson(json), StandardCharsets.UTF_8);
+    }
+
     /** Отмечает вход: имя, когда заходил. Ошибка записи не мешает карте. */
     public void touch() throws IOException {
         Files.createDirectories(root);
@@ -67,6 +129,7 @@ public final class MapStore {
         }
         json.addProperty("v", VERSION);
         json.addProperty("name", key.name());
+        if (key.id().startsWith("w-")) json.addProperty("world", key.id().substring(2));
         long now = System.currentTimeMillis() / 1000;
         if (!json.has("created")) json.addProperty("created", now);
         json.addProperty("seen", now);

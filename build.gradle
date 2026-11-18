@@ -46,12 +46,15 @@ neoForge {
             client()
             gameDirectory = project.file('run')
         }
-        // Сценарий в новом мире: замер сканера, регионы на диске, повторный вход. Куча задаётся явно (-Pheap, по умолчанию 3G).
+        // Сценарии в новом мире (-Pautotest): scan (замер сканера, регионы, повторный вход), ui (снимки рядом с макетами),
+        // migrate (MapHello, папка на UUID мира, шаг map на копии карты FTB из fixtures). Куча задаётся явно (-Pheap, по умолчанию 3G).
         autotest {
             client()
             gameDirectory = project.file('run')
             jvmArgument "-Xmx${project.findProperty('heap') ?: '3G'}"
             systemProperty 'rysmap.autotest', project.findProperty('autotest') ?: 'scan'
+            // сценарий migrate берёт настоящую карту FTB из fixtures (в git её нет)
+            systemProperty 'rysmap.ftbFixture', project.findProperty('ftbFixture') ?: project.file('../../_shared/_saved/fixtures/ftb-2026-11-18/client/ftbchunks').absolutePath
             programArguments.addAll '--width', '1280', '--height', '800'
         }
     }

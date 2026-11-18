@@ -87,7 +87,9 @@ class PointStoreTest {
         List<PointStore.Point> points = FtbPoints.read(FtbRegionReader.open(world));
         assertEquals(2, points.size());
         PointStore.Point death = points.get(0), portal = points.get(1);
-        assertTrue(death.death());
+        assertFalse(death.death(), "место гибели FTB переходит обычной точкой");
+        assertEquals(FtbPoints.NOTE_DEATH, death.note);
+        assertEquals("skull", death.icon);
         assertFalse(death.minimap, "hidden выключает миникарту");
         assertEquals("minecraft:the_end", death.dimension);
         assertEquals("flag", portal.icon);
@@ -114,12 +116,13 @@ class PointStoreTest {
         }
         assertEquals(expected, total, "все точки из waypoints.json прочитаны");
         assertTrue(total > 0);
-        // в списке гибели остаются три последних
+        // все точки FTB остаются: правило «три последних» только для новых смертей
         PointStore store = new PointStore();
         try (Stream<Path> s = Files.list(root)) {
             for (Path dir : s.filter(Files::isDirectory).toList()) for (PointStore.Point p : FtbPoints.read(FtbRegionReader.open(dir))) store.add(p);
         }
-        assertTrue(store.points().stream().filter(PointStore.Point::death).count() <= PointStore.DEATHS_KEPT);
+        assertEquals(total, store.points().size());
+        assertEquals(0, store.points().stream().filter(PointStore.Point::death).count());
         System.out.println("[ftb-fixture] точек " + total + ", после переноса " + store.points().size());
     }
 }

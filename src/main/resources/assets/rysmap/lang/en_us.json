@@ -45,5 +45,7 @@
   "rysmap.direction.west": "to the west",
   "rysmap.direction.northwest": "to the northwest",
   "rysmap.direction.north": "to the north",
-  "rysmap.direction.northeast": "to the northeast"
+  "rysmap.direction.northeast": "to the northeast",
+  "rysmap.migrate.done": "Map moved from FTB Chunks: %s points, %s regions",
+  "rysmap.point.note.ftb_death": "Death spot (from FTB)"
 }

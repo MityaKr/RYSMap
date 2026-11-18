@@ -27,7 +27,8 @@ import org.jetbrains.annotations.Nullable;
  *   "icon": "home", "color": 2, "minimap": true, "world": false, "kind": "point", "created": 1794267098, "from": "ftb" } ] }
  * </pre>
  *
- * Мест гибели хранится три последних. {@link #revision()} растёт при любой правке: слой точек пересобирает метки по нему.
+ * Мест гибели ({@code kind: death}) хранится три последних; бывшие места гибели FTB лежат обычными точками с пометкой
+ * {@code note: ftb_death} и под это правило не попадают (решение дирижёра 18.11). {@link #revision()} растёт при любой правке: слой точек пересобирает метки по нему.
  */
 public final class PointStore {
     public static final int VERSION = 1, DEATHS_KEPT = 3, COLORS = 12;
@@ -47,6 +48,8 @@ public final class PointStore {
         public String kind = "point";
         public long created = System.currentTimeMillis() / 1000;
         public @Nullable String from;
+        /** Пометка: {@code ftb_death} у бывших мест гибели FTB (обычная точка, правило «три последних» её не трогает). */
+        public @Nullable String note;
 
         public boolean death() {
             return "death".equals(kind);
@@ -137,6 +140,7 @@ public final class PointStore {
             p.kind = str(o, "kind", "point");
             if (o.has("created")) p.created = o.get("created").getAsLong();
             p.from = o.has("from") ? o.get("from").getAsString() : null;
+            p.note = o.has("note") ? o.get("note").getAsString() : null;
             s.points.add(p);
         }
         return s;
@@ -169,6 +173,7 @@ public final class PointStore {
             o.addProperty("kind", p.kind);
             o.addProperty("created", p.created);
             if (p.from != null) o.addProperty("from", p.from);
+            if (p.note != null) o.addProperty("note", p.note);
             array.add(o);
         }
         json.add("points", array);

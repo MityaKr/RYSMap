@@ -45,5 +45,7 @@
   "rysmap.direction.west": "на запад",
   "rysmap.direction.northwest": "на северо-запад",
   "rysmap.direction.north": "на север",
-  "rysmap.direction.northeast": "на северо-восток"
+  "rysmap.direction.northeast": "на северо-восток",
+  "rysmap.migrate.done": "Карта перенесена из FTB Chunks: точек %s, регионов %s",
+  "rysmap.point.note.ftb_death": "Место гибели (из FTB)"
 }

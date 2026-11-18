@@ -721,6 +721,11 @@ public final class MapScreen extends ScaledScreen {
         return true;
     }
 
+    /** Масштаб окна, единиц на блок (автотест, будущая настройка). */
+    public void setZoom(double z) {
+        zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+    }
+
     /** Для автотеста: меню правой кнопки чуть правее и ниже середины полотна. */
     public void openMenuForTest() {
         openMenu(cx0 + cw / 2 + 30, cy0 + ch / 2 + 20);

@@ -154,6 +154,10 @@ public final class MapAutoTest {
             UiAutoTest.build();
             return;
         }
+        if ("migrate".equals(System.getProperty("rysmap.autotest"))) {
+            MigrateAutoTest.build();
+            return;
+        }
         step("title", () -> {
             mc().options.pauseOnLostFocus = false;
             mc().options.onboardAccessibility = false;

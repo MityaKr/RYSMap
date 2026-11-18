@@ -172,6 +172,36 @@ public final class DimensionMap {
         return baker.bakeChunk(r, palette, neighbors(), chunkX & 31, chunkZ & 31);
     }
 
+    /**
+     * Переезд из FTB: разведанные чанки региона FTB дописываются в наш слой поверхности; чанк, который сканер уже снял,
+     * не трогается. Регион в памяти правится на месте, регион не из памяти читается с диска, правится и сразу пишется,
+     * в кэш не кладётся: переезд не вытесняет регионы вокруг игрока.
+     *
+     * @return сколько чанков перенесено
+     */
+    public int importFtb(works.repka.rysmap.migrate.FtbRegionReader.Region src, works.repka.rysmap.migrate.FtbRegionReader.World world) throws IOException {
+        RegionData r = cache.peek(src.x, src.z);
+        boolean cached = r != null;
+        if (r == null) {
+            Path file = store.region(dimension, src.x, src.z);
+            try {
+                r = RegionFile.readSurface(file, src.x, src.z);
+            } catch (RegionFile.BrokenException e) {
+                broken++;
+                Path moved = RegionFile.quarantine(file);
+                log.accept("регион " + file.getFileName() + " не прочитался (" + e.getMessage() + "), перенесён в " + moved.getParent().getFileName());
+                r = null;
+            }
+            if (r == null) r = new RegionData(src.x, src.z);
+        }
+        int n = works.repka.rysmap.migrate.FtbRegionReader.write(src, world, r, palette);
+        if (n == 0) return 0;
+        if (cached) r.dirty = true;
+        else save(r);
+        if (cached || scanIndex.containsKey(RegionData.key(src.x, src.z))) publish(src.x, src.z, r);
+        return n;
+    }
+
     public void flush() throws IOException {
         if (palette.dirty()) palette.save(store.palette(dimension));
         cache.flush();

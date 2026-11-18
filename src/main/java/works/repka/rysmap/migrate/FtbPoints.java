@@ -14,10 +14,14 @@ import works.repka.rysmap.point.PointStore;
 
 /**
  * Точки FTB Chunks ({@code <папка измерения>/waypoints.json}) в наши (план 10.6, шаг 2): {@code default} становится
- * личной точкой со значком флага и ближайшим из двенадцати цветов, {@code death} местом гибели, {@code hidden}
- * выключает «на миникарте». У точки пометка {@code "from": "ftb"}. Чистая Java; шаг {@code map} это этап М4.
+ * личной точкой со значком флага и ближайшим из двенадцати цветов, {@code hidden} выключает «на миникарте». У точки
+ * пометка {@code "from": "ftb"}. Места гибели {@code death} (в мире автора это все 13 точек) переходят обычными точками
+ * со значком черепа и пометкой {@code note: ftb_death}: правило «три последних» их не удаляет, оно только для новых
+ * смертей (решение дирижёра 18.11). Чистая Java.
  */
 public final class FtbPoints {
+    /** Пометка бывшего места гибели FTB. */
+    public static final String NOTE_DEATH = "ftb_death";
     private static final java.util.regex.Pattern NUMBER = java.util.regex.Pattern.compile("#([0-9]{1,6})");
 
     private FtbPoints() {}
@@ -45,12 +49,13 @@ public final class FtbPoints {
                 p.z = w.has("z") ? w.get("z").getAsInt() : 0;
                 p.minimap = !(w.has("hidden") && w.get("hidden").getAsBoolean());
                 boolean death = w.has("type") && "death".equals(w.get("type").getAsString());
-                p.kind = death ? "death" : "point";
+                p.kind = "point";
                 p.icon = death ? "skull" : "flag";
                 p.color = PointStore.nearestColor(color(w));
                 p.from = "ftb";
                 if (death) {
-                    // у FTB времени гибели нет, есть номер в имени «Death #28»: по нему остаются три последних
+                    p.note = NOTE_DEATH;
+                    // у FTB времени гибели нет, есть номер в имени «Death #28»: по нему сохраняется порядок
                     java.util.regex.Matcher m = NUMBER.matcher(p.name);
                     if (m.find()) p.created = p.created - 1_000_000 + Long.parseLong(m.group(1));
                 }

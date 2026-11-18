@@ -299,6 +299,16 @@ public final class TileTextures {
         }
     }
 
+    /** Перерисовать один регион (переезд из FTB дописал его): следующий кадр закажет текстуру заново. */
+    public void invalidate(String dimension, int regionX, int regionZ) {
+        Long2ObjectOpenHashMap<Tile> map = tiles.get(dimension);
+        if (map == null) return;
+        Tile t = map.get(RegionData.key(regionX, regionZ));
+        if (t == null || t.state == REQUESTED) return;
+        release(t);
+        map.remove(RegionData.key(regionX, regionZ));
+    }
+
     /** Выход из мира: всё отпускается, внешний буфер тоже. */
     public void close() {
         for (Long2ObjectOpenHashMap<Tile> map : tiles.values()) for (Tile t : map.values()) release(t);

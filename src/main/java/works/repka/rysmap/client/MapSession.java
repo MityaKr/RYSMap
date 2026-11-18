@@ -62,6 +62,7 @@ public final class MapSession {
     private int ticks;
     private int pinnedX = Integer.MIN_VALUE, pinnedZ = Integer.MIN_VALUE;
     private long colorsSeen = -1;
+    private volatile boolean closed;
 
     // замеры для отчёта и строки F3
     private long snapNanos, snapCount, snapMaxNanos;
@@ -219,6 +220,9 @@ public final class MapSession {
                 results.poll();
                 tiles.accept(p);
                 regions++;
+            } else if (r instanceof Invalidate inv) {
+                results.poll();
+                tiles.invalidate(inv.dimension, inv.regionX, inv.regionZ);
             } else if (r instanceof TileTextures.Patch p) {
                 if (patches >= PATCHES_PER_FRAME) break;
                 results.poll();
@@ -258,6 +262,63 @@ public final class MapSession {
             }
             results.add(new TileTextures.Pixels(dim, regionX, regionZ, px));
         });
+    }
+
+    /** Регион переписан не сканером (переезд из FTB): текстуру заказать заново. */
+    private record Invalidate(String dimension, int regionX, int regionZ) {}
+
+    /**
+     * Переезд из FTB: регион в карту в рабочем потоке. Будущее завершается числом перенесённых чанков; поток переезда
+     * ждёт его, поэтому в куче одновременно лежит один регион FTB.
+     */
+    public java.util.concurrent.CompletableFuture<Integer> importFtb(String dimensionId, works.repka.rysmap.migrate.FtbRegionReader.Region region,
+                                                                    works.repka.rysmap.migrate.FtbRegionReader.World world) {
+        java.util.concurrent.CompletableFuture<Integer> out = new java.util.concurrent.CompletableFuture<>();
+        if (closed) {
+            out.completeExceptionally(new IOException("карта закрыта"));
+            return out;
+        }
+        worker.submit(() -> {
+            try {
+                int n = dim(dimensionId).importFtb(region, world);
+                if (n > 0) results.add(new Invalidate(dimensionId, region.x, region.z));
+                out.complete(n);
+            } catch (Throwable t) {
+                out.completeExceptionally(t);
+            }
+        });
+        return out;
+    }
+
+    /** Карта закрыта (выход из мира или смена ключа). */
+    public boolean closed() {
+        return closed;
+    }
+
+    /** Чанки, уже лежащие у клиента, снова в очередь: после смены ключа мира новая сессия их ещё не видела. */
+    public void requeueLoaded(ClientLevel level, int centerChunkX, int centerChunkZ, int radius) {
+        for (int z = centerChunkZ - radius; z <= centerChunkZ + radius; z++)
+            for (int x = centerChunkX - radius; x <= centerChunkX + radius; x++)
+                if (level.getChunkSource().getChunk(x, z, ChunkStatus.FULL, false) != null) chunkLoaded(x, z);
+    }
+
+    /**
+     * Точки из FTB в хранилище (главный поток). Перед первой правкой {@code points.json} копируется рядом
+     * ({@code points.before-ftb-<время>.json}). Возвращает добавленные.
+     */
+    public int importPoints(java.util.List<works.repka.rysmap.point.PointStore.Point> ftb) {
+        java.nio.file.Path file = store.root().resolve("points.json");
+        try {
+            if (java.nio.file.Files.isRegularFile(file)) {
+                String stamp = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+                java.nio.file.Files.copy(file, file.resolveSibling("points.before-ftb-" + stamp + ".json"));
+            }
+        } catch (IOException e) {
+            RYSMap.LOG.warn("[rysmap] копия points.json не сделана: {}", e.toString());
+        }
+        int added = works.repka.rysmap.migrate.FtbImport.mergePoints(points, ftb);
+        if (added > 0) savePoints();
+        return added;
     }
 
     // ---- рабочий поток ----
@@ -338,6 +399,7 @@ public final class MapSession {
 
     /** Выход из мира: всё записать, поток остановить, текстуры отпустить. Главный поток ждёт до 10 секунд. */
     public void close() {
+        closed = true;
         worker.stop(() -> {
             for (String id : new HashSet<>(dims.keySet())) closeDimension(id);
         }, 10_000);
@@ -401,14 +463,39 @@ public final class MapSession {
         return java.nio.file.Files.isRegularFile(store.region(dim, regionX, regionZ));
     }
 
-    public static WorldKey keyFor(Minecraft mc) {
+    /**
+     * Ключ мира: UUID от сервера с RYSMap ({@code MapHello}), иначе имя сохранения или адрес сервера. Имя для шапки
+     * окна: название мира или сервера из списка.
+     */
+    public static WorldKey keyFor(Minecraft mc, java.util.@Nullable UUID world) {
+        String name;
+        WorldKey fallback;
+        if (mc.getSingleplayerServer() != null) {
+            String folder = mc.getSingleplayerServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
+                .toAbsolutePath().normalize().getFileName().toString();
+            fallback = WorldKey.singleplayer(folder);
+            String level = mc.getSingleplayerServer().getWorldData().getLevelName();
+            name = level == null || level.isBlank() ? folder : level;
+        } else {
+            var server = mc.getCurrentServer();
+            fallback = WorldKey.server(server != null ? server.ip : "unknown");
+            name = server == null ? "?" : server.name == null || server.name.isBlank() ? server.ip : server.name;
+        }
+        if (world != null) return WorldKey.world(world, name);
+        // UUID этого мира уже приходил раньше: та же папка и до MapHello
+        String known = works.repka.rysmap.world.MapStore.known(mc.gameDirectory.toPath().resolve("rysmap"), fallback.id());
+        if (known != null && known.startsWith("w-")) return new WorldKey(known, name);
+        return new WorldKey(fallback.id(), name);
+    }
+
+    /** Ключ без серверной части (по имени сохранения или адресу). */
+    public static WorldKey fallbackKey(Minecraft mc) {
         if (mc.getSingleplayerServer() != null) {
             String folder = mc.getSingleplayerServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
                 .toAbsolutePath().normalize().getFileName().toString();
             return WorldKey.singleplayer(folder);
         }
         var server = mc.getCurrentServer();
-        if (server != null) return WorldKey.server(server.ip);
-        return WorldKey.server("unknown");
+        return WorldKey.server(server != null ? server.ip : "unknown");
     }
 }
