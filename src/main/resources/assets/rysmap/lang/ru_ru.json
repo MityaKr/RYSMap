@@ -187,5 +187,8 @@
   "rysmap.settings.shape.view": "По взгляду",
   "rysmap.chat.point": "Точка",
   "rysmap.chat.add": "Клик: добавить точку себе",
-  "rysmap.point.chat": "В чат"
+  "rysmap.point.chat": "В чат",
+  "rysmap.search.hint": "Точка, игрок, координаты",
+  "rysmap.search.none": "Ничего не нашлось",
+  "rysmap.search.goto": "Перейти: X %s, Z %s"
 }

@@ -187,5 +187,8 @@
   "rysmap.settings.shape.view": "Follow view",
   "rysmap.chat.point": "Point",
   "rysmap.chat.add": "Click: add this point to your map",
-  "rysmap.point.chat": "To chat"
+  "rysmap.point.chat": "To chat",
+  "rysmap.search.hint": "Point, player, coordinates",
+  "rysmap.search.none": "Nothing found",
+  "rysmap.search.goto": "Go to X %s, Z %s"
 }

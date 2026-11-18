@@ -76,6 +76,11 @@ public final class MapScreen extends ScaledScreen {
     private MapApi.@Nullable ModeView modeView;
     private final CanvasSurface surface = new CanvasSurface();
     private boolean modeMouse;
+    /** Поиск в шапке (макет 14) и его место в прошлом кадре. */
+    private final MapSearch search = new MapSearch();
+    private int searchX, searchY;
+    /** Клавиша / поставила курсор в поиск: её символ в поле не пишется. */
+    private boolean skipSlash;
 
     /** Мышь в прошлом кадре, единицы окна: клавиша T телепортирует под курсор. */
     private int lastMx = -1, lastMy = -1;
@@ -157,7 +162,8 @@ public final class MapScreen extends ScaledScreen {
         if (settings != null) {
             header(g, t, s, mx, my);
             settings.draw(g, t, hits, this, mx, my);
-            if (tip != null) Kit.tooltip(g, t, tip, mx, my);
+            search.drawResults(g, t, hits, this, searchX, searchY, mx, my);
+            if (tip != null && !search.focused()) Kit.tooltip(g, t, tip, mx, my);
             return;
         }
         if (tab != null && !safeAvailable(tab)) setTab(null);
@@ -170,7 +176,8 @@ public final class MapScreen extends ScaledScreen {
                 tab = null;
             }
             header(g, t, s, mx, my);
-            if (tip != null) Kit.tooltip(g, t, tip, mx, my);
+            search.drawResults(g, t, hits, this, searchX, searchY, mx, my);
+            if (tip != null && !search.focused()) Kit.tooltip(g, t, tip, mx, my);
             return;
         }
         canvas(g, t, canvas, s, mx, my, partial);
@@ -196,6 +203,7 @@ public final class MapScreen extends ScaledScreen {
         if (menu != null) menu(g, t, mx, my);
         else if (tip != null && !dimDrop.open && dialog == null && (editor == null || !editor.over(mx, my))) Kit.tooltip(g, t, tip, mx, my);
         if (dialog != null) Kit.dialog(g, t, hits, dialog, mx, my);
+        else search.drawResults(g, t, hits, this, searchX, searchY, mx, my);
     }
 
     private void header(GuiGraphics g, Theme t, MapSession s, int mx, int my) {
@@ -231,6 +239,9 @@ public final class MapScreen extends ScaledScreen {
                 on ? t.c("text.secondary") : t.c("button.border"));
         }
         Icons.draw(g, Icons.Shape.GEAR, gearX + 4.5f, y + 9.5f, 9, hot || on ? t.c("text.primary") : t.c("button.fg"));
+        searchX = gearX - 6 - MapSearch.W;
+        searchY = y + 5;
+        if (searchX > tx + 8) search.drawField(g, t, hits, this, searchX, searchY, mx, my);
         hits.add(gearX, y + 5, 18, 18, b -> {
             if (settings == null) openSettings();
             else closeSettings();
@@ -248,6 +259,14 @@ public final class MapScreen extends ScaledScreen {
 
     void closeSettings() {
         settings = null;
+    }
+
+    /** Для автотеста: строка в поиске; возвращает заголовок первого результата или пусто. */
+    public String searchForTest(String q) {
+        search.focus(true);
+        search.field.setValue(q);
+        List<MapSearch.Result> r = search.compute(q, this);
+        return r.isEmpty() ? "" : r.get(0).title();
     }
 
     /** Для автотеста: страница настроек. */
@@ -951,6 +970,28 @@ public final class MapScreen extends ScaledScreen {
         return out;
     }
 
+    MapApi.@Nullable Tab tab() {
+        return tab;
+    }
+
+    /** Поле окна точки или поиска в фокусе: клавиши идут туда. */
+    private boolean anyFieldFocused() {
+        if (search.focused()) return true;
+        if (editor != null) for (works.repka.ryscore.ui.Field f : editor.fields()) if (f.isFocused()) return true;
+        return false;
+    }
+
+    /** Карта к месту результата поиска; своя точка открывает панель. */
+    void goTo(ResourceKey<Level> dim, double x, double z, PointStore.@Nullable Point point) {
+        closeSettings();
+        setTab(null);
+        menu = null;
+        dimension = dim;
+        centerX = x;
+        centerZ = z;
+        if (point != null) selectPoint(point, true);
+    }
+
     /** Вкладка мода или карта (null). */
     public void setTab(MapApi.@Nullable Tab next) {
         if (next == tab) return;
@@ -1205,6 +1246,10 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     protected boolean onClick(double x, double y, int button) {
+        if (search.focused() && dialog == null) {
+            if (hits.click(x, y, button)) return true;
+            search.focus(false);
+        }
         if (settings != null) {
             hits.click(x, y, button);
             return true;
@@ -1388,6 +1433,13 @@ public final class MapScreen extends ScaledScreen {
     @Override
     public boolean keyPressed(int key, int scan, int modifiers) {
         if (dialog != null) return dialog.keyPressed(key);
+        if (search.key(key, scan, modifiers, this)) return true;
+        if (key == GLFW.GLFW_KEY_SLASH && editor == null && (tab == null || settings != null || !anyFieldFocused())) {
+            search.focus(true);
+            setFocused(search.field);
+            skipSlash = true;
+            return true;
+        }
         if (settings != null) {
             if (settings.keyPressed(key)) return true;
             if (key == GLFW.GLFW_KEY_ESCAPE) {
@@ -1461,6 +1513,12 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     public boolean charTyped(char c, int modifiers) {
+        if (skipSlash && c == '/') {
+            skipSlash = false;
+            return true;
+        }
+        skipSlash = false;
+        if (search.chars(c, modifiers)) return true;
         if (tab != null && settings == null) {
             MapApi.Tab current = tab;
             if (safe(() -> current.charTyped(c, modifiers), false)) return true;

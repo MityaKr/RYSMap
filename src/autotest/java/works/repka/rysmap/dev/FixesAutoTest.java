@@ -219,9 +219,15 @@ final class FixesAutoTest {
             MapApi.get().openTab(ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "autotest_tab"));
         }, 20);
         shot("map_tab");
-        step("settings", () -> {
+        step("search", () -> {
             screen().setTab(null);
             screen().setMode(null);
+            String first = screen().searchForTest("120 −40");
+            check("поиск координат: " + first, first.contains("120"));
+        }, 10);
+        shot("map_search");
+        step("settings", () -> {
+            screen().keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0);
             screen().settingsForTest();
         }, 20);
         shot("settings_server");
