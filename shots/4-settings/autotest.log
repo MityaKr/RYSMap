@@ -1,0 +1,17 @@
+[autotest] копия карты FTB .\local\ftbchunks\data\5936c581-1c3c-4b77-a35b-18590b23d87c: регионов к переносу 340, точек 13
+[autotest] OK   MapHello дал ключ по UUID мира: w-78857abd-1c45-44ee-a08c-9326d2ad86d1
+[autotest] OK   папка по имени сохранения не осталась (переехала или не создавалась)
+[autotest] OK   имя мира в ключе: rysmap_migrate_1a1ec51ac14
+[autotest] OK   без id FTB шаг не шёл
+[autotest] OK   тот же ключ после перезахода
+[autotest] замер переезда: map: готово, points 13, regions 340, chunks 83099; пропущено: измерение neovitae:dungeon: без карты, 40847 мс за 39 с
+[autotest] OK   шаг map прошёл: map: готово, points 13, regions 340, chunks 83099; пропущено: измерение neovitae:dungeon: без карты, 40847 мс
+[autotest] OK   точки FTB перенесены: 13 из 13
+[autotest] OK   места гибели FTB стали обычными точками с пометкой
+[autotest] OK   регионы на диске: 340 из 340 (плюс снятые сканером)
+[autotest] OK   отметка шага в папке карты
+[autotest] замер кучи после переезда: 1151 из 3072 МБ; RYSMap: 11 МБ, 4 рег. в памяти, 4 текстур, очередь 0
+[autotest] OK   угол миникарты из настроек: TOP_LEFT
+[autotest] OK   третий вход шаг не повторил: map: пропущен, уже сделан 2026-11-18T01:43:13.170049300Z
+[autotest] OK   точек столько же: 13
+[autotest] PASS
