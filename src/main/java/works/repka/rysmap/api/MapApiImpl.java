@@ -27,6 +27,14 @@ public final class MapApiImpl implements MapApi {
         works.repka.rysmap.screen.MapScreen.open(target);
     }
 
+    /** «Сохранить точкой» у чужой метки (ядро 1.13): маленькое окно новой точки с этими данными. */
+    @Override
+    public void newPoint(Target target) {
+        String name = target.label().getString();
+        works.repka.rysmap.screen.QuickPointScreen.openAt(target.dimension().location().toString(), (int) Math.floor(target.x()),
+            (int) Math.floor(target.y()), (int) Math.floor(target.z()), name.isEmpty() ? "?" : name);
+    }
+
     @Override
     public void openTab(net.minecraft.resources.ResourceLocation tab) {
         works.repka.rysmap.screen.MapScreen.openTab(tab);

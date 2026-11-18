@@ -100,7 +100,7 @@ final class SettingsPage {
         String cornerName = Component.translatable("rysmap.settings.corner." + corner.name().toLowerCase(java.util.Locale.ROOT)).getString();
         int dw = Kit.dropdownWidth(cornerName, 100);
         int cornerX = lx + lw - Math.max(dw, 85);
-        Kit.dropdown(g, t, hits, cornerDrop, cornerX, y + 2, Math.max(dw, 85), cornerName, c.minimapCorner != null, mx, my);
+        Kit.dropdown(g, t, hits, cornerDrop, cornerX, y + 2, Math.max(dw, 85), cornerName, Anchors.mapCorner() != Anchors.Corner.TOP_RIGHT, mx, my);
         y += ROW;
 
         // размер
@@ -272,8 +272,9 @@ final class SettingsPage {
             for (Anchors.Corner k : corners)
                 options.add(new Kit.Option(Component.translatable("rysmap.settings.corner." + k.name().toLowerCase(java.util.Locale.ROOT)).getString()));
             Kit.dropdownList(g, t, hits, cornerDrop, options, corner.ordinal(), 100, mx, my, i -> {
-                c.minimapCorner = corners[i] == Anchors.mapCorner() ? null : corners[i].name();
+                c.minimapCorner = null;
                 c.save();
+                Anchors.setMapCorner(corners[i]);
             });
         }
     }

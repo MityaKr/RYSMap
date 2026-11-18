@@ -95,15 +95,22 @@ public final class Minimap {
         drawAt(g, mc, session, p, partial, x, y, size, lines);
     }
 
-    /** Угол миникарты: свой выбор игрока в настройках карты, иначе угол зоны карты ядра. */
+    /**
+     * Угол миникарты: угол зоны карты ядра. Выбор игрока в настройках карты уходит в ядро ({@code Anchors.setMapCorner},
+     * 1.13), соседи по углу подвигаются по нему. Старый свой выбор из {@code client.json} (до 0.1.0-m8) переносится в
+     * ядро один раз.
+     */
     public static Anchors.Corner corner() {
-        String c = ClientConfig.get().minimapCorner;
+        ClientConfig cfg = ClientConfig.get();
+        String c = cfg.minimapCorner;
         if (c != null) {
             try {
-                return Anchors.Corner.valueOf(c);
+                Anchors.setMapCorner(Anchors.Corner.valueOf(c));
             } catch (IllegalArgumentException ignored) {
                 // неизвестное значение в файле: угол ядра
             }
+            cfg.minimapCorner = null;
+            cfg.save();
         }
         return Anchors.mapCorner();
     }
