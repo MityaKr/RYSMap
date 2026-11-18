@@ -148,14 +148,46 @@ final class SettingsPage {
         });
         y += ROW + 2;
 
-        // мобы и чужие игроки: только показанный слой или все (просьба автора 18.11)
-        label(g, t, "rysmap.settings.entities", "rysmap.settings.entities.note", lx, y);
-        String[] layersOpt = {Component.translatable("rysmap.settings.entities.current").getString(), Component.translatable("rysmap.settings.entities.all").getString()};
-        segmented(g, t, hits, lx + lw, y, layersOpt, c.entitiesAllLayers ? 1 : 0, mx, my, i -> {
-            c.entitiesAllLayers = i == 1;
+        // мобы (скептик s2): вид, свой слой, кого показывать; камни пути
+        label(g, t, "rysmap.settings.mobs", null, lx, y);
+        String[] views = {Component.translatable("rysmap.settings.no").getString(), Component.translatable("rysmap.settings.mobs.heads").getString(),
+            Component.translatable("rysmap.settings.mobs.dots").getString()};
+        segmented(g, t, hits, lx + lw, y, views, c.mobsView, mx, my, i -> {
+            c.mobsView = i;
             c.save();
         });
-        y += ROW + 4;
+        y += ROW + 2;
+        label(g, t, "rysmap.settings.mobs.layer", "rysmap.settings.mobs.layer.note", lx, y);
+        int[] mobRanges = {8, 16, 0};
+        String[] mobRangeNames = {"±8", "±16", Component.translatable("rysmap.settings.mobs.all").getString()};
+        int rsel = c.mobsRange == 8 ? 0 : c.mobsRange == 16 ? 1 : 2;
+        segmented(g, t, hits, lx + lw, y, mobRangeNames, rsel, mx, my, i -> {
+            c.mobsRange = mobRanges[i];
+            c.save();
+        });
+        y += ROW + 2;
+        label(g, t, "rysmap.settings.mobs.who", null, lx, y);
+        pills(g, t, hits, lx + lw, y, new String[]{Component.translatable("rysmap.settings.mobs.hostile").getString(),
+            Component.translatable("rysmap.settings.mobs.passive").getString(), Component.translatable("rysmap.settings.mobs.pets").getString()},
+            new boolean[]{c.mobsHostile, c.mobsPassive, c.mobsPets}, mx, my, i -> {
+                if (i == 0) c.mobsHostile = !c.mobsHostile;
+                else if (i == 1) c.mobsPassive = !c.mobsPassive;
+                else c.mobsPets = !c.mobsPets;
+                c.save();
+            });
+        y += ROW + 2;
+        if (works.repka.rysmap.compat.Waystones.active()) {
+            works.repka.ryscore.map.MapApi.Layer stones = works.repka.rysmap.layer.Layers.find(works.repka.rysmap.compat.Waystones.ID);
+            label(g, t, "rysmap.settings.waystones", "rysmap.settings.waystones.note", lx, y);
+            boolean on = stones != null && works.repka.rysmap.layer.Layers.visible(stones);
+            boolean hotW = Kit.over(mx, my, lx + lw - 18, y + 4, 18, 10);
+            Kit.toggle(g, t, lx + lw - 18, y + 4, on, hotW);
+            hits.add(lx + lw - 18, y + 4, 18, 10, b -> {
+                if (stones != null) works.repka.rysmap.layer.Layers.setVisible(stones, !on);
+            });
+            y += ROW + 2;
+        }
+        y += 2;
 
         // места гибели
         Kit.caps(g, t, Component.translatable("rysmap.settings.world").getString(), lx, y + 4, 11, 0.44f);

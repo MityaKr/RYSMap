@@ -52,8 +52,14 @@ public final class ClientConfig {
     public boolean minimapRotate;
     /** Пещерный срез под крышей и этажи (М5). */
     public boolean caves = true;
-    /** Мобы и чужие игроки на всех слоях (ложь: только на показанном этаже или у поверхности). */
+    /** Старое (m9): мобы на всех слоях; при загрузке переходит в {@link #mobsRange} = 0. */
     public boolean entitiesAllLayers;
+    /** Вид мобов (скептик s2): 0 нет, 1 головы, 2 точки. */
+    public int mobsView = 1;
+    /** Слой мобов и чужих игроков: ±8 или ±16 блоков от игрока (или от этажа на карте), 0 все слои. */
+    public int mobsRange = 16;
+    /** Кого показывать. */
+    public boolean mobsHostile = true, mobsPassive = true, mobsPets;
     /** Карта темнеет ночью (М6). */
     public boolean night = true;
     /** Сколько последних мест гибели хранить: 0 (не ставить), 1, 3, 5. Точки FTB не в счёт. */
@@ -107,6 +113,15 @@ public final class ClientConfig {
                 if (json.has("caves")) c.caves = json.get("caves").getAsBoolean();
                 if (json.has("night")) c.night = json.get("night").getAsBoolean();
                 if (json.has("entitiesAllLayers")) c.entitiesAllLayers = json.get("entitiesAllLayers").getAsBoolean();
+                if (c.entitiesAllLayers) c.mobsRange = 0;
+                c.mobsView = clamp(json, "mobsView", c.mobsView, 0, 2);
+                if (json.has("mobsRange")) {
+                    int r = json.get("mobsRange").getAsInt();
+                    c.mobsRange = r == 8 || r == 16 ? r : 0;
+                }
+                if (json.has("mobsHostile")) c.mobsHostile = json.get("mobsHostile").getAsBoolean();
+                if (json.has("mobsPassive")) c.mobsPassive = json.get("mobsPassive").getAsBoolean();
+                if (json.has("mobsPets")) c.mobsPets = json.get("mobsPets").getAsBoolean();
                 c.deathsKept = clamp(json, "deathsKept", c.deathsKept, 0, 5);
                 if (c.deathsKept == 2 || c.deathsKept == 4) c.deathsKept = 3;
                 if (json.has("worldLabels") && json.get("worldLabels").isJsonPrimitive())
@@ -152,7 +167,12 @@ public final class ClientConfig {
         json.addProperty("minimapRotate", minimapRotate);
         json.addProperty("caves", caves);
         json.addProperty("night", night);
-        json.addProperty("entitiesAllLayers", entitiesAllLayers);
+        json.remove("entitiesAllLayers");
+        json.addProperty("mobsView", mobsView);
+        json.addProperty("mobsRange", mobsRange);
+        json.addProperty("mobsHostile", mobsHostile);
+        json.addProperty("mobsPassive", mobsPassive);
+        json.addProperty("mobsPets", mobsPets);
         if (minimapCorner != null) json.addProperty("minimapCorner", minimapCorner);
         else json.remove("minimapCorner");
         json.addProperty("deathsKept", deathsKept);

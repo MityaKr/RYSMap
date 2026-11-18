@@ -139,14 +139,15 @@ public final class MobHeads {
 
     /** Места голов одной текстуры: x, y, сторона. */
     public static final class Batch {
-        float[] xys = new float[24];
+        float[] xys = new float[32];
         int n;
 
-        void add(float x, float y, float size) {
-            if (n * 3 + 3 > xys.length) xys = java.util.Arrays.copyOf(xys, xys.length * 2);
-            xys[n * 3] = x;
-            xys[n * 3 + 1] = y;
-            xys[n * 3 + 2] = size;
+        void add(float x, float y, float size, float alpha) {
+            if (n * 4 + 4 > xys.length) xys = java.util.Arrays.copyOf(xys, xys.length * 2);
+            xys[n * 4] = x;
+            xys[n * 4 + 1] = y;
+            xys[n * 4 + 2] = size;
+            xys[n * 4 + 3] = alpha;
             n++;
         }
     }
@@ -155,20 +156,20 @@ public final class MobHeads {
     static void draw(GuiGraphics g, Map<Integer, Batch> heads) {
         works.repka.ryscore.ui.Batch.flush();
         g.flush();
-        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         Matrix4f m = g.pose().last().pose();
         for (Map.Entry<Integer, Batch> e : heads.entrySet()) {
             Batch b = e.getValue();
             RenderSystem.setShaderTexture(0, e.getKey());
-            BufferBuilder buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+            BufferBuilder buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
             for (int i = 0; i < b.n; i++) {
-                float x = b.xys[i * 3], y = b.xys[i * 3 + 1], s = b.xys[i * 3 + 2];
-                buf.addVertex(m, x, y, 0).setUv(0, 1);
-                buf.addVertex(m, x, y + s, 0).setUv(0, 0);
-                buf.addVertex(m, x + s, y + s, 0).setUv(1, 0);
-                buf.addVertex(m, x + s, y, 0).setUv(1, 1);
+                float x = b.xys[i * 4], y = b.xys[i * 4 + 1], s = b.xys[i * 4 + 2], a = b.xys[i * 4 + 3];
+                buf.addVertex(m, x, y, 0).setUv(0, 1).setColor(1f, 1f, 1f, a);
+                buf.addVertex(m, x, y + s, 0).setUv(0, 0).setColor(1f, 1f, 1f, a);
+                buf.addVertex(m, x + s, y + s, 0).setUv(1, 0).setColor(1f, 1f, 1f, a);
+                buf.addVertex(m, x + s, y, 0).setUv(1, 1).setColor(1f, 1f, 1f, a);
             }
             var mesh = buf.build();
             if (mesh != null) BufferUploader.drawWithShader(mesh);

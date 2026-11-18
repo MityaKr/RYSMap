@@ -48,10 +48,17 @@ public final class Entities {
     public static final int MOB_LIMIT = 256;
     public static final int HOSTILE = 0xFFE5534B, PASSIVE = 0xFF7CCB5E, TEAM = 0xFF4FA3D9, OTHER = 0xFFB8BEC9;
 
-    public enum Kind { TEAM, PLAYER, HOSTILE, PASSIVE }
+    public enum Kind { TEAM, PLAYER, HOSTILE, PASSIVE, PET }
+
+    /** Цвет рамки питомца. */
+    public static final int PET = 0xFF6FB7E8;
 
     /** Сущность для рисования: место в блоках, вид, имя (игрок) или сама сущность (моб, имя по запросу). */
-    public record Dot(UUID id, double x, double y, double z, Kind kind, String name, @Nullable Entity entity) {
+    public record Dot(UUID id, double x, double y, double z, Kind kind, String name, @Nullable Entity entity, float alpha) {
+        public Dot(UUID id, double x, double y, double z, Kind kind, String name, @Nullable Entity entity) {
+            this(id, x, y, z, kind, name, entity, 1f);
+        }
+
         public boolean player() {
             return kind == Kind.TEAM || kind == Kind.PLAYER;
         }
@@ -117,15 +124,18 @@ public final class Entities {
         return collect(dimension, minX, minZ, maxX, maxZ, partial, shown(PLAYERS), shown(MOBS), floor);
     }
 
-    /** Подходит ли место сущности к показанному слою. */
-    static boolean onLayer(net.minecraft.client.multiplayer.ClientLevel level, double x, double y, double z, @Nullable Integer floor, double playerY) {
-        if (works.repka.rysmap.client.ClientConfig.get().entitiesAllLayers) return true;
-        if (floor != null) return y >= works.repka.rysmap.scan.Floors.bottom(floor) - 1 && y <= works.repka.rysmap.scan.Floors.top(floor) + 1;
-        if (level.dimensionType().hasCeiling()) return Math.abs(y - playerY) <= 24;
-        int bx = Mth.floor(x), bz = Mth.floor(z);
-        int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, bx, bz);
-        if (y >= top - 12) return true;
-        return level.canSeeSky(net.minecraft.core.BlockPos.containing(x, y + 1, z));
+    /**
+     * Прозрачность сущности по слою (скептик s2): «Только свой слой ±8 / ±16» считается от игрока, а на карте с показанным
+     * этажом от середины этажа. В первой половине диапазона сущность видна целиком, во второй бледнее, дальше не видна (0).
+     * «Все слои»: всегда 1.
+     */
+    static float layerAlpha(double y, @Nullable Integer floor, double playerY) {
+        int range = works.repka.rysmap.client.ClientConfig.get().mobsRange;
+        if (range <= 0) return 1f;
+        double ref = floor != null ? works.repka.rysmap.scan.Floors.bottom(floor) + 8 : playerY;
+        double dy = Math.abs(y - ref);
+        if (dy <= range / 2.0) return 1f;
+        return dy <= range ? 0.45f : 0f;
     }
 
     static List<Dot> collect(ResourceKey<Level> dimension, double minX, double minZ, double maxX, double maxZ, float partial,
@@ -146,12 +156,13 @@ public final class Entities {
                     if (!team && !others) continue;
                     double x = Mth.lerp(partial, p.xo, p.getX()), z = Mth.lerp(partial, p.zo, p.getZ());
                     seen.add(p.getUUID());
-                    if (!team && !onLayer(mc.level, x, p.getY(), z, floor, mc.player.getY())) continue;
+                    float alpha = team ? 1f : layerAlpha(p.getY(), floor, mc.player.getY());
+                    if (alpha <= 0) continue;
                     if (x < minX || x > maxX || z < minZ || z > maxZ) {
                         // за краем рисуется только участник команды (миникарта прижимает его к рамке)
                         if (!team) continue;
                     }
-                    out.add(new Dot(p.getUUID(), x, p.getY(), z, team ? Kind.TEAM : Kind.PLAYER, p.getGameProfile().getName(), null));
+                    out.add(new Dot(p.getUUID(), x, p.getY(), z, team ? Kind.TEAM : Kind.PLAYER, p.getGameProfile().getName(), null, alpha));
                 }
             }
             String dim = dimension.location().toString();
@@ -160,20 +171,24 @@ public final class Entities {
                 if (!s.team() && !others) continue;
                 double x = s.x() + 0.5, z = s.z() + 0.5;
                 if (!s.team() && (x < minX || x > maxX || z < minZ || z > maxZ)) continue;
-                // дальний чужой игрок: высоту слоя проверить можно только на этаже (столбец у клиента не загружен)
-                if (!s.team() && floor != null && !works.repka.rysmap.client.ClientConfig.get().entitiesAllLayers
-                    && (s.y() < works.repka.rysmap.scan.Floors.bottom(floor) - 1 || s.y() > works.repka.rysmap.scan.Floors.top(floor) + 1)) continue;
-                out.add(new Dot(s.id(), x, s.y(), z, s.team() ? Kind.TEAM : Kind.PLAYER, s.name(), null));
+                float alpha = s.team() ? 1f : layerAlpha(s.y(), floor, mc.player.getY());
+                if (alpha <= 0) continue;
+                out.add(new Dot(s.id(), x, s.y(), z, s.team() ? Kind.TEAM : Kind.PLAYER, s.name(), null, alpha));
             }
         }
-        if (mobs && here && ServerRules.mobsAllowed()) {
+        works.repka.rysmap.client.ClientConfig cfg = works.repka.rysmap.client.ClientConfig.get();
+        if (mobs && here && ServerRules.mobsAllowed() && cfg.mobsView != 0) {
             int n = 0;
             for (Entity e : mc.level.entitiesForRendering()) {
                 if (!(e instanceof Mob) || e.isInvisible() || !e.isAlive()) continue;
+                Kind kind = e instanceof Enemy ? Kind.HOSTILE
+                    : e instanceof net.minecraft.world.entity.OwnableEntity own && own.getOwnerUUID() != null ? Kind.PET : Kind.PASSIVE;
+                if (kind == Kind.HOSTILE && !cfg.mobsHostile || kind == Kind.PASSIVE && !cfg.mobsPassive || kind == Kind.PET && !cfg.mobsPets) continue;
                 double x = Mth.lerp(partial, e.xo, e.getX()), z = Mth.lerp(partial, e.zo, e.getZ());
                 if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
-                if (!onLayer(mc.level, x, e.getY(), z, floor, mc.player.getY())) continue;
-                out.add(new Dot(e.getUUID(), x, e.getY(), z, e instanceof Enemy ? Kind.HOSTILE : Kind.PASSIVE, "", e));
+                float alpha = layerAlpha(e.getY(), floor, mc.player.getY());
+                if (alpha <= 0) continue;
+                out.add(new Dot(e.getUUID(), x, e.getY(), z, kind, "", e, alpha));
                 if (++n >= MOB_LIMIT) break;
             }
         }
@@ -211,8 +226,12 @@ public final class Entities {
 
     /** Точка моба: кружок с тёмной кромкой (запасной вид, пока голова не испечена или не печётся). */
     public static void mob(GuiGraphics g, Dot d, float x, float y, float r) {
-        Draw.disc(g, x, y, r + 0.6f, 0xCC101216);
-        Draw.disc(g, x, y, r, d.kind() == Kind.HOSTILE ? HOSTILE : PASSIVE);
+        Draw.disc(g, x, y, r + 0.6f, Draw.alpha(0xCC101216, d.alpha()));
+        Draw.disc(g, x, y, r, Draw.alpha(rim(d), d.alpha()));
+    }
+
+    static int rim(Dot d) {
+        return d.kind() == Kind.HOSTILE ? HOSTILE : d.kind() == Kind.PET ? PET : PASSIVE;
     }
 
     /**
@@ -228,21 +247,25 @@ public final class Entities {
         for (int i = 0; i < dots.size(); i++) {
             Dot d = dots.get(i);
             float x = xy[i * 2], y = xy[i * 2 + 1];
-            int tex = d.entity() == null ? -1 : MobHeads.texture(d.entity().getType());
+            int tex = d.entity() == null || works.repka.rysmap.client.ClientConfig.get().mobsView == 2 ? -1 : MobHeads.texture(d.entity().getType());
             if (tex < 0) {
                 mob(g, d, x, y, Math.max(1.5f, size * 0.28f));
                 continue;
             }
-            int rim = d.kind() == Kind.HOSTILE ? HOSTILE : PASSIVE;
-            Draw.round(g, x - half - 1f, y - half - 1f, size + 2f, size + 2f, 1.5f, 0xE0101216);
-            Draw.round(g, x - half - 0.6f, y - half - 0.6f, size + 1.2f, size + 1.2f, 1.2f, rim);
-            heads.computeIfAbsent(tex, k -> new MobHeads.Batch()).add(x - half, y - half, size);
+            Draw.round(g, x - half - 1f, y - half - 1f, size + 2f, size + 2f, 1.5f, Draw.alpha(0xE0101216, d.alpha()));
+            Draw.round(g, x - half - 0.6f, y - half - 0.6f, size + 1.2f, size + 1.2f, 1.2f, Draw.alpha(rim(d), d.alpha()));
+            heads.computeIfAbsent(tex, k -> new MobHeads.Batch()).add(x - half, y - half, size, d.alpha());
         }
         if (!heads.isEmpty()) MobHeads.draw(g, heads);
     }
 
     /** Голова игрока размером {@code size} в рамке: синей у своей команды, серой у чужих. */
     public static void head(GuiGraphics g, Dot d, float x, float y, float size) {
+        if (d.alpha() < 0.99f) {
+            // чужой игрок на соседнем слое: бледный значок вместо головы
+            Draw.disc(g, x, y, size / 2f, Draw.alpha(OTHER, d.alpha()));
+            return;
+        }
         float half = size / 2f;
         int ring = d.kind() == Kind.TEAM ? TEAM : OTHER;
         Draw.round(g, x - half - 1, y - half - 1, size + 2, size + 2, 1.5f, 0xE0101216);

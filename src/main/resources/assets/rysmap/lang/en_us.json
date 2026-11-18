@@ -242,5 +242,17 @@
   "rysmap.waystone.waystone": "Waystone",
   "rysmap.waystone.sharestone": "Sharestone",
   "rysmap.waystone.note": "Waystones you have activated. Warping by waystone goes through its own menu, with its cost and cooldown.",
-  "rysmap.waystone.save": "As point"
+  "rysmap.waystone.save": "As point",
+  "rysmap.settings.mobs": "Mobs",
+  "rysmap.settings.mobs.heads": "Heads",
+  "rysmap.settings.mobs.dots": "Dots",
+  "rysmap.settings.mobs.layer": "Own layer only",
+  "rysmap.settings.mobs.layer.note": "above and below you paler, further away hidden",
+  "rysmap.settings.mobs.all": "All",
+  "rysmap.settings.mobs.who": "Who",
+  "rysmap.settings.mobs.hostile": "hostile",
+  "rysmap.settings.mobs.passive": "passive",
+  "rysmap.settings.mobs.pets": "pets",
+  "rysmap.settings.waystones": "Waystones",
+  "rysmap.settings.waystones.note": "waystones you have activated"
 }

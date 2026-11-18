@@ -80,7 +80,7 @@ final class MobsAutoTest {
             // площадка фермы на высоте земли
             mc().player.connection.sendCommand(String.format("fill %d %d %d %d %d %d stone", baseX - 12, groundY - 1, baseZ - 12, baseX + 12, groundY - 1, baseZ + 12));
             mc().player.connection.sendCommand(String.format("fill %d %d %d %d %d %d air", baseX - 12, groundY, baseZ - 12, baseX + 12, groundY + 6, baseZ + 12));
-            mc().player.connection.sendCommand(String.format("tp @s %d %d %d 0 70", baseX, groundY + 14, baseZ));
+            mc().player.connection.sendCommand(String.format("tp @s %d %d %d 0 70", baseX, groundY + 6, baseZ));
         }, 30);
         step("farm", () -> {
             // 200 мобов: сетка 20×10, тип по столбцу
@@ -101,7 +101,8 @@ final class MobsAutoTest {
             ClientConfig c = ClientConfig.get();
             c.minimapSize = 128;
             c.minimapZoom = 2;
-            c.entitiesAllLayers = false;
+            c.mobsRange = 16;
+            c.mobsView = 1;
         }, 60);
         when("heads", () -> MobHeads.count() >= 5, () -> {
             check("головы испечены: " + MobHeads.count() + " типов, " + MobHeads.bakeMicros() + " мкс на тип", MobHeads.count() >= 5);
@@ -111,14 +112,18 @@ final class MobsAutoTest {
             long us = Minimap.frameMicrosAndReset();
             long surface = mobs(around(null));
             RYSMap.LOG.info("[autotest] замер кадра миникарты с толпой ({} мобов на поверхности): {} мкс", surface, us);
-            check("с поверхности видна ферма, но не пещера: " + surface, surface >= 190 && surface <= 200);
+            check("с поверхности (±16 от игрока) видна ферма, но не пещера: " + surface, surface >= 190 && surface <= 200);
             check("кадр миникарты с толпой дешевле 2 мс: " + us + " мкс", us < 2000);
             long cave = mobs(around(Floors.of(-30)));
             check("на этаже пещеры только мобы пещеры: " + cave, cave == 2);
-            ClientConfig.get().entitiesAllLayers = true;
+            ClientConfig.get().mobsRange = 0;
             long all = mobs(around(null));
             check("«Все слои»: видны все: " + all, all >= 200);
-            ClientConfig.get().entitiesAllLayers = false;
+            ClientConfig.get().mobsRange = 16;
+            ClientConfig.get().mobsHostile = false;
+            long peaceful = mobs(around(null));
+            check("без враждебных видны только мирные: " + peaceful, peaceful > 0 && peaceful < surface);
+            ClientConfig.get().mobsHostile = true;
         }, 4);
         shot("minimap_crowd");
         step("map", () -> {

@@ -242,5 +242,17 @@
   "rysmap.waystone.waystone": "Камень пути",
   "rysmap.waystone.sharestone": "Общий камень пути",
   "rysmap.waystone.note": "Камни, которые ты открыл. Телепорт камнем идёт в его меню, с его ценой и паузой.",
-  "rysmap.waystone.save": "Точкой"
+  "rysmap.waystone.save": "Точкой",
+  "rysmap.settings.mobs": "Мобы",
+  "rysmap.settings.mobs.heads": "Головы",
+  "rysmap.settings.mobs.dots": "Точки",
+  "rysmap.settings.mobs.layer": "Только свой слой",
+  "rysmap.settings.mobs.layer.note": "выше и ниже тебя бледнее, дальше не видны",
+  "rysmap.settings.mobs.all": "Все",
+  "rysmap.settings.mobs.who": "Кого",
+  "rysmap.settings.mobs.hostile": "враждебные",
+  "rysmap.settings.mobs.passive": "мирные",
+  "rysmap.settings.mobs.pets": "питомцы",
+  "rysmap.settings.waystones": "Камни пути",
+  "rysmap.settings.waystones.note": "открытые тобой камни Waystones"
 }
