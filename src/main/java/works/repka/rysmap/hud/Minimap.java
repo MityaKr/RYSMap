@@ -142,11 +142,6 @@ public final class Minimap {
         Draw.disc(g, cx, cy, 4.5f, 0xB0101216);
         Icons.drawRotated(g, Icons.Shape.NAV, cx - 5, cy - 5, 10, yaw + 180f, 0xFFF7F8FB);
 
-        // север на верхней кромке
-        String north = Component.translatable("rysmap.north").getString();
-        Draw.disc(g, cx, y + 0.5f, 3.75f, 0xFF101216);
-        Draw.label(g, north, cx - Draw.labelWidth(north, 9f, Type.Weight.SEMIBOLD) / 2f, y + 0.5f, 9f, Type.Weight.SEMIBOLD, 0xFFF7F8FB);
-
         if (t.beveled()) {
             Draw.rect(g, x - 1, y - 1, size + 2, 1, t.c("hud.map.border"));
             Draw.rect(g, x - 1, y + size, size + 2, 1, t.c("hud.map.border"));
@@ -157,7 +152,20 @@ public final class Minimap {
             Draw.roundBorder(g, x - 1, y - 1, size + 2, size + 2, r + 1, t.c("hud.bg"), 1.25f);
             Draw.roundBorder(g, x - 1.5f, y - 1.5f, size + 3, size + 3, r + 1.5f, t.c("hud.map.border"), 0.5f);
         }
+        north(g, t, cx, y);
         plate(g, t, lines, x, y + size + GAP, size, plateH, r);
+    }
+
+    /**
+     * Буква севера в кружке 7,5 на верхней кромке (макет {@code 01}). Рисуется после рамки, иначе кольцо рамки ложится
+     * поперёк буквы; кружок обведён цветом рамки, чтобы читался и на светлой карте.
+     */
+    private static void north(GuiGraphics g, Theme t, float cx, float y) {
+        String north = Component.translatable("rysmap.north").getString();
+        float cy = y + 0.5f;
+        Draw.disc(g, cx, cy, 4.25f, t.c("hud.map.border"));
+        Draw.disc(g, cx, cy, 3.75f, 0xFF101216);
+        Draw.label(g, north, cx - Draw.labelWidth(north, 9f, Type.Weight.SEMIBOLD) / 2f, cy, 9f, Type.Weight.SEMIBOLD, 0xFFF7F8FB);
     }
 
     /** Полосы внутри скруглённого квадрата: середина целиком, у углов по строке на единицу радиуса. */
