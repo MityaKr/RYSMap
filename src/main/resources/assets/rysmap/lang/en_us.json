@@ -237,5 +237,10 @@
   "rysmap.settings.no": "No",
   "rysmap.settings.yes": "Yes",
   "rysmap.settings.server.changed": "Rules changed.",
-  "rysmap.settings.server.undo": "Undo · %s s"
+  "rysmap.settings.server.undo": "Undo · %s s",
+  "rysmap.layer.waystones": "Waystones",
+  "rysmap.waystone.waystone": "Waystone",
+  "rysmap.waystone.sharestone": "Sharestone",
+  "rysmap.waystone.note": "Waystones you have activated. Warping by waystone goes through its own menu, with its cost and cooldown.",
+  "rysmap.waystone.save": "As point"
 }

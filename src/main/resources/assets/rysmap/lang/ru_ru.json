@@ -237,5 +237,10 @@
   "rysmap.settings.no": "Нет",
   "rysmap.settings.yes": "Да",
   "rysmap.settings.server.changed": "Правила изменены.",
-  "rysmap.settings.server.undo": "Вернуть · %s с"
+  "rysmap.settings.server.undo": "Вернуть · %s с",
+  "rysmap.layer.waystones": "Камни пути",
+  "rysmap.waystone.waystone": "Камень пути",
+  "rysmap.waystone.sharestone": "Общий камень пути",
+  "rysmap.waystone.note": "Камни, которые ты открыл. Телепорт камнем идёт в его меню, с его ценой и паузой.",
+  "rysmap.waystone.save": "Точкой"
 }

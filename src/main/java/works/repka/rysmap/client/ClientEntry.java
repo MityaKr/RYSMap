@@ -68,6 +68,7 @@ public final class ClientEntry {
         works.repka.rysmap.point.PointsLayer.register();
         works.repka.rysmap.hud.Entities.register();
         PingsLayer.register();
+        works.repka.rysmap.compat.Waystones.init();
         works.repka.ryscore.world.Labels.provide();
         works.repka.ryscore.migrate.Migrations.register(new works.repka.rysmap.migrate.FtbMapStep());
         modBus.addListener((RegisterKeyMappingsEvent e) -> {
@@ -223,6 +224,7 @@ public final class ClientEntry {
         Layers.clear();
         ServerRules.reset();
         PingsLayer.clear();
+        works.repka.rysmap.compat.Waystones.clear();
         works.repka.rysmap.hud.MobHeads.clear();
         if (MapApi.get() instanceof MapApiImpl api) api.track(null);
     }
