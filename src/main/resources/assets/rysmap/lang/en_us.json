@@ -179,5 +179,10 @@
   "rysmap.layer.players": "Players",
   "rysmap.layer.mobs": "Mobs",
   "rysmap.entity.team": "Your team",
-  "rysmap.screen.mode.overview": "Overview"
+  "rysmap.screen.mode.overview": "Overview",
+  "rysmap.settings.shape": "Shape and rotation",
+  "rysmap.settings.shape.square": "Square",
+  "rysmap.settings.shape.circle": "Circle",
+  "rysmap.settings.shape.north": "North up",
+  "rysmap.settings.shape.view": "Follow view"
 }

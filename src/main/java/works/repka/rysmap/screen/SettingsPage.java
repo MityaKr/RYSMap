@@ -28,7 +28,7 @@ import works.repka.rysmap.hud.Minimap;
  * Страница настроек карты внутри окна (макет {@code 50}, урезано по плану 13.2): слева «Миникарта» (показывать, угол,
  * размер, приближение) и «В мире» (места гибели, подписи точек в мире, их дальность); справа живой образец миникарты, клавиши со ссылкой на настройки игры и
  * сведения о данных (размер карты мира, переезд из FTB). Оператор видит раздел «Сервер»: правила карты на сервере
- * (миникарта, пещеры, телепорт и пауза, чужие игроки и мобы). Форма, поворот и строки под картой идут позже. Всё пишется в {@code config/rysmap/client.json} сразу.
+ * (миникарта, пещеры, телепорт и пауза, чужие игроки и мобы). Строки под картой идут позже. Всё пишется в {@code config/rysmap/client.json} сразу.
  */
 final class SettingsPage {
     private static final int ROW = 19, SEG_H = 18;
@@ -102,6 +102,20 @@ final class SettingsPage {
         String[] zooms = {"×0,5", "×1", "×2"};
         segmented(g, t, hits, lx + lw, y, zooms, c.minimapZoom, mx, my, i -> {
             c.minimapZoom = i;
+            c.save();
+        });
+        y += ROW + 2;
+
+        // форма и поворот (макет 50): два переключателя рядом
+        label(g, t, "rysmap.settings.shape", null, lx, y);
+        String[] turns = {Component.translatable("rysmap.settings.shape.north").getString(), Component.translatable("rysmap.settings.shape.view").getString()};
+        int turnW = segmented(g, t, hits, lx + lw, y, turns, c.minimapRotate ? 1 : 0, mx, my, i -> {
+            c.minimapRotate = i == 1;
+            c.save();
+        });
+        String[] shapes = {Component.translatable("rysmap.settings.shape.square").getString(), Component.translatable("rysmap.settings.shape.circle").getString()};
+        segmented(g, t, hits, lx + lw - turnW - 4, y, shapes, c.minimapCircle ? 1 : 0, mx, my, i -> {
+            c.minimapCircle = i == 1;
             c.save();
         });
         y += ROW + 8;
@@ -293,7 +307,7 @@ final class SettingsPage {
     }
 
     /** Сегментный переключатель справа до {@code right}: ряд {@link Kit#pill} на общей подложке. */
-    private static void segmented(GuiGraphics g, Theme t, Kit.Hits hits, int right, int y, String[] options, int selected, int mx, int my,
+    private static int segmented(GuiGraphics g, Theme t, Kit.Hits hits, int right, int y, String[] options, int selected, int mx, int my,
                                   java.util.function.IntConsumer pick) {
         float w = 4;
         for (int i = 0; i < options.length; i++) w += Draw.labelWidth(options[i], 12.5f, i == selected ? Weight.MEDIUM : Weight.REGULAR) + 12 + (i > 0 ? 1 : 0);
@@ -305,6 +319,7 @@ final class SettingsPage {
             int index = i;
             px += Kit.pill(g, t, hits, px, y + 2, options[i], i == selected, mx, my, () -> pick.accept(index)) + 1;
         }
+        return (int) Math.ceil(w);
     }
 
     private static String keyText(net.minecraft.client.KeyMapping k) {

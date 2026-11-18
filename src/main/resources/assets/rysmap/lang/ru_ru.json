@@ -179,5 +179,10 @@
   "rysmap.layer.players": "Игроки",
   "rysmap.layer.mobs": "Мобы",
   "rysmap.entity.team": "Твоя команда",
-  "rysmap.screen.mode.overview": "Обзор"
+  "rysmap.screen.mode.overview": "Обзор",
+  "rysmap.settings.shape": "Форма и поворот",
+  "rysmap.settings.shape.square": "Квадрат",
+  "rysmap.settings.shape.circle": "Круг",
+  "rysmap.settings.shape.north": "Север сверху",
+  "rysmap.settings.shape.view": "По взгляду"
 }

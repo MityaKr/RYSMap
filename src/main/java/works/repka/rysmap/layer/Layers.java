@@ -126,6 +126,15 @@ public final class Layers {
      */
     public static void drawAreas(net.minecraft.client.gui.GuiGraphics g, MapApi.Layer layer, ResourceKey<Level> dimension, int cx0, int cz0, int cx1, int cz1,
                                  double ox, double oz, double ppb, float clipX0, float clipY0, float clipX1, float clipY1) {
+        drawAreas(g, layer, dimension, cx0, cz0, cx1, cz1, ox, oz, ppb, clipX0, clipY0, clipX1, clipY1, null);
+    }
+
+    /**
+     * То же с обрезкой по полосам формы ({@code x0, y0, x1, y1} подряд, как у тайлов): круглая и скруглённая миникарта.
+     * Заливка режется по каждой полосе, обводка по полосам, в которые попадает.
+     */
+    public static void drawAreas(net.minecraft.client.gui.GuiGraphics g, MapApi.Layer layer, ResourceKey<Level> dimension, int cx0, int cz0, int cx1, int cz1,
+                                 double ox, double oz, double ppb, float clipX0, float clipY0, float clipX1, float clipY1, float @Nullable [] strips) {
         it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<AreaChunk> chunks = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
         for (int rz = cz0 >> 5; rz <= cz1 >> 5; rz++)
             for (int rx = cx0 >> 5; rx <= cx1 >> 5; rx++)
@@ -161,7 +170,12 @@ public final class Layers {
             }
             i = j;
         }
-        quads(g, fill, fillColors, runs);
+        if (strips != null) {
+            Cut cut = cut(fill, fillColors, runs, strips, false);
+            quads(g, cut.xy(), cut.colors(), cut.count());
+        } else {
+            quads(g, fill, fillColors, runs);
+        }
         float[] xy = new float[chunks.size() * 16];
         int[] colors = new int[chunks.size() * 4];
         int n = 0;
@@ -191,7 +205,10 @@ public final class Layers {
                 n++;
             }
         }
-        if (n > 0) works.repka.ryscore.ui.Draw.lines(g, xy, colors, n, 1f);
+        if (n > 0 && strips != null) {
+            Cut cut = cut(xy, colors, n, strips, true);
+            if (cut.count() > 0) works.repka.ryscore.ui.Draw.lines(g, cut.xy(), cut.colors(), cut.count(), 1f);
+        } else if (n > 0) works.repka.ryscore.ui.Draw.lines(g, xy, colors, n, 1f);
     }
 
     /**
@@ -219,6 +236,53 @@ public final class Layers {
         var mesh = b.build();
         if (mesh != null) com.mojang.blaze3d.vertex.BufferUploader.drawWithShader(mesh);
         com.mojang.blaze3d.systems.RenderSystem.disableBlend();
+    }
+
+    /** Куски после обрезки по полосам. */
+    record Cut(float[] xy, int[] colors, int count) {}
+
+    /**
+     * Прямоугольники ({@code lines} ложь) или отрезки по осям ({@code lines} правда), обрезанные полосами формы. Соседние
+     * куски одного отрезка сливаются, чтобы обводка не рвалась на стыках полос.
+     */
+    static Cut cut(float[] src, int[] colors, int count, float[] strips, boolean lines) {
+        float[] xy = new float[Math.max(16, count * 8)];
+        int[] cs = new int[Math.max(4, count * 2)];
+        int n = 0;
+        for (int i = 0; i < count; i++) {
+            float x0 = Math.min(src[i * 4], src[i * 4 + 2]), x1 = Math.max(src[i * 4], src[i * 4 + 2]);
+            float y0 = Math.min(src[i * 4 + 1], src[i * 4 + 3]), y1 = Math.max(src[i * 4 + 1], src[i * 4 + 3]);
+            boolean horizontal = lines && y0 == y1, vertical = lines && x0 == x1;
+            int first = n;
+            for (int k = 0; k + 3 < strips.length; k += 4) {
+                float sx0 = strips[k], sy0 = strips[k + 1], sx1 = strips[k + 2], sy1 = strips[k + 3];
+                float a0, b0, a1, b1;
+                if (horizontal) {
+                    if (y0 < sy0 || y0 > sy1) continue;
+                    a0 = Math.max(x0, sx0); a1 = Math.min(x1, sx1); b0 = b1 = y0;
+                    if (a1 <= a0) continue;
+                } else if (vertical) {
+                    if (x0 < sx0 || x0 > sx1) continue;
+                    b0 = Math.max(y0, sy0); b1 = Math.min(y1, sy1); a0 = a1 = x0;
+                    if (b1 <= b0) continue;
+                } else {
+                    a0 = Math.max(x0, sx0); b0 = Math.max(y0, sy0); a1 = Math.min(x1, sx1); b1 = Math.min(y1, sy1);
+                    if (a1 <= a0 || b1 <= b0) continue;
+                }
+                if (lines && n > first) {
+                    int l = (n - 1) * 4;
+                    if (vertical && Math.abs(xy[l + 3] - b0) < 0.01f) { xy[l + 3] = b1; continue; }
+                    if (horizontal && Math.abs(xy[l + 2] - a0) < 0.01f) { xy[l + 2] = a1; continue; }
+                }
+                if (n * 4 + 4 > xy.length) {
+                    xy = java.util.Arrays.copyOf(xy, xy.length * 2);
+                    cs = java.util.Arrays.copyOf(cs, cs.length * 2);
+                }
+                xy[n * 4] = a0; xy[n * 4 + 1] = b0; xy[n * 4 + 2] = a1; xy[n * 4 + 3] = b1;
+                cs[n++] = colors[i];
+            }
+        }
+        return new Cut(xy, cs, n);
     }
 
     private static void broken(MapApi.Layer layer, Throwable t) {

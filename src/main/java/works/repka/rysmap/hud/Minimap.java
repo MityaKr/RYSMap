@@ -120,17 +120,80 @@ public final class Minimap {
         return size + GAP + plateH;
     }
 
+    /**
+     * Вид миникарты в кадре: центр, масштаб, поворот и форма. Мировое место переводится на экран {@link #sx}, {@link #sy}:
+     * при повороте по взгляду смещение от игрока поворачивается на {@code 180° − yaw}, так взгляд всегда смотрит вверх.
+     */
+    static final class View {
+        final double px, pz, ppb;
+        final float cx, cy, half, angle;
+        final boolean circle, rotate;
+        final float cos, sin;
+
+        View(double px, double pz, double ppb, float cx, float cy, float half, boolean circle, boolean rotate, float yaw) {
+            this.px = px;
+            this.pz = pz;
+            this.ppb = ppb;
+            this.cx = cx;
+            this.cy = cy;
+            this.half = half;
+            this.circle = circle;
+            this.rotate = rotate;
+            this.angle = rotate ? 180f - yaw : 0f;
+            double a = Math.toRadians(angle);
+            this.cos = (float) Math.cos(a);
+            this.sin = (float) Math.sin(a);
+        }
+
+        float sx(double wx, double wz) {
+            double dx = (wx - px) * ppb, dy = (wz - pz) * ppb;
+            return (float) (cx + (rotate ? dx * cos - dy * sin : dx));
+        }
+
+        float sy(double wx, double wz) {
+            double dx = (wx - px) * ppb, dy = (wz - pz) * ppb;
+            return (float) (cy + (rotate ? dx * sin + dy * cos : dy));
+        }
+
+        /** Точка внутри формы с запасом {@code inset}. */
+        boolean inside(float x, float y, float inset) {
+            float dx = x - cx, dy = y - cy, lim = half - inset;
+            return circle ? dx * dx + dy * dy <= lim * lim : Math.abs(dx) <= lim && Math.abs(dy) <= lim;
+        }
+
+        /** Прижать точку к кромке формы с запасом {@code inset}: {x, y}. */
+        float[] clamp(float x, float y, float inset) {
+            float dx = x - cx, dy = y - cy, lim = half - inset;
+            if (circle) {
+                float d = (float) Math.sqrt(dx * dx + dy * dy);
+                if (d <= lim || d == 0) return new float[]{x, y};
+                return new float[]{cx + dx / d * lim, cy + dy / d * lim};
+            }
+            return new float[]{cx + Math.max(-lim, Math.min(lim, dx)), cy + Math.max(-lim, Math.min(lim, dy))};
+        }
+
+        /** Сколько блоков от игрока до дальнего угла видимой формы (для отбора). */
+        double reachBlocks() {
+            return half * (rotate && !circle ? 1.42 : 1.0) / ppb;
+        }
+    }
+
     private static void drawAt(GuiGraphics g, Minecraft mc, MapSession session, LocalPlayer p, float partial, int x, int y, int size, List<Line> lines) {
         Theme t = ThemeManager.get();
         int plateH = lines.size() * LINE + 4;
-        float r = t.beveled() ? 0 : Math.max(2f, t.r("panel.radius"));
+        ClientConfig cfg = ClientConfig.get();
+        boolean circle = cfg.minimapCircle;
+        float r = circle ? size / 2f : t.beveled() ? 0 : Math.max(2f, t.r("panel.radius"));
 
         // место игрока между тиками: тайлы, области и метки едут плавно и одним кадром со стрелкой
         double px = net.minecraft.util.Mth.lerp(partial, p.xo, p.getX()), pz = net.minecraft.util.Mth.lerp(partial, p.zo, p.getZ());
-        double ppb = ZOOM[ClientConfig.get().minimapZoom] / UiScale.pixels();
+        double ppb = ZOOM[cfg.minimapZoom] / UiScale.pixels();
         ResourceKey<Level> dim = p.level().dimension();
-        Draw.round(g, x, y, size, size, r, t.c("map.bg"));
+        float yaw = p.getViewYRot(partial);
         float cx = x + size / 2f, cy = y + size / 2f;
+        View v = new View(px, pz, ppb, cx, cy, size / 2f, circle, cfg.minimapRotate, yaw);
+        if (circle) Draw.disc(g, cx, cy, size / 2f, t.c("map.bg"));
+        else Draw.round(g, x, y, size, size, r, t.c("map.bg"));
         if (!works.repka.rysmap.client.ServerRules.minimapAllowed()) {
             // сервер выключил миникарту: в рамке причина, а не чёрный квадрат (макет 04)
             List<String> why = Draw.wrapLabel(Component.translatable("rysmap.minimap.off_server").getString(), size - 12, 11, Type.Weight.REGULAR, 4);
@@ -139,30 +202,54 @@ public final class Minimap {
                 Draw.label(g, line, cx - Draw.labelWidth(line, 11, Type.Weight.REGULAR) / 2f, ty, 11, Type.Weight.REGULAR, t.c("hud.muted"));
                 ty += 6.5f;
             }
-            frame(g, t, x, y, size, r);
-            north(g, t, cx, y);
-            plate(g, t, lines, x, y + size + GAP, size, plateH, r);
+            frame(g, t, x, y, size, r, circle);
+            north(g, t, v);
+            plate(g, t, lines, x, y + size + GAP, size, plateH, circle ? Math.max(2f, t.r("panel.radius")) : r);
             return;
         }
-        session.tiles.draw(g, dim.location().toString(), px, pz, ppb, x, y, size, size, rounded(x, y, size, r));
 
-        areas(g, dim, px, pz, ppb, x, y, size);
-        markers(g, dim, px, pz, ppb, x, y, size, cx, cy);
-        entities(g, dim, px, pz, ppb, x, y, size, cx, cy, partial);
-        target(g, t, dim, px, pz, ppb, x, y, size, cx, cy);
+        String dimId = dim.location().toString();
+        float[] shape = rounded(x, y, size, r);
+        if (!v.rotate) {
+            session.tiles.draw(g, dimId, px, pz, ppb, x, y, size, size, shape);
+            areas(g, dim, v, x, y, size, shape);
+        } else {
+            // поворот по взгляду: тайлы и области рисуются в повёрнутой матрице. Круг от поворота не меняется, его полосы
+            // годятся как есть; квадрат режется ножницами экрана (углы скругления закрывает рамка).
+            float big = size * 1.42f;
+            float bx = cx - big / 2f, by = cy - big / 2f;
+            works.repka.ryscore.ui.Batch.flush();
+            if (!circle) Draw.scissor(g, x, y, x + size, y + size);
+            g.pose().pushPose();
+            g.pose().rotateAround(com.mojang.math.Axis.ZP.rotationDegrees(v.angle), cx, cy, 0);
+            float[] clips = circle ? shape : new float[]{bx, by, bx + big, by + big};
+            session.tiles.draw(g, dimId, px, pz, ppb, bx, by, big, big, clips);
+            View flat = new View(px, pz, ppb, cx, cy, big / 2f, circle, false, 0);
+            areas(g, dim, flat, (int) bx, (int) by, (int) Math.ceil(big), clips);
+            works.repka.ryscore.ui.Batch.flush();
+            g.pose().popPose();
+            if (!circle) g.disableScissor();
+        }
 
-        // игрок: стрелка по взгляду, белая на тёмной подложке
-        float yaw = p.getViewYRot(partial);
+        markers(g, dim, v);
+        entities(g, dim, v, partial);
+        target(g, t, dim, v);
+
+        // игрок: стрелка по взгляду (при повороте карты всегда вверх), белая на тёмной подложке
         Draw.disc(g, cx, cy, 4.5f, 0xB0101216);
-        Icons.drawRotated(g, Icons.Shape.NAV, cx - 5, cy - 5, 10, yaw + 180f, 0xFFF7F8FB);
+        Icons.drawRotated(g, Icons.Shape.NAV, cx - 5, cy - 5, 10, v.rotate ? 0f : yaw + 180f, 0xFFF7F8FB);
 
-        frame(g, t, x, y, size, r);
-        north(g, t, cx, y);
-        plate(g, t, lines, x, y + size + GAP, size, plateH, r);
+        frame(g, t, x, y, size, r, circle);
+        north(g, t, v);
+        plate(g, t, lines, x, y + size + GAP, size, plateH, circle ? Math.max(2f, t.r("panel.radius")) : r);
     }
 
-    private static void frame(GuiGraphics g, Theme t, int x, int y, int size, float r) {
-        if (t.beveled()) {
+    private static void frame(GuiGraphics g, Theme t, int x, int y, int size, float r, boolean circle) {
+        if (circle) {
+            float cx = x + size / 2f, cy = y + size / 2f;
+            Draw.ring(g, cx, cy, size / 2f + 0.5f, 1.25f, t.c("hud.bg"));
+            Draw.ring(g, cx, cy, size / 2f + 1.5f, 0.5f, t.c("hud.map.border"));
+        } else if (t.beveled()) {
             Draw.rect(g, x - 1, y - 1, size + 2, 1, t.c("hud.map.border"));
             Draw.rect(g, x - 1, y + size, size + 2, 1, t.c("hud.map.border"));
             Draw.rect(g, x - 1, y, 1, size, t.c("hud.map.border"));
@@ -175,15 +262,20 @@ public final class Minimap {
     }
 
     /**
-     * Буква севера в кружке 7,5 на верхней кромке (макет {@code 01}). Рисуется после рамки, иначе кольцо рамки ложится
-     * поперёк буквы; кружок обведён цветом рамки, чтобы читался и на светлой карте.
+     * Буква севера в кружке 7,5 на кромке (макет {@code 01}): сверху, а при повороте по взгляду там, где север. Рисуется
+     * после рамки, иначе кольцо рамки ложится поперёк буквы; кружок обведён цветом рамки, чтобы читался и на светлой карте.
      */
-    private static void north(GuiGraphics g, Theme t, float cx, float y) {
+    private static void north(GuiGraphics g, Theme t, View v) {
+        // направление на север на экране: мировое (0, −1) после поворота
+        float dx = v.rotate ? v.sin : 0, dy = v.rotate ? -v.cos : -1;
+        float k;
+        if (v.circle) k = v.half;
+        else k = v.half / Math.max(Math.abs(dx), Math.abs(dy));
+        float nx = v.cx + dx * k, ny = v.cy + dy * k + (dy < -0.99f ? 0.5f : 0);
         String north = Component.translatable("rysmap.north").getString();
-        float cy = y + 0.5f;
-        Draw.disc(g, cx, cy, 4.25f, t.c("hud.map.border"));
-        Draw.disc(g, cx, cy, 3.75f, 0xFF101216);
-        Draw.label(g, north, cx - Draw.labelWidth(north, 9f, Type.Weight.SEMIBOLD) / 2f, cy, 9f, Type.Weight.SEMIBOLD, 0xFFF7F8FB);
+        Draw.disc(g, nx, ny, 4.25f, t.c("hud.map.border"));
+        Draw.disc(g, nx, ny, 3.75f, 0xFF101216);
+        Draw.label(g, north, nx - Draw.labelWidth(north, 9f, Type.Weight.SEMIBOLD) / 2f, ny, 9f, Type.Weight.SEMIBOLD, 0xFFF7F8FB);
     }
 
     /** Полосы внутри скруглённого квадрата: середина целиком, у углов по строке на единицу радиуса. */
@@ -204,29 +296,30 @@ public final class Minimap {
         return out;
     }
 
-    private static void areas(GuiGraphics g, ResourceKey<Level> dim, double px, double pz, double ppb, int x, int y, int size) {
-        double half = size / 2.0 / ppb;
-        int cx0 = (int) Math.floor((px - half) / 16), cx1 = (int) Math.floor((px + half) / 16);
-        int cz0 = (int) Math.floor((pz - half) / 16), cz1 = (int) Math.floor((pz + half) / 16);
-        double ox = x + size / 2.0 - px * ppb, oz = y + size / 2.0 - pz * ppb;
+    /** Области слоёв в осях карты (без поворота: его даёт матрица), обрезка по полосам формы. */
+    private static void areas(GuiGraphics g, ResourceKey<Level> dim, View v, int x, int y, int size, float[] clips) {
+        double half = size / 2.0 / v.ppb;
+        int cx0 = (int) Math.floor((v.px - half) / 16), cx1 = (int) Math.floor((v.px + half) / 16);
+        int cz0 = (int) Math.floor((v.pz - half) / 16), cz1 = (int) Math.floor((v.pz + half) / 16);
+        double ox = v.cx - v.px * v.ppb, oz = v.cy - v.pz * v.ppb;
         for (MapApi.Layer layer : Layers.shown()) {
             if (layer.areas() == null) continue;
-            Layers.drawAreas(g, layer, dim, cx0 - 1, cz0 - 1, cx1 + 1, cz1 + 1, ox, oz, ppb, x, y, x + size, y + size);
+            Layers.drawAreas(g, layer, dim, cx0 - 1, cz0 - 1, cx1 + 1, cz1 + 1, ox, oz, v.ppb, x, y, x + size, y + size, clips);
         }
     }
 
-    private static void markers(GuiGraphics g, ResourceKey<Level> dim, double px, double pz, double ppb, int x, int y, int size, float cx, float cy) {
+    private static void markers(GuiGraphics g, ResourceKey<Level> dim, View v) {
         int drawn = 0;
         for (MapApi.Layer layer : Layers.shown()) {
             for (MapApi.Marker m : Layers.markers(layer, dim)) {
                 if (!m.minimap() || drawn >= 64) continue;
-                float sx = (float) (cx + (m.x() - px) * ppb), sy = (float) (cy + (m.z() - pz) * ppb);
-                boolean inside = sx >= x + 3 && sx <= x + size - 3 && sy >= y + 3 && sy <= y + size - 3;
-                if (!inside) {
+                float sx = v.sx(m.x(), m.z()), sy = v.sy(m.x(), m.z());
+                if (!v.inside(sx, sy, 3)) {
                     // участник и цель за краем прижаты к рамке, остальное не видно
                     if (m.kind() != MapApi.Kind.PLAYER && m.kind() != MapApi.Kind.GOAL) continue;
-                    sx = Math.max(x + 3.5f, Math.min(x + size - 3.5f, sx));
-                    sy = Math.max(y + 3.5f, Math.min(y + size - 3.5f, sy));
+                    float[] c = v.clamp(sx, sy, 3.5f);
+                    sx = c[0];
+                    sy = c[1];
                 }
                 Draw.disc(g, sx, sy, 3.5f, m.color());
                 if (m.icon() != null) Icons.draw(g, m.icon(), sx - 2.5f, sy - 2.5f, 5, 0xFF101216);
@@ -236,33 +329,31 @@ public final class Minimap {
     }
 
     /** Игроки и мобы (слои «Игроки» и «Мобы»): участник команды за краем прижат к рамке, остальные за краем не видны. */
-    private static void entities(GuiGraphics g, ResourceKey<Level> dim, double px, double pz, double ppb, int x, int y, int size, float cx, float cy, float partial) {
-        double half = size / 2.0 / ppb;
-        for (Entities.Dot d : Entities.collect(dim, px - half, pz - half, px + half, pz + half, partial)) {
-            float sx = (float) (cx + (d.x() - px) * ppb), sy = (float) (cy + (d.z() - pz) * ppb);
+    private static void entities(GuiGraphics g, ResourceKey<Level> dim, View v, float partial) {
+        double reach = v.reachBlocks();
+        for (Entities.Dot d : Entities.collect(dim, v.px - reach, v.pz - reach, v.px + reach, v.pz + reach, partial)) {
+            float sx = v.sx(d.x(), d.z()), sy = v.sy(d.x(), d.z());
             if (d.player()) {
-                boolean inside = sx >= x + 4 && sx <= x + size - 4 && sy >= y + 4 && sy <= y + size - 4;
-                if (!inside) {
+                if (!v.inside(sx, sy, 4)) {
                     if (d.kind() != Entities.Kind.TEAM) continue;
-                    sx = Math.max(x + 4.5f, Math.min(x + size - 4.5f, sx));
-                    sy = Math.max(y + 4.5f, Math.min(y + size - 4.5f, sy));
+                    float[] c = v.clamp(sx, sy, 4.5f);
+                    sx = c[0];
+                    sy = c[1];
                 }
                 Entities.head(g, d, sx, sy, 7);
-            } else if (sx >= x + 1.5f && sx <= x + size - 1.5f && sy >= y + 1.5f && sy <= y + size - 1.5f) {
+            } else if (v.inside(sx, sy, 1.5f)) {
                 Entities.mob(g, d, sx, sy, 1.5f);
             }
         }
     }
 
-    private static void target(GuiGraphics g, Theme t, ResourceKey<Level> dim, double px, double pz, double ppb, int x, int y, int size, float cx, float cy) {
+    private static void target(GuiGraphics g, Theme t, ResourceKey<Level> dim, View v) {
         if (!(MapApi.get() instanceof MapApiImpl api) || api.tracked() == null) return;
         MapApi.Target target = api.tracked();
         if (!target.dimension().equals(dim)) return;
-        float sx = (float) (cx + (target.x() - px) * ppb), sy = (float) (cy + (target.z() - pz) * ppb);
-        sx = Math.max(x + 4f, Math.min(x + size - 4f, sx));
-        sy = Math.max(y + 4f, Math.min(y + size - 4f, sy));
-        Draw.disc(g, sx, sy, 4f, 0xFFF7F8FB);
-        Icons.draw(g, Icons.Shape.TARGET, sx - 3, sy - 3, 6, 0xFF101216);
+        float[] c = v.clamp(v.sx(target.x(), target.z()), v.sy(target.x(), target.z()), 4f);
+        Draw.disc(g, c[0], c[1], 4f, 0xFFF7F8FB);
+        Icons.draw(g, Icons.Shape.TARGET, c[0] - 3, c[1] - 3, 6, 0xFF101216);
     }
 
     // ---- строки под картой ----
