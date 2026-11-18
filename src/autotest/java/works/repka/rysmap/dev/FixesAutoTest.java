@@ -190,6 +190,13 @@ final class FixesAutoTest {
             check("мобы на карте: враждебных " + hostile + ", мирных " + passive, hostile >= 2 && passive >= 2);
         }, 4);
         shot("entities");
+        step("night", () -> mc().player.connection.sendCommand("time set midnight"), 30);
+        shot("night");
+        step("day", () -> {
+            check("ночью множитель карты меньше 1: " + works.repka.rysmap.client.MapSession.nightBrightness(mc().level, 1f),
+                works.repka.rysmap.client.MapSession.nightBrightness(mc().level, 1f) < 0.6f);
+            mc().player.connection.sendCommand("time set noon");
+        }, 30);
         step("circle", () -> {
             ClientConfig.get().minimapCircle = true;
             mc().player.connection.sendCommand("tp @s ~ ~ ~ 0 10");
@@ -227,6 +234,9 @@ final class FixesAutoTest {
         }, 60);
         step("map zoom", () -> screen().setZoom(4), 20);
         shot("map_entities");
+        step("map far", () -> screen().setZoom(0.15), 80);
+        shot("map_far");
+        step("map near", () -> screen().setZoom(4), 10);
         step("mode", () -> {
             MapApi.get().openMode(ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "autotest_mode"), null);
         }, 20);

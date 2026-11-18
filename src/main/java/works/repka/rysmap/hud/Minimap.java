@@ -212,6 +212,8 @@ public final class Minimap {
         Integer cave = session.caveFloor();
         if (cave != null) dimId = works.repka.rysmap.scan.Floors.id(dimId, cave); // под землёй и в Нижнем мире этаж игрока
         float[] shape = rounded(x, y, size, r);
+        // ночь: множитель в шейдере, этажи пещер не темнеют
+        session.tiles.brightness(cave == null ? MapSession.nightBrightness(mc.level, partial) : 1f);
         if (!v.rotate) {
             session.tiles.draw(g, dimId, px, pz, ppb, x, y, size, size, shape);
             areas(g, dim, v, x, y, size, shape);
@@ -233,6 +235,7 @@ public final class Minimap {
             if (!circle) g.disableScissor();
         }
 
+        session.tiles.brightness(1f);
         markers(g, dim, v);
         entities(g, dim, v, partial);
         target(g, t, dim, v);

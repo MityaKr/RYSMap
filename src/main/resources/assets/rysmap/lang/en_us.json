@@ -198,5 +198,8 @@
   "rysmap.cave.slice": "Slice",
   "rysmap.cave.floors": "Floors",
   "rysmap.cave.off_server": "The server turned the cave map off",
-  "rysmap.cave.wheel": "Floor down and up; Ctrl+wheel over the map"
+  "rysmap.cave.wheel": "Floor down and up; Ctrl+wheel over the map",
+  "rysmap.settings.night_caves": "Night and caves",
+  "rysmap.settings.night": "Darken at night",
+  "rysmap.settings.caves": "Caves under a roof"
 }

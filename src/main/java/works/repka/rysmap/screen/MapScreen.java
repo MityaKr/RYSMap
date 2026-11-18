@@ -454,7 +454,13 @@ public final class MapScreen extends ScaledScreen {
         Draw.round(g, cx0 + cw - 2 * r - 1, cy0, 2 * r, ch - 1, r - 1, canvas.c("map.bg"));
         String dim = tileId();
         s.viewFloor(caves && playerHere() ? floor : null);
-        s.tiles.draw(g, dim, centerX, centerZ, zoom, cx0, cy0, cw, ch, clips(r));
+        // дальний план (М6): мельче 0,5 единицы на блок рисуются уменьшенные тайлы и сетка регионов
+        boolean far = zoom < FAR_ZOOM;
+        works.repka.rysmap.tile.TileTextures layer = far ? s.overview : s.tiles;
+        layer.brightness(caves ? 1f : MapSession.nightBrightness(Minecraft.getInstance().level, partial));
+        layer.draw(g, dim, centerX, centerZ, zoom, cx0, cy0, cw, ch, clips(r));
+        layer.brightness(1f);
+        if (far) regionGrid(g, canvas);
         MapApi.ModeView view = modeView;
         if (view != null && safe(view::dimTiles, false)) Draw.rect(g, cx0, cy0, cw - (int) r, ch - 1, 0x99101216);
         if (view == null || safe(view::drawAreas, true)) areas(g);
@@ -956,6 +962,33 @@ public final class MapScreen extends ScaledScreen {
             ry += MENU_ROW;
         }
         g.pose().popPose();
+    }
+
+    /** С какого масштаба (единиц на блок) окно переходит на дальний план. */
+    static final double FAR_ZOOM = 0.5;
+
+    /** Сетка регионов 512×512 на дальнем плане (макет {@code 12}). */
+    private void regionGrid(GuiGraphics g, Theme canvas) {
+        int right = cx0 + cw - 1, bottom = cy0 + ch - 1;
+        int rx0 = (int) Math.floor(blockX(cx0) / 512), rx1 = (int) Math.ceil(blockX(right) / 512);
+        int rz0 = (int) Math.floor(blockZ(cy0) / 512), rz1 = (int) Math.ceil(blockZ(bottom) / 512);
+        int n = (rx1 - rx0 + 1) + (rz1 - rz0 + 1);
+        if (n > 200) return;
+        float[] xy = new float[n * 4];
+        int k = 0;
+        for (int rx = rx0; rx <= rx1; rx++) {
+            float x = sx(rx * 512.0);
+            if (x <= cx0 || x >= right) continue;
+            xy[k * 4] = x; xy[k * 4 + 1] = cy0; xy[k * 4 + 2] = x; xy[k * 4 + 3] = bottom;
+            k++;
+        }
+        for (int rz = rz0; rz <= rz1; rz++) {
+            float y = sy(rz * 512.0);
+            if (y <= cy0 || y >= bottom) continue;
+            xy[k * 4] = cx0; xy[k * 4 + 1] = y; xy[k * 4 + 2] = right; xy[k * 4 + 3] = y;
+            k++;
+        }
+        if (k > 0) Draw.lines(g, xy, k, 0.5f, Draw.alpha(canvas.c("map.grid") | 0xFF000000, 0.35f));
     }
 
     // ---- этажи пещер (М5) ----

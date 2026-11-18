@@ -62,6 +62,10 @@ public final class TileTextures {
     }
 
     private final Source source;
+    /** Сторона текстуры региона: 512 у обычных тайлов, меньше у дальнего плана (М6). */
+    private final int side;
+    /** Множитель яркости следующего рисования (ночь, М6): 1 без затемнения. */
+    private float brightness = 1f;
     private final Map<String, Long2ObjectOpenHashMap<Tile>> tiles = new HashMap<>();
     private int cap;
     private long idleNanos;
@@ -70,6 +74,12 @@ public final class TileTextures {
     private long uploads;
 
     public TileTextures(Source source, int cap, int idleSeconds) {
+        this(source, cap, idleSeconds, RegionData.SIZE);
+    }
+
+    /** {@code side}: сторона текстуры региона (дальний план: 64, регион уменьшен в 8 раз). */
+    public TileTextures(Source source, int cap, int idleSeconds, int side) {
+        this.side = side;
         this.source = source;
         this.cap = Math.max(4, cap);
         this.idleNanos = idleSeconds * 1_000_000_000L;
@@ -117,7 +127,7 @@ public final class TileTextures {
             if (!begun) {
                 Batch.flush();
                 g.flush();
-                RenderSystem.setShader(GameRenderer::getPositionTexShader);
+                RenderSystem.setShader(brightness < 0.999f ? GameRenderer::getPositionTexColorShader : GameRenderer::getPositionTexShader);
                 RenderSystem.enableBlend();
                 RenderSystem.defaultBlendFunc();
                 begun = true;
@@ -127,7 +137,8 @@ public final class TileTextures {
             double rsx0 = x + (ox - left) * pixelsPerBlock, rsy0 = y + (oz - top) * pixelsPerBlock;
             double side = RegionData.SIZE * pixelsPerBlock;
             RenderSystem.setShaderTexture(0, t.glId);
-            BufferBuilder b = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+            boolean dim = brightness < 0.999f;
+            BufferBuilder b = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, dim ? DefaultVertexFormat.POSITION_TEX_COLOR : DefaultVertexFormat.POSITION_TEX);
             int quads = 0;
             for (int c = 0; c + 3 < clips.length; c += 4) {
                 double qx0 = Math.max(Math.max(rsx0, x), clips[c]), qy0 = Math.max(Math.max(rsy0, y), clips[c + 1]);
@@ -135,10 +146,19 @@ public final class TileTextures {
                 if (qx1 <= qx0 || qy1 <= qy0) continue;
                 float u0 = (float) ((qx0 - rsx0) / side), u1 = (float) ((qx1 - rsx0) / side);
                 float v0 = (float) ((qy0 - rsy0) / side), v1 = (float) ((qy1 - rsy0) / side);
-                b.addVertex(m, (float) qx0, (float) qy0, 0).setUv(u0, v0);
-                b.addVertex(m, (float) qx0, (float) qy1, 0).setUv(u0, v1);
-                b.addVertex(m, (float) qx1, (float) qy1, 0).setUv(u1, v1);
-                b.addVertex(m, (float) qx1, (float) qy0, 0).setUv(u1, v0);
+                if (dim) {
+                    // ночь: цвет тайла умножается в шейдере на цвет вершины, текстура не перезаливается
+                    float k = brightness;
+                    b.addVertex(m, (float) qx0, (float) qy0, 0).setUv(u0, v0).setColor(k, k, k, 1f);
+                    b.addVertex(m, (float) qx0, (float) qy1, 0).setUv(u0, v1).setColor(k, k, k, 1f);
+                    b.addVertex(m, (float) qx1, (float) qy1, 0).setUv(u1, v1).setColor(k, k, k, 1f);
+                    b.addVertex(m, (float) qx1, (float) qy0, 0).setUv(u1, v0).setColor(k, k, k, 1f);
+                } else {
+                    b.addVertex(m, (float) qx0, (float) qy0, 0).setUv(u0, v0);
+                    b.addVertex(m, (float) qx0, (float) qy1, 0).setUv(u0, v1);
+                    b.addVertex(m, (float) qx1, (float) qy1, 0).setUv(u1, v1);
+                    b.addVertex(m, (float) qx1, (float) qy0, 0).setUv(u1, v0);
+                }
                 quads++;
             }
             var mesh = b.build();
@@ -199,11 +219,12 @@ public final class TileTextures {
         buf.clear();
         buf.put(p.abgr());
         buf.flip();
-        upload(t.glId, 0, 0, RegionData.SIZE, RegionData.SIZE, buf);
+        upload(t.glId, 0, 0, side, side, buf);
         t.state = READY;
     }
 
     public void accept(Patch p) {
+        if (side != RegionData.SIZE) return; // дальний план кусками не обновляется: текстура уйдёт по простою и перепечётся
         Tile t = find(p.dimension(), p.chunkX() >> 5, p.chunkZ() >> 5);
         if (t == null || t.state == REQUESTED) return;
         if (t.state == EMPTY) {
@@ -230,7 +251,7 @@ public final class TileTextures {
     private void ensureTexture(Tile t) {
         if (t.glId >= 0) return;
         t.glId = TextureUtil.generateTextureId();
-        TextureUtil.prepareImage(t.glId, 0, RegionData.SIZE, RegionData.SIZE);
+        TextureUtil.prepareImage(t.glId, 0, side, side);
         GlStateManager._texParameter(GL_TEXTURE_2D, 10241, 9728); // MIN_FILTER NEAREST
         GlStateManager._texParameter(GL_TEXTURE_2D, 10240, 9728); // MAG_FILTER NEAREST
         GlStateManager._texParameter(GL_TEXTURE_2D, 10242, 33071); // WRAP_S CLAMP_TO_EDGE
@@ -249,7 +270,7 @@ public final class TileTextures {
     }
 
     private IntBuffer scratch() {
-        if (scratch == null) scratch = MemoryUtil.memAllocInt(RegionData.AREA);
+        if (scratch == null) scratch = MemoryUtil.memAllocInt(side * side);
         return scratch;
     }
 
@@ -320,6 +341,41 @@ public final class TileTextures {
         }
     }
 
+    /** Множитель яркости следующих рисований (ночь): 1 без затемнения. */
+    public void brightness(float k) {
+        brightness = Math.max(0f, Math.min(1f, k));
+    }
+
+    /** Уменьшить пиксели региона 512×512 в {@code side}×{@code side} усреднением (дальний план). Рабочий поток. */
+    public static int[] downsample(int[] abgr, int side) {
+        int f = RegionData.SIZE / side;
+        int[] out = new int[side * side];
+        for (int oy = 0; oy < side; oy++) {
+            for (int ox = 0; ox < side; ox++) {
+                long a = 0, b = 0, g = 0, r = 0;
+                int n = 0;
+                for (int y = 0; y < f; y++) {
+                    int row = (oy * f + y) * RegionData.SIZE + ox * f;
+                    for (int x = 0; x < f; x++) {
+                        int c = abgr[row + x];
+                        int ca = c >>> 24;
+                        if (ca == 0) continue;
+                        a += ca;
+                        b += (c >> 16) & 255;
+                        g += (c >> 8) & 255;
+                        r += c & 255;
+                        n++;
+                    }
+                }
+                if (n == 0) continue;
+                // прозрачность по доле разведанного: край разведки мягкий
+                int alpha = (int) (a / (f * f));
+                out[oy * side + ox] = (alpha << 24) | (int) (b / n) << 16 | (int) (g / n) << 8 | (int) (r / n);
+            }
+        }
+        return out;
+    }
+
     public void setLimits(int cap, int idleSeconds) {
         this.cap = Math.max(4, cap);
         this.idleNanos = idleSeconds * 1_000_000_000L;
@@ -331,7 +387,7 @@ public final class TileTextures {
 
     /** Видеопамять текстур плюс общий буфер, байты. */
     public long bytes() {
-        return (long) textures * RegionData.AREA * 4 + (scratch != null ? (long) RegionData.AREA * 4 : 0);
+        return (long) textures * side * side * 4 + (scratch != null ? (long) side * side * 4 : 0);
     }
 
     public long uploads() {

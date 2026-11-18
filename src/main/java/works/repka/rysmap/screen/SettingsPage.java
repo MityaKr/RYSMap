@@ -118,7 +118,17 @@ final class SettingsPage {
             c.minimapCircle = i == 1;
             c.save();
         });
-        y += ROW + 8;
+        y += ROW + 2;
+
+        // ночь и пещеры (макет 50): независимые выключатели
+        label(g, t, "rysmap.settings.night_caves", null, lx, y);
+        pills(g, t, hits, lx + lw, y, new String[]{Component.translatable("rysmap.settings.night").getString(),
+            Component.translatable("rysmap.settings.caves").getString()}, new boolean[]{c.night, c.caves}, mx, my, i -> {
+            if (i == 0) c.night = !c.night;
+            else c.caves = !c.caves;
+            c.save();
+        });
+        y += ROW + 4;
 
         // места гибели
         Kit.caps(g, t, Component.translatable("rysmap.settings.world").getString(), lx, y + 4, 11, 0.44f);
@@ -167,7 +177,7 @@ final class SettingsPage {
         });
 
         // сервер: видит только оператор (макет 50, раздел «Сервер»)
-        if (works.repka.rysmap.client.ServerRules.op()) server(g, t, hits, lx, lw, y + ROW + 8, mx, my);
+        if (works.repka.rysmap.client.ServerRules.op()) server(g, t, hits, lx, lw, y + ROW + 4, mx, my);
 
         // справа: образец
         int ry = top + 12;
@@ -254,13 +264,13 @@ final class SettingsPage {
             if (i == 0) send(r, r.teleport(), r.pause(), !r.minimap(), r.caves(), r.players(), r.mobs());
             else send(r, r.teleport(), r.pause(), r.minimap(), !r.caves(), r.players(), r.mobs());
         });
-        y += ROW + 2;
+        y += ROW;
         label(g, t, "rysmap.settings.server.teleport", "rysmap.settings.server.teleport.note", lx, y);
         String[] modes = {Component.translatable("rysmap.settings.server.teleport.off").getString(),
             Component.translatable("rysmap.settings.server.teleport.ops").getString(),
             Component.translatable("rysmap.settings.server.teleport.all").getString()};
         segmented(g, t, hits, lx + lw, y, modes, r.teleport(), mx, my, i -> send(r, i, r.pause(), r.minimap(), r.caves(), r.players(), r.mobs()));
-        y += ROW + 2;
+        y += ROW;
         label(g, t, "rysmap.settings.server.pause", "rysmap.settings.server.pause.note", lx, y);
         String[] pauses = new String[PAUSES.length];
         int ps = -1;
@@ -271,7 +281,7 @@ final class SettingsPage {
             if (PAUSES[i] == r.pause()) ps = i;
         }
         segmented(g, t, hits, lx + lw, y, pauses, ps, mx, my, i -> send(r, r.teleport(), PAUSES[i], r.minimap(), r.caves(), r.players(), r.mobs()));
-        y += ROW + 2;
+        y += ROW;
         label(g, t, "rysmap.settings.server.entities", "rysmap.settings.server.entities.note", lx, y);
         pills(g, t, hits, lx + lw, y, new String[]{Component.translatable("rysmap.settings.server.players").getString(),
             Component.translatable("rysmap.settings.server.mobs").getString()}, new boolean[]{r.players(), r.mobs()}, mx, my, i -> {

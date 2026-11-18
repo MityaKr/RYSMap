@@ -198,5 +198,8 @@
   "rysmap.cave.slice": "Срез",
   "rysmap.cave.floors": "Этажи",
   "rysmap.cave.off_server": "Сервер выключил карту пещер",
-  "rysmap.cave.wheel": "Этаж ниже и выше; Ctrl+колесо над картой"
+  "rysmap.cave.wheel": "Этаж ниже и выше; Ctrl+колесо над картой",
+  "rysmap.settings.night_caves": "Ночь и пещеры",
+  "rysmap.settings.night": "Темнеть ночью",
+  "rysmap.settings.caves": "Пещеры под крышей"
 }

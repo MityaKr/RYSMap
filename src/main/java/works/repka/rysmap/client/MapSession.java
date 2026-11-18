@@ -55,6 +55,9 @@ public final class MapSession {
     private final DirtyColumns dirty = new DirtyColumns(2048);
     private final AtomicInteger pending = new AtomicInteger();
     public final TileTextures tiles;
+    /** Дальний план (М6): регион уменьшен до 64×64, потолок 256 текстур (4 МБ видеопамяти). */
+    public final TileTextures overview;
+    public static final int OVERVIEW_SIDE = 64;
     private final works.repka.rysmap.point.PointStore points;
 
     private @Nullable String dimension;
@@ -81,6 +84,7 @@ public final class MapSession {
         this.config = config;
         this.worker = new MapWorker("RYSMap worker", t -> RYSMap.LOG.error("[rysmap] сбой задачи рабочего потока", t));
         this.tiles = new TileTextures(this::requestRegion, config.textures, config.textureIdleSeconds);
+        this.overview = new TileTextures(this::requestOverview, 256, 30, OVERVIEW_SIDE);
         try {
             store.touch();
         } catch (IOException e) {
@@ -140,6 +144,7 @@ public final class MapSession {
         dirty.clear();
         pinnedX = pinnedZ = Integer.MIN_VALUE;
         tiles.keepOnly(dim);
+        overview.keepOnly(dim);
         if (old != null) worker.submit(() -> closeOthers(dim));
         RYSMap.LOG.info("[rysmap] измерение {}{}{}", dim, ceiling ? " (потолок: срез под потолком)" : "", noMap ? " (без карты)" : "");
     }
@@ -180,10 +185,16 @@ public final class MapSession {
         ColorTable colors = ColorTable.INSTANCE;
         if (!colors.step(2_000_000L)) return;
         if (colorsSeen != colors.version()) {
-            if (colorsSeen >= 0) tiles.invalidate();
+            if (colorsSeen >= 0) {
+                tiles.invalidate();
+                overview.invalidate();
+            }
             colorsSeen = colors.version();
         }
-        if (ticks % 20 == 0) tiles.tick();
+        if (ticks % 20 == 0) {
+            tiles.tick();
+            overview.tick();
+        }
         if (ticks % FLUSH_TICKS == 0) worker.submit(this::flushAll);
         if (noMap || dimension == null) return;
 
@@ -247,6 +258,9 @@ public final class MapSession {
                 results.poll();
                 tiles.accept(p);
                 regions++;
+            } else if (r instanceof Overview o) {
+                results.poll();
+                overview.accept(o.pixels());
             } else if (r instanceof Invalidate inv) {
                 results.poll();
                 tiles.invalidate(inv.dimension, inv.regionX, inv.regionZ);
@@ -353,6 +367,33 @@ public final class MapSession {
             }
             results.add(new TileTextures.Pixels(dim, regionX, regionZ, px));
         });
+    }
+
+    /** Уменьшенный регион для дальнего плана. */
+    private record Overview(TileTextures.Pixels pixels) {}
+
+    private void requestOverview(String dim, int regionX, int regionZ) {
+        worker.submit(() -> {
+            int[] px = null;
+            try {
+                int[] full = dim(dim).bakeRegion(regionX, regionZ);
+                if (full != null) px = TileTextures.downsample(full, OVERVIEW_SIDE);
+            } catch (IOException e) {
+                RYSMap.LOG.warn("[rysmap] регион {},{} {} не прочитался: {}", regionX, regionZ, dim, e.toString());
+            }
+            results.add(new Overview(new TileTextures.Pixels(dim, regionX, regionZ, px)));
+        });
+    }
+
+    /**
+     * Множитель ночи (М6): 1 днём, к ночи до 0,45 по небесной темноте мира. В измерениях без неба и на этажах пещер
+     * карта не темнеет; игрок выключает это настройкой «Темнеть ночью».
+     */
+    public static float nightBrightness(@Nullable ClientLevel level, float partial) {
+        if (level == null || !ClientConfig.get().night || !level.dimensionType().hasSkyLight()) return 1f;
+        float sky = level.getSkyDarken(partial); // 0,2 ночью … 1 днём
+        float day = Math.max(0f, Math.min(1f, (sky - 0.2f) / 0.8f));
+        return 0.45f + 0.55f * day;
     }
 
     /** Регион переписан не сканером (переезд из FTB): текстуру заказать заново. */
@@ -513,6 +554,7 @@ public final class MapSession {
             for (String id : new HashSet<>(dims.keySet())) closeDimension(id);
         }, 10_000);
         tiles.close();
+        overview.close();
         results.clear();
         RYSMap.LOG.info("[rysmap] карта закрыта: снимков {}, среднее {} мкс, худший {} мкс; разбор в рабочем потоке {} мкс на чанк",
             snapCount, snapCount == 0 ? 0 : snapNanos / snapCount / 1000, snapMaxNanos / 1000, scanCount.get() == 0 ? 0 : scanNanos.get() / scanCount.get() / 1000);
