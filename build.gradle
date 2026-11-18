@@ -50,9 +50,14 @@ neoForge {
         // migrate (MapHello, папка на UUID мира, шаг map на копии карты FTB из fixtures). Куча задаётся явно (-Pheap, по умолчанию 3G).
         autotest {
             client()
-            gameDirectory = project.file('run')
+            // -PrunDir=run-repys: копия клиента сборки (моды в <папка>/mods), для сценария server на настоящем сервере
+            gameDirectory = project.file(project.findProperty('runDir') ?: 'run')
             jvmArgument "-Xmx${project.findProperty('heap') ?: '3G'}"
             systemProperty 'rysmap.autotest', project.findProperty('autotest') ?: 'scan'
+            // сценарий server: JSON с адресом, ключом мира и точками (ServerAutoTest)
+            systemProperty 'rysmap.autotest.plan', project.findProperty('plan') ?: ''
+            // в копии сборки моды с GameTest для разработки (Binnie) падают без своих классов: GameTest выключены
+            if (project.findProperty('runDir') != null) systemProperty 'neoforge.enableGameTest', 'false'
             // сценарий migrate берёт настоящую карту FTB из fixtures (в git её нет)
             systemProperty 'rysmap.ftbFixture', project.findProperty('ftbFixture') ?: project.file('../../_shared/_saved/fixtures/ftb-2026-11-18/client/ftbchunks').absolutePath
             programArguments.addAll '--width', '1280', '--height', '800'

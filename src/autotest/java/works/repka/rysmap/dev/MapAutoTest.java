@@ -39,9 +39,18 @@ public final class MapAutoTest {
     private record Step(String name, BooleanSupplier ready, Runnable action, int pause) {}
 
     private static final boolean ON = System.getProperty("rysmap.autotest") != null;
+
+    static {
+        // Сценарий server идёт в копии сборки: в запуске разработки игра считает себя «в IDE» и включает GameTest,
+        // а моды с тестами разработки (Binnie) без своих классов роняют загрузку. Класс грузится при сборке модов,
+        // раньше регистрации GameTest в конструкторе Minecraft.
+        if ("server".equals(System.getProperty("rysmap.autotest"))) net.minecraft.SharedConstants.IS_RUNNING_IN_IDE = false;
+    }
     private static final List<Step> STEPS = new ArrayList<>();
     private static boolean built;
     static int index, wait, failures, shots = 1, settle, stepTicks;
+    /** Сколько тиков шаг ждёт готовности, потом считается проваленным. */
+    static int limit = 20 * 240;
     static String world;
     private static int spawnX, spawnZ;
     private static long firstSnapshots, firstScanned;
@@ -65,9 +74,9 @@ public final class MapAutoTest {
         Step s = STEPS.get(index);
         stepTicks++;
         if (!s.ready.getAsBoolean()) {
-            if (stepTicks > 20 * 240) {
+            if (stepTicks > limit) {
                 failures++;
-                RYSMap.LOG.error("[autotest] шаг {} не дождался за 4 минуты", s.name);
+                RYSMap.LOG.error("[autotest] шаг {} не дождался за {} с", s.name, limit / 20);
                 stepTicks = 0;
                 index++;
             }
@@ -156,6 +165,10 @@ public final class MapAutoTest {
         }
         if ("migrate".equals(System.getProperty("rysmap.autotest"))) {
             MigrateAutoTest.build();
+            return;
+        }
+        if ("server".equals(System.getProperty("rysmap.autotest"))) {
+            ServerAutoTest.build();
             return;
         }
         if ("labels".equals(System.getProperty("rysmap.autotest"))) {
