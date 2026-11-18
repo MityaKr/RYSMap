@@ -37,6 +37,11 @@ public final class MapRules {
     public int pause = 300;
     /** Чужие игроки на карте; по умолчанию только рядом. */
     public Players players = Players.NEAR;
+    /**
+     * Куда можно телепортироваться не оператору, кроме своего текущего измерения (перепроверка 18.11): по умолчанию Верхний
+     * и Нижний мир. Энд, пространственные ячейки AE2, шахтёрские измерения модов не открыты. Правится в файле.
+     */
+    public java.util.List<String> teleportDimensions = new java.util.ArrayList<>(java.util.List.of("minecraft:overworld", "minecraft:the_nether"));
     /** Мобы на карте. */
     public boolean mobs = true;
 
@@ -50,6 +55,7 @@ public final class MapRules {
         r.pause = pause;
         r.players = players;
         r.mobs = mobs;
+        r.teleportDimensions = new java.util.ArrayList<>(teleportDimensions);
         return r;
     }
 
@@ -66,6 +72,10 @@ public final class MapRules {
             if (o.has("playersMode")) r.players = players(o.get("playersMode").getAsString());
             else if (o.has("players")) r.players = o.get("players").getAsBoolean() ? Players.NEAR : Players.NEVER;
             if (o.has("mobs")) r.mobs = o.get("mobs").getAsBoolean();
+            if (o.has("teleportDimensions") && o.get("teleportDimensions").isJsonArray()) {
+                r.teleportDimensions = new java.util.ArrayList<>();
+                for (var e : o.getAsJsonArray("teleportDimensions")) r.teleportDimensions.add(e.getAsString());
+            }
         } catch (Exception e) {
             RYSMap.LOG.warn("[rysmap] {} не прочитался, правила по умолчанию: {}", file, e.toString());
         }
@@ -81,6 +91,9 @@ public final class MapRules {
         o.addProperty("pause", pause);
         o.addProperty("playersMode", players.name().toLowerCase(java.util.Locale.ROOT));
         o.addProperty("mobs", mobs);
+        com.google.gson.JsonArray dims = new com.google.gson.JsonArray();
+        for (String d : teleportDimensions) dims.add(d);
+        o.add("teleportDimensions", dims);
         try {
             Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");

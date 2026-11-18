@@ -49,6 +49,28 @@ public final class Teleports {
         return left <= 0 ? 0 : (int) Math.ceil(left / 1000.0);
     }
 
+    /** Игроки, чей телепорт ждёт загрузки чанков: второй запрос до ответа не принимается. */
+    private static final java.util.Set<UUID> PENDING = new java.util.HashSet<>();
+    /** Сколько телепортов одновременно ждут загрузки на всём сервере. */
+    private static final int MAX_PENDING = 4;
+    /** Тикет загрузки места телепорта: держит чанки 10 секунд, пока идёт поиск. */
+    private static final net.minecraft.server.level.TicketType<net.minecraft.world.level.ChunkPos> TICKET =
+        net.minecraft.server.level.TicketType.create("rysmap_teleport", java.util.Comparator.comparingLong(net.minecraft.world.level.ChunkPos::toLong), 200);
+
+    /** Пауза у игрока, который не оператор: и после телепорта, и после отказа на месте (нет места, граница). */
+    private static void pause(ServerPlayer player) {
+        if (!MapServer.op(player)) LAST.put(player.getUUID(), System.currentTimeMillis());
+    }
+
+    /**
+     * Измерение разрешено: своё текущее, из списка правила ({@link MapRules#teleportDimensions}) или любое у оператора.
+     * Клиент присылает имя сам, поэтому сервер не верит ему на слово (перепроверка 18.11, пункт 2).
+     */
+    static boolean dimensionAllowed(ServerPlayer player, ServerLevel level, MapRules rules) {
+        if (MapServer.op(player) || player.level() == level) return true;
+        return rules.teleportDimensions.contains(level.dimension().location().toString());
+    }
+
     public static void request(ServerPlayer player, MapNet.Teleport t) {
         MinecraftServer server = player.getServer();
         if (server == null) return;
@@ -72,12 +94,58 @@ public final class Teleports {
         }
         ResourceLocation loc = ResourceLocation.tryParse(t.dimension());
         ServerLevel level = loc == null ? null : server.getLevel(ResourceKey.create(Registries.DIMENSION, loc));
-        if (level == null) {
+        if (level == null || !dimensionAllowed(player, level, rules)) {
             deny(player, "dimension", 0);
             return;
         }
         if (!level.getWorldBorder().isWithinBounds(new BlockPos(t.x(), 0, t.z()))) {
             deny(player, "border", 0);
+            return;
+        }
+        if (PENDING.contains(player.getUUID()) || PENDING.size() >= MAX_PENDING) {
+            deny(player, "busy", 0);
+            return;
+        }
+        // чанки места (столбец и круг поиска) грузятся и при нужде создаются асинхронно, под тикетом; главный поток не ждёт
+        int r = SafeSpot.RADIUS;
+        java.util.List<java.util.concurrent.CompletableFuture<?>> loads = new java.util.ArrayList<>();
+        java.util.List<net.minecraft.world.level.ChunkPos> held = new java.util.ArrayList<>();
+        for (int cz = (t.z() - r) >> 4; cz <= (t.z() + r) >> 4; cz++) {
+            for (int cx = (t.x() - r) >> 4; cx <= (t.x() + r) >> 4; cx++) {
+                net.minecraft.world.level.ChunkPos cp = new net.minecraft.world.level.ChunkPos(cx, cz);
+                level.getChunkSource().addRegionTicket(TICKET, cp, 1, cp);
+                held.add(cp);
+                loads.add(level.getChunkSource().getChunkFuture(cx, cz, net.minecraft.world.level.chunk.status.ChunkStatus.FULL, true));
+            }
+        }
+        PENDING.add(player.getUUID());
+        UUID id = player.getUUID();
+        java.util.concurrent.CompletableFuture.allOf(loads.toArray(new java.util.concurrent.CompletableFuture[0]))
+            .orTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .whenCompleteAsync((v, err) -> {
+                PENDING.remove(id);
+                ServerPlayer p = server.getPlayerList().getPlayer(id);
+                try {
+                    if (p == null) return;
+                    if (err != null) {
+                        pause(p);
+                        deny(p, "unsafe", 0);
+                        return;
+                    }
+                    finish(p, level, t, rules);
+                } catch (RuntimeException e) {
+                    RYSMap.LOG.warn("[rysmap] телепорт {} не прошёл: {}", p == null ? id : p.getGameProfile().getName(), e.toString());
+                    if (p != null) deny(p, "unsafe", 0);
+                } finally {
+                    for (net.minecraft.world.level.ChunkPos cp : held) level.getChunkSource().removeRegionTicket(TICKET, cp, 1, cp);
+                }
+            }, server);
+    }
+
+    /** Чанки загружены: поиск места и перенос. Главный поток. */
+    private static void finish(ServerPlayer player, ServerLevel level, MapNet.Teleport t, MapRules rules) {
+        if (player.isSpectator() || !player.isAlive()) {
+            deny(player, "state", 0);
             return;
         }
         boolean ceiling = level.dimensionType().hasCeiling();
@@ -91,16 +159,18 @@ public final class Teleports {
         long micros = (System.nanoTime() - t0) / 1000;
         if (spot == null) {
             RYSMap.LOG.info("[rysmap] телепорт {}: в {} {} {} нет безопасного места ({} мкс)", player.getGameProfile().getName(), t.dimension(), t.x(), t.z(), micros);
+            pause(player);
             deny(player, "unsafe", 0);
             return;
         }
         if (!level.getWorldBorder().isWithinBounds(new BlockPos(spot[0], spot[1], spot[2]))) {
+            pause(player);
             deny(player, "border", 0);
             return;
         }
         player.teleportTo(level, spot[0] + 0.5, spot[1], spot[2] + 0.5, player.getYRot(), player.getXRot());
         player.resetFallDistance();
-        if (!MapServer.op(player)) LAST.put(player.getUUID(), System.currentTimeMillis());
+        pause(player);
         RYSMap.LOG.info("[rysmap] телепорт {}: {} {} {} {} (поиск {} мкс)", player.getGameProfile().getName(), t.dimension(), spot[0], spot[1], spot[2], micros);
         MapNet.send(player, new MapNet.TeleportResult(true, "", MapServer.op(player) ? 0 : rules.pause));
         MapServer.sendRules(player);
@@ -110,7 +180,7 @@ public final class Teleports {
         MapNet.send(player, new MapNet.TeleportResult(false, reason, seconds));
     }
 
-    /** Мир сервера для поиска: чанк загружается (и создаётся) при первом обращении. */
+    /** Мир сервера для поиска: чанки уже загружены под тикетом ({@link #request}); чужой чанк вне круга не создаётся. */
     static final class LevelProbe implements SafeSpot.Probe {
         private final ServerLevel level;
         private final boolean ceiling;
@@ -122,7 +192,9 @@ public final class Teleports {
         }
 
         private ChunkAccess chunk(int x, int z) {
-            return level.getChunk(x >> 4, z >> 4);
+            ChunkAccess c = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
+            if (c == null) throw new IllegalStateException("чанк места телепорта не загружен");
+            return c;
         }
 
         @Override
