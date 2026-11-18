@@ -398,6 +398,8 @@ final class FixesAutoTest {
             check("сообщения об отказе нет", ServerRules.message() == null);
         }, 20);
         shot("teleported");
+        step("whats new", () -> works.repka.rysmap.screen.WhatsNewScreen.openForTest(13, 340), 20);
+        shot("whats_new");
         step("finish", () -> {
             mc().setScreen(null);
             RYSMap.LOG.info(MapAutoTest.failures == 0 ? "[autotest] PASS" : "[autotest] FAILED: {}", MapAutoTest.failures);

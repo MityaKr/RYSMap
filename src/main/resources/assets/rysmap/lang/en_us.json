@@ -254,5 +254,19 @@
   "rysmap.settings.mobs.passive": "passive",
   "rysmap.settings.mobs.pets": "pets",
   "rysmap.settings.waystones": "Waystones",
-  "rysmap.settings.waystones.note": "waystones you have activated"
+  "rysmap.settings.waystones.note": "waystones you have activated",
+  "rysmap.whatsnew.title": "The map and land are our own now",
+  "rysmap.whatsnew.sub": "FTB Chunks was removed from the server. Everything of yours was moved.",
+  "rysmap.whatsnew.map": "Map",
+  "rysmap.whatsnew.map.note": "the map key; the gear opens settings",
+  "rysmap.whatsnew.map.note_land": "\"Map\" and \"Land\" tabs, \"Claim\" mode for chunks",
+  "rysmap.whatsnew.land": "Team land moved",
+  "rysmap.whatsnew.land.note": "rights and allies as in FTB; the \"Land\" tab",
+  "rysmap.whatsnew.points": "Points: %s and %s of explored map",
+  "rysmap.whatsnew.points.note": "FTB death places are in the \"Mine\" group",
+  "rysmap.whatsnew.new": "New: caves, teleport, players and mobs",
+  "rysmap.whatsnew.new.note": "floors underground, T over the map, waystones",
+  "rysmap.whatsnew.open": "Open map",
+  "rysmap.whatsnew.where": "Where is my land",
+  "rysmap.whatsnew.ok": "Got it"
 }

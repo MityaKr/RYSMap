@@ -254,5 +254,19 @@
   "rysmap.settings.mobs.passive": "мирные",
   "rysmap.settings.mobs.pets": "питомцы",
   "rysmap.settings.waystones": "Камни пути",
-  "rysmap.settings.waystones.note": "открытые тобой камни Waystones"
+  "rysmap.settings.waystones.note": "открытые тобой камни Waystones",
+  "rysmap.whatsnew.title": "Карта и земля теперь свои",
+  "rysmap.whatsnew.sub": "FTB Chunks убран с сервера. Всё твоё перенесено.",
+  "rysmap.whatsnew.map": "Карта",
+  "rysmap.whatsnew.map.note": "клавиша карты; шестерёнка открывает настройки",
+  "rysmap.whatsnew.map.note_land": "вкладки «Карта» и «Земля», режим «Приват» для чанков",
+  "rysmap.whatsnew.land": "Земля команды перенесена",
+  "rysmap.whatsnew.land.note": "права и союзники как были в FTB; вкладка «Земля»",
+  "rysmap.whatsnew.points": "Точки: %s и %s разведанной карты",
+  "rysmap.whatsnew.points.note": "места гибели FTB лежат в группе «Мои»",
+  "rysmap.whatsnew.new": "Новое: пещеры, телепорт, игроки и мобы",
+  "rysmap.whatsnew.new.note": "этажи под землёй, клавиша T над картой, камни пути",
+  "rysmap.whatsnew.open": "Открыть карту",
+  "rysmap.whatsnew.where": "Где моя земля",
+  "rysmap.whatsnew.ok": "Понятно"
 }

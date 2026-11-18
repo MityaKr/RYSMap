@@ -124,6 +124,11 @@ public final class MapSession {
         }
     }
 
+    /** Тиков с начала сессии. */
+    public int ticksAlive() {
+        return ticks;
+    }
+
     public @Nullable String dimension() {
         return dimension;
     }

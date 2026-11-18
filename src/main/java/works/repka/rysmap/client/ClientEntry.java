@@ -118,6 +118,7 @@ public final class ClientEntry {
                 while (NEW_POINT.consumeClick()) if (mc.screen == null) works.repka.rysmap.screen.QuickPointScreen.open();
                 while (ZOOM_IN.consumeClick()) Minimap.zoom(1);
                 while (ZOOM_OUT.consumeClick()) Minimap.zoom(-1);
+                if (session.ticksAlive() % 20 == 0) works.repka.rysmap.screen.WhatsNewScreen.maybeShow(mc);
             }
         });
         bus.addListener((net.neoforged.neoforge.client.event.ScreenEvent.Opening e) -> {
