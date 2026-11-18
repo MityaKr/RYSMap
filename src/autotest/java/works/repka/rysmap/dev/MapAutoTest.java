@@ -171,6 +171,10 @@ public final class MapAutoTest {
             ServerAutoTest.build();
             return;
         }
+        if ("fixes".equals(System.getProperty("rysmap.autotest"))) {
+            FixesAutoTest.build();
+            return;
+        }
         if ("labels".equals(System.getProperty("rysmap.autotest"))) {
             LabelsAutoTest.build();
             return;
