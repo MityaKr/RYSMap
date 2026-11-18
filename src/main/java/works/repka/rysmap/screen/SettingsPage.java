@@ -26,8 +26,8 @@ import works.repka.rysmap.hud.Minimap;
 
 /**
  * Страница настроек карты внутри окна (макет {@code 50}, урезано по плану 13.2): слева «Миникарта» (показывать, угол,
- * размер, приближение) и «Места гибели»; справа живой образец миникарты, клавиши со ссылкой на настройки игры и
- * сведения о данных (размер карты мира, переезд из FTB). Форма, поворот, строки под картой, подписи в мире и раздел
+ * размер, приближение) и «В мире» (места гибели, подписи точек в мире, их дальность); справа живой образец миникарты, клавиши со ссылкой на настройки игры и
+ * сведения о данных (размер карты мира, переезд из FTB). Форма, поворот, строки под картой и раздел
  * «Сервер» идут во втором выпуске. Всё пишется в {@code config/rysmap/client.json} сразу.
  */
 final class SettingsPage {
@@ -123,6 +123,34 @@ final class SettingsPage {
                 session.savePoints();
             }
         });
+        y += ROW + 2;
+
+        // подписи точек в мире: режим и дальность (порог раскрытия у прицела и предел числа меток только в файле)
+        label(g, t, "rysmap.settings.labels", "rysmap.settings.labels.note", lx, y);
+        works.repka.rysmap.hud.LabelPlan.Mode[] modes = works.repka.rysmap.hud.LabelPlan.Mode.values();
+        String[] modeNames = new String[modes.length];
+        int ms = 1;
+        for (int i = 0; i < modes.length; i++) {
+            modeNames[i] = Component.translatable("rysmap.settings.labels." + modes[i].id).getString();
+            if (modes[i].id.equals(c.worldLabels)) ms = i;
+        }
+        segmented(g, t, hits, lx + lw, y, modeNames, ms, mx, my, i -> {
+            c.worldLabels = modes[i].id;
+            c.save();
+        });
+        y += ROW + 2;
+        label(g, t, "rysmap.settings.range", "rysmap.settings.range.note", lx, y);
+        int[] ranges = {128, 256, 512, 1024};
+        String[] rangeNames = new String[ranges.length];
+        int rs = -1;
+        for (int i = 0; i < ranges.length; i++) {
+            rangeNames[i] = Minimap.group(ranges[i]);
+            if (ranges[i] == c.labelRange) rs = i;
+        }
+        segmented(g, t, hits, lx + lw, y, rangeNames, rs, mx, my, i -> {
+            c.labelRange = ranges[i];
+            c.save();
+        });
 
         // справа: образец
         int ry = top + 12;
@@ -159,6 +187,8 @@ final class SettingsPage {
         key(g, t, keyText(ClientEntry.NEW_POINT), "rysmap.settings.keys.new_point", rx, ry);
         ry += 12;
         key(g, t, keyText(ClientEntry.ZOOM_IN) + " " + keyText(ClientEntry.ZOOM_OUT), "rysmap.settings.keys.zoom", rx, ry);
+        ry += 12;
+        key(g, t, keyText(ClientEntry.SHOW_POINTS), "rysmap.settings.keys.show_points", rx, ry);
         ry += 12 + 8;
 
         // данные

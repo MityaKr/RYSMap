@@ -15,8 +15,8 @@ import java.util.Set;
 import works.repka.rysmap.RYSMap;
 
 /**
- * Настройки игрока: {@code config/rysmap/client.json}. Миникарту, угол, приближение и места гибели правит страница
- * настроек окна карты ({@code screen.SettingsPage}); память и сканер только файлом. Неизвестные поля файла сохраняются
+ * Настройки игрока: {@code config/rysmap/client.json}. Миникарту, угол, приближение, места гибели, подписи в мире и их дальность
+ * правит страница настроек окна карты ({@code screen.SettingsPage}); память и сканер только файлом. Неизвестные поля файла сохраняются
  * как есть.
  */
 public final class ClientConfig {
@@ -48,6 +48,14 @@ public final class ClientConfig {
     public @org.jetbrains.annotations.Nullable String minimapCorner;
     /** Сколько последних мест гибели хранить: 0 (не ставить), 1, 3, 5. Точки FTB не в счёт. */
     public int deathsKept = 3;
+    /** Какие точки подписаны в мире: {@code goal} (цель и гибель), {@code nearby} (все рядом), {@code all} (все). */
+    public String worldLabels = "nearby";
+    /** Дальность подписей в мире, блоки: дальше не рисуются (кроме цели пути и места гибели; в режиме «Все» без предела). */
+    public int labelRange = 512;
+    /** Метка раскрывается, когда она ближе к прицелу, чем столько единиц интерфейса; 0 не раскрывает у прицела. */
+    public int labelFocus = 40;
+    /** Сколько меток рисуется самое большее: ближайшие, цель и место гибели всегда. */
+    public int labelLimit = 64;
     /** Глаз слоёв по id; слоя нет в списке: как решил мод. */
     public final java.util.Map<String, Boolean> layers = new java.util.LinkedHashMap<>();
 
@@ -86,6 +94,11 @@ public final class ClientConfig {
                 if (json.has("minimapCorner") && json.get("minimapCorner").isJsonPrimitive()) c.minimapCorner = json.get("minimapCorner").getAsString();
                 c.deathsKept = clamp(json, "deathsKept", c.deathsKept, 0, 5);
                 if (c.deathsKept == 2 || c.deathsKept == 4) c.deathsKept = 3;
+                if (json.has("worldLabels") && json.get("worldLabels").isJsonPrimitive())
+                    c.worldLabels = works.repka.rysmap.hud.LabelPlan.Mode.of(json.get("worldLabels").getAsString()).id;
+                c.labelRange = clamp(json, "labelRange", c.labelRange, 32, 8192);
+                c.labelFocus = clamp(json, "labelFocus", c.labelFocus, 0, 200);
+                c.labelLimit = clamp(json, "labelLimit", c.labelLimit, 4, 256);
                 if (json.has("layers") && json.get("layers").isJsonObject())
                     for (var e : json.getAsJsonObject("layers").entrySet()) c.layers.put(e.getKey(), e.getValue().getAsBoolean());
             } else {
@@ -123,6 +136,10 @@ public final class ClientConfig {
         if (minimapCorner != null) json.addProperty("minimapCorner", minimapCorner);
         else json.remove("minimapCorner");
         json.addProperty("deathsKept", deathsKept);
+        json.addProperty("worldLabels", worldLabels);
+        json.addProperty("labelRange", labelRange);
+        json.addProperty("labelFocus", labelFocus);
+        json.addProperty("labelLimit", labelLimit);
         JsonObject l = new JsonObject();
         layers.forEach(l::addProperty);
         json.add("layers", l);

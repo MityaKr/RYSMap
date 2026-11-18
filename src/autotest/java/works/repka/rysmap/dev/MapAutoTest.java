@@ -158,6 +158,10 @@ public final class MapAutoTest {
             MigrateAutoTest.build();
             return;
         }
+        if ("labels".equals(System.getProperty("rysmap.autotest"))) {
+            LabelsAutoTest.build();
+            return;
+        }
         step("title", () -> {
             mc().options.pauseOnLostFocus = false;
             mc().options.onboardAccessibility = false;

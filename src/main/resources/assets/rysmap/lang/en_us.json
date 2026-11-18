@@ -130,5 +130,17 @@
   "rysmap.settings.regions.many": "%s regions",
   "rysmap.settings.points.one": "%s point",
   "rysmap.settings.points.few": "%s points",
-  "rysmap.settings.points.many": "%s points"
+  "rysmap.settings.points.many": "%s points",
+  "key.rysmap.show_points": "Show all waypoints (hold)",
+  "rysmap.labels.goal": "Destination",
+  "rysmap.point.in_world": "Always in world",
+  "rysmap.point.info.in_world": "The waypoint label shows in the world in any settings mode while the waypoint is within range",
+  "rysmap.settings.labels": "Waypoints in world",
+  "rysmap.settings.labels.note": "labels through walls; expand near the crosshair",
+  "rysmap.settings.labels.goal": "Target and death",
+  "rysmap.settings.labels.nearby": "All nearby",
+  "rysmap.settings.labels.all": "All",
+  "rysmap.settings.range": "Range",
+  "rysmap.settings.range.note": "blocks; target and death always shown",
+  "rysmap.settings.keys.show_points": "hold: show all waypoints"
 }

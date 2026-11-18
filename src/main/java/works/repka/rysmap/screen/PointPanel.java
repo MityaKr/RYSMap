@@ -19,9 +19,9 @@ import works.repka.rysmap.point.PointsLayer;
 
 /**
  * Панель точки справа (макеты {@code 15}, {@code 18}), 180 единиц: значок, имя, кто это; карточка «Координаты» с
- * копированием, «Отсюда» с расстоянием и стороной света, «Измерение», место портала в другом измерении; «На миникарте»;
+ * копированием, «Отсюда» с расстоянием и стороной света, «Измерение», место портала в другом измерении; «На миникарте», «В мире всегда»;
  * внизу «В путь», «Изменить», «Удалить» (с вопросом). У места гибели строка «Прошло» с подсказкой, почему срок вещей
- * не показан. «Телепорт», «В чат» и «В мире всегда» идут во втором выпуске.
+ * не показан. «В мире всегда» включает подпись точки в мире в любом режиме. «Телепорт» и «В чат» идут во втором выпуске.
  */
 final class PointPanel {
     static final int W = 180;
@@ -119,6 +119,21 @@ final class PointPanel {
             p.minimap = !p.minimap;
             s.pointsChanged();
         });
+        // в мире всегда: подпись видна в любом режиме настроек (в пределах дальности); у места гибели не нужен
+        if (!p.death()) {
+            cy += 16;
+            Draw.label(g, Component.translatable("rysmap.point.in_world").getString(), ix, cy + 9, 13, Weight.REGULAR, t.c("text.body"));
+            float lw = Draw.labelWidth(Component.translatable("rysmap.point.in_world").getString(), 13, Weight.REGULAR);
+            boolean hotI = Kit.over(mx, my, (int) (ix + lw + 3), cy + 3, 9, 11);
+            Draw.info(g, ix + lw + 4, cy + 5.5f, 7, hotI ? t.c("text.primary") : t.c("text.muted"));
+            if (hotI) tip[0] = List.of(Component.translatable("rysmap.point.info.in_world").getString());
+            boolean hotW = Kit.over(mx, my, ix + iw - 18, cy + 4, 18, 10);
+            Kit.toggle(g, t, ix + iw - 18, cy + 4, p.world, hotW);
+            hits.add(ix + iw - 18, cy + 4, 18, 10, b -> {
+                p.world = !p.world;
+                s.pointsChanged();
+            });
+        }
 
         // действия
         int actTop = y + h - 6 - 14 - 4 - 21 - 6;

@@ -47,6 +47,11 @@ public final class MapApiImpl implements MapApi {
         return tracked;
     }
 
+    /** Id своей точки, к которой ведёт путь, или null (путь к месту с карты или от другого мода). */
+    public java.util.@Nullable UUID trackedPoint() {
+        return tracked == null ? null : trackedPoint;
+    }
+
     @Override
     public boolean drawTiles(GuiGraphics g, ResourceKey<Level> dimension, double centerX, double centerZ, double pixelsPerBlock,
                              int x, int y, int w, int h) {

@@ -47,6 +47,8 @@ public final class ClientEntry {
     public static final KeyMapping ZOOM_IN = new KeyMapping("key.rysmap.zoom_in", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_EQUAL, CATEGORY);
     /** Окно новой точки (макет 09): по умолчанию без клавиши, в RepYS J занята Mekanism (план 12, «Клавиши»). */
     public static final KeyMapping NEW_POINT = new KeyMapping("key.rysmap.new_point", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), CATEGORY);
+    /** Держать: подписи всех точек рядом раскрыты (решение автора 18.11: по умолчанию без клавиши, обычно `). */
+    public static final KeyMapping SHOW_POINTS = new KeyMapping("key.rysmap.show_points", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), CATEGORY);
     public static final KeyMapping ZOOM_OUT = new KeyMapping("key.rysmap.zoom_out", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_MINUS, CATEGORY);
     private static @Nullable MapSession session;
     private static ClientConfig config = new ClientConfig();
@@ -68,9 +70,13 @@ public final class ClientEntry {
             e.register(ZOOM_IN);
             e.register(ZOOM_OUT);
             e.register(NEW_POINT);
+            e.register(SHOW_POINTS);
         });
-        modBus.addListener((RegisterGuiLayersEvent e) ->
-            e.registerBelow(VanillaGuiLayers.CHAT, ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "minimap"), Minimap::render));
+        modBus.addListener((RegisterGuiLayersEvent e) -> {
+            e.registerBelow(VanillaGuiLayers.CHAT, ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "minimap"), Minimap::render);
+            // подписи точек в мире: под прицелом и остальным HUD
+            e.registerAbove(VanillaGuiLayers.CAMERA_OVERLAYS, ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "world_labels"), works.repka.rysmap.hud.WorldLabels::render);
+        });
         modBus.addListener((FMLClientSetupEvent e) -> e.enqueueWork(() -> DockButton.builder("rysmap_map")
             .label(Component.translatable("rysmap.dock")).description(() -> Component.translatable("rysmap.dock.description"))
             .tile(0xFF4FA3D9).icon(Icons.Shape.MAP).key(OPEN).order(20).replacesFtb("ftbchunks_chunks").action(MapScreen::open).register()));
@@ -109,6 +115,7 @@ public final class ClientEntry {
             if (e.getNewScreen() instanceof net.minecraft.client.gui.screens.DeathScreen && !(e.getCurrentScreen() instanceof net.minecraft.client.gui.screens.DeathScreen))
                 works.repka.rysmap.point.PointsLayer.died();
         });
+        bus.addListener(net.neoforged.neoforge.client.event.RenderLevelStageEvent.class, works.repka.rysmap.hud.WorldLabels::capture);
         bus.addListener((RenderFrameEvent.Pre e) -> {
             if (session != null) session.frame();
         });

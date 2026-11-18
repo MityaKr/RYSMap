@@ -130,5 +130,17 @@
   "rysmap.settings.regions.many": "%s регионов",
   "rysmap.settings.points.one": "%s точка",
   "rysmap.settings.points.few": "%s точки",
-  "rysmap.settings.points.many": "%s точек"
+  "rysmap.settings.points.many": "%s точек",
+  "key.rysmap.show_points": "Показать все точки (держать)",
+  "rysmap.labels.goal": "Цель пути",
+  "rysmap.point.in_world": "В мире всегда",
+  "rysmap.point.info.in_world": "Подпись точки видна в мире при любом режиме настроек, если точка в пределах дальности",
+  "rysmap.settings.labels": "Точки в мире",
+  "rysmap.settings.labels.note": "подписи сквозь стены; у прицела раскрываются",
+  "rysmap.settings.labels.goal": "Цель и гибель",
+  "rysmap.settings.labels.nearby": "Все рядом",
+  "rysmap.settings.labels.all": "Все",
+  "rysmap.settings.range": "Дальность",
+  "rysmap.settings.range.note": "блоков; цель пути и гибель видны всегда",
+  "rysmap.settings.keys.show_points": "держать: показать все точки"
 }
