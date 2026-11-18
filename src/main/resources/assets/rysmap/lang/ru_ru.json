@@ -1,3 +1,21 @@
 {
-  "rysmap.name": "RYSMap"
+  "rysmap.name": "RYSMap",
+  "key.categories.rysmap": "RYSMap",
+  "key.rysmap.open": "Карта мира",
+  "key.rysmap.zoom_in": "Миникарта: ближе",
+  "key.rysmap.zoom_out": "Миникарта: дальше",
+  "rysmap.dock": "Карта",
+  "rysmap.dock.description": "Карта мира, слои модов семьи",
+  "rysmap.north": "С",
+  "rysmap.meters": "%s м",
+  "rysmap.screen.title": "Карта",
+  "rysmap.screen.dimension": "Измерение",
+  "rysmap.screen.layers": "Слои",
+  "rysmap.screen.to_me": "Ко мне · Пробел",
+  "rysmap.screen.zoom_in": "×%s",
+  "rysmap.screen.zoom_out": "1:%s",
+  "rysmap.menu.copy": "Скопировать координаты",
+  "rysmap.dimension.minecraft.overworld": "Верхний мир",
+  "rysmap.dimension.minecraft.the_nether": "Нижний мир",
+  "rysmap.dimension.minecraft.the_end": "Край"
 }

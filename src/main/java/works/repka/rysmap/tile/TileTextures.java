@@ -85,6 +85,15 @@ public final class TileTextures {
      */
     public boolean draw(GuiGraphics g, String dimension, double centerX, double centerZ, double pixelsPerBlock,
                         float x, float y, float w, float h) {
+        return draw(g, dimension, centerX, centerZ, pixelsPerBlock, x, y, w, h, new float[]{x, y, x + w, y + h});
+    }
+
+    /**
+     * То же с обрезкой по набору прямоугольников ({@code x0, y0, x1, y1} подряд): скруглённая рамка миникарты
+     * собирается полосами, без ножниц и трафарета. Все полосы региона уходят одним вызовом отрисовки.
+     */
+    public boolean draw(GuiGraphics g, String dimension, double centerX, double centerZ, double pixelsPerBlock,
+                        float x, float y, float w, float h, float[] clips) {
         if (pixelsPerBlock <= 0 || w <= 0 || h <= 0) return false;
         long now = System.nanoTime();
         double left = centerX - w / 2.0 / pixelsPerBlock, top = centerZ - h / 2.0 / pixelsPerBlock;
@@ -114,20 +123,27 @@ public final class TileTextures {
                 begun = true;
             }
             double ox = (double) rx * RegionData.SIZE, oz = (double) rz * RegionData.SIZE;
-            double bx0 = Math.max(left, ox), bx1 = Math.min(right, ox + RegionData.SIZE);
-            double bz0 = Math.max(top, oz), bz1 = Math.min(bottom, oz + RegionData.SIZE);
-            if (bx1 <= bx0 || bz1 <= bz0) continue;
-            float sx0 = (float) (x + (bx0 - left) * pixelsPerBlock), sx1 = (float) (x + (bx1 - left) * pixelsPerBlock);
-            float sy0 = (float) (y + (bz0 - top) * pixelsPerBlock), sy1 = (float) (y + (bz1 - top) * pixelsPerBlock);
-            float u0 = (float) ((bx0 - ox) / RegionData.SIZE), u1 = (float) ((bx1 - ox) / RegionData.SIZE);
-            float v0 = (float) ((bz0 - oz) / RegionData.SIZE), v1 = (float) ((bz1 - oz) / RegionData.SIZE);
+            // место региона на холсте; каждая область обрезки даёт свой квад с подрезанными UV
+            double rsx0 = x + (ox - left) * pixelsPerBlock, rsy0 = y + (oz - top) * pixelsPerBlock;
+            double side = RegionData.SIZE * pixelsPerBlock;
             RenderSystem.setShaderTexture(0, t.glId);
             BufferBuilder b = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
-            b.addVertex(m, sx0, sy0, 0).setUv(u0, v0);
-            b.addVertex(m, sx0, sy1, 0).setUv(u0, v1);
-            b.addVertex(m, sx1, sy1, 0).setUv(u1, v1);
-            b.addVertex(m, sx1, sy0, 0).setUv(u1, v0);
-            BufferUploader.drawWithShader(b.buildOrThrow());
+            int quads = 0;
+            for (int c = 0; c + 3 < clips.length; c += 4) {
+                double qx0 = Math.max(Math.max(rsx0, x), clips[c]), qy0 = Math.max(Math.max(rsy0, y), clips[c + 1]);
+                double qx1 = Math.min(Math.min(rsx0 + side, x + w), clips[c + 2]), qy1 = Math.min(Math.min(rsy0 + side, y + h), clips[c + 3]);
+                if (qx1 <= qx0 || qy1 <= qy0) continue;
+                float u0 = (float) ((qx0 - rsx0) / side), u1 = (float) ((qx1 - rsx0) / side);
+                float v0 = (float) ((qy0 - rsy0) / side), v1 = (float) ((qy1 - rsy0) / side);
+                b.addVertex(m, (float) qx0, (float) qy0, 0).setUv(u0, v0);
+                b.addVertex(m, (float) qx0, (float) qy1, 0).setUv(u0, v1);
+                b.addVertex(m, (float) qx1, (float) qy1, 0).setUv(u1, v1);
+                b.addVertex(m, (float) qx1, (float) qy0, 0).setUv(u1, v0);
+                quads++;
+            }
+            var mesh = b.build();
+            if (mesh == null || quads == 0) continue;
+            BufferUploader.drawWithShader(mesh);
             drew = true;
         }
         if (begun) RenderSystem.disableBlend();

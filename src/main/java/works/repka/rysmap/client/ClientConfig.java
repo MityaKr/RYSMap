@@ -37,7 +37,21 @@ public final class ClientConfig {
     /** Бюджет главного потока на снимки чанков за тик, микросекунды; при FPS ниже 40 берётся половина. */
     public int scanBudgetMicros = 1500;
 
+    /** Миникарта включена. */
+    public boolean minimap = true;
+    /** Размер миникарты в единицах: 0 «Авто» (M, на маленьком окне S), 72, 96, 128. */
+    public int minimapSize = 0;
+    /** Ступень приближения миникарты: 0 ×0,5, 1 ×1, 2 ×2 пикселя экрана на блок. */
+    public int minimapZoom = 1;
+    /** Глаз слоёв по id; слоя нет в списке: как решил мод. */
+    public final java.util.Map<String, Boolean> layers = new java.util.LinkedHashMap<>();
+
     private JsonObject raw = new JsonObject();
+    private static ClientConfig current = new ClientConfig();
+
+    public static ClientConfig get() {
+        return current;
+    }
 
     public static Path file() {
         return net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get().resolve("rysmap").resolve("client.json");
@@ -45,6 +59,7 @@ public final class ClientConfig {
 
     public static ClientConfig load() {
         ClientConfig c = new ClientConfig();
+        current = c;
         Path file = file();
         try {
             if (Files.isRegularFile(file)) {
@@ -59,6 +74,12 @@ public final class ClientConfig {
                 c.textureIdleSeconds = clamp(json, "textureIdleSeconds", c.textureIdleSeconds, 5, 3600);
                 c.rescanMinutes = clamp(json, "rescanMinutes", c.rescanMinutes, 0, 24 * 60);
                 c.scanBudgetMicros = clamp(json, "scanBudgetMicros", c.scanBudgetMicros, 200, 10_000);
+                if (json.has("minimap")) c.minimap = json.get("minimap").getAsBoolean();
+                c.minimapSize = clamp(json, "minimapSize", c.minimapSize, 0, 128);
+                if (c.minimapSize != 0 && c.minimapSize != 72 && c.minimapSize != 96 && c.minimapSize != 128) c.minimapSize = 0;
+                c.minimapZoom = clamp(json, "minimapZoom", c.minimapZoom, 0, 2);
+                if (json.has("layers") && json.get("layers").isJsonObject())
+                    for (var e : json.getAsJsonObject("layers").entrySet()) c.layers.put(e.getKey(), e.getValue().getAsBoolean());
             } else {
                 c.save();
             }
@@ -88,6 +109,12 @@ public final class ClientConfig {
         json.addProperty("textureIdleSeconds", textureIdleSeconds);
         json.addProperty("rescanMinutes", rescanMinutes);
         json.addProperty("scanBudgetMicros", scanBudgetMicros);
+        json.addProperty("minimap", minimap);
+        json.addProperty("minimapSize", minimapSize);
+        json.addProperty("minimapZoom", minimapZoom);
+        JsonObject l = new JsonObject();
+        layers.forEach(l::addProperty);
+        json.add("layers", l);
         try {
             Files.createDirectories(file().getParent());
             Files.writeString(file(), GSON.toJson(json), StandardCharsets.UTF_8);

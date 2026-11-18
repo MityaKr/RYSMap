@@ -14,7 +14,23 @@ import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.ChunkEvent;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
+import net.neoforged.neoforge.client.settings.KeyConflictContext;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
+import works.repka.ryscore.dock.DockButton;
+import works.repka.ryscore.ui.Icons;
+import works.repka.rysmap.RYSMap;
+import works.repka.rysmap.hud.Minimap;
+import works.repka.rysmap.layer.Layers;
+import works.repka.rysmap.screen.MapScreen;
 import works.repka.ryscore.map.MapApi;
 import works.repka.ryscore.theme.Theme;
 import works.repka.ryscore.theme.ThemeManager;
@@ -25,6 +41,11 @@ import works.repka.rysmap.world.MapStore;
 
 /** Клиентская часть: сессия карты на вход в мир, события чанков, тик, кадр, строка F3, реализация {@link MapApi}. */
 public final class ClientEntry {
+    public static final String CATEGORY = "key.categories.rysmap";
+    /** Окно карты: M, как у FTB Chunks (в RepYS на M ещё магнит EnderIO, план 12, «Клавиши»). */
+    public static final KeyMapping OPEN = new KeyMapping("key.rysmap.open", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_M, CATEGORY);
+    public static final KeyMapping ZOOM_IN = new KeyMapping("key.rysmap.zoom_in", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_EQUAL, CATEGORY);
+    public static final KeyMapping ZOOM_OUT = new KeyMapping("key.rysmap.zoom_out", KeyConflictContext.IN_GAME, InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_MINUS, CATEGORY);
     private static @Nullable MapSession session;
     private static ClientConfig config = new ClientConfig();
 
@@ -34,6 +55,16 @@ public final class ClientEntry {
         config = ClientConfig.load();
         SablePlots.setActive(ModList.get().isLoaded("sable"));
         MapApi.provide(new MapApiImpl());
+        modBus.addListener((RegisterKeyMappingsEvent e) -> {
+            e.register(OPEN);
+            e.register(ZOOM_IN);
+            e.register(ZOOM_OUT);
+        });
+        modBus.addListener((RegisterGuiLayersEvent e) ->
+            e.registerBelow(VanillaGuiLayers.CHAT, ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "minimap"), Minimap::render));
+        modBus.addListener((FMLClientSetupEvent e) -> e.enqueueWork(() -> DockButton.builder("rysmap_map")
+            .label(Component.translatable("rysmap.dock")).description(() -> Component.translatable("rysmap.dock.description"))
+            .tile(0xFF4FA3D9).icon(Icons.Shape.MAP).key(OPEN).order(20).replacesFtb("ftbchunks_chunks").action(MapScreen::open).register()));
         modBus.addListener((RegisterClientReloadListenersEvent e) ->
             e.registerReloadListener((ResourceManagerReloadListener) resources -> ColorTable.INSTANCE.invalidate()));
         var bus = NeoForge.EVENT_BUS;
@@ -59,6 +90,9 @@ public final class ClientEntry {
             if (session != null && mc.level != null) {
                 ensure(mc.level);
                 session.tick(mc);
+                while (OPEN.consumeClick()) if (mc.screen == null) MapScreen.open();
+                while (ZOOM_IN.consumeClick()) Minimap.zoom(1);
+                while (ZOOM_OUT.consumeClick()) Minimap.zoom(-1);
             }
         });
         bus.addListener((RenderFrameEvent.Pre e) -> {
@@ -88,6 +122,8 @@ public final class ClientEntry {
         MapSession s = session;
         session = null;
         if (s != null) s.close();
+        Layers.clear();
+        if (MapApi.get() instanceof MapApiImpl api) api.track(null);
     }
 
     public static @Nullable MapSession session() {

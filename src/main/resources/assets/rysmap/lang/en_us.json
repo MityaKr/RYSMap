@@ -1,3 +1,21 @@
 {
-  "rysmap.name": "RYSMap"
+  "rysmap.name": "RYSMap",
+  "key.categories.rysmap": "RYSMap",
+  "key.rysmap.open": "World map",
+  "key.rysmap.zoom_in": "Minimap: zoom in",
+  "key.rysmap.zoom_out": "Minimap: zoom out",
+  "rysmap.dock": "Map",
+  "rysmap.dock.description": "World map, layers of the family mods",
+  "rysmap.north": "N",
+  "rysmap.meters": "%s m",
+  "rysmap.screen.title": "Map",
+  "rysmap.screen.dimension": "Dimension",
+  "rysmap.screen.layers": "Layers",
+  "rysmap.screen.to_me": "To me · Space",
+  "rysmap.screen.zoom_in": "×%s",
+  "rysmap.screen.zoom_out": "1:%s",
+  "rysmap.menu.copy": "Copy coordinates",
+  "rysmap.dimension.minecraft.overworld": "Overworld",
+  "rysmap.dimension.minecraft.the_nether": "The Nether",
+  "rysmap.dimension.minecraft.the_end": "The End"
 }
