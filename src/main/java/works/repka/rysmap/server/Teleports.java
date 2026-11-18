@@ -224,7 +224,8 @@ public final class Teleports {
         if (shape.isEmpty()) return SafeSpot.Kind.FREE;
         // крыша Нижнего мира: бедрок под потолком полом не считается
         if (ceiling && state.is(Blocks.BEDROCK)) return SafeSpot.Kind.BLOCKED;
+        // пол: верх формы не выше блока (ковёр, снег слоями, нижняя плита, обычный блок); забор и стена выше
         double top = shape.max(Direction.Axis.Y);
-        return top >= 0.5 && top <= 1.0 ? SafeSpot.Kind.FLOOR : SafeSpot.Kind.BLOCKED;
+        return top > 0 && top <= 1.0 ? SafeSpot.Kind.FLOOR : SafeSpot.Kind.BLOCKED;
     }
 }

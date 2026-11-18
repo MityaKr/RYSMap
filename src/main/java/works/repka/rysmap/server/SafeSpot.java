@@ -63,6 +63,9 @@ public final class SafeSpot {
     static @Nullable Integer column(Probe probe, int x, int z, int minY, int maxY, boolean ceiling, int hint) {
         if (!ceiling && hint == NO_HINT) {
             int top = Math.min(probe.top(x, z), maxY);
+            // верхний блок столбца по WORLD_SURFACE может быть травой, цветком, снегом слоем или факелом: у них нет
+            // формы столкновения, стоять надо на опоре под ними (перепроверка 18.11, пункт 4)
+            while (top >= minY && probe.at(x, top, z) == Kind.FREE) top--;
             if (top < minY) return null; // пустота
             return stand(probe, x, top, z) ? top + 1 : null;
         }

@@ -84,6 +84,35 @@ class SafeSpotTest {
         assertNull(SafeSpot.find(w, 100, 100, 0, 255, false, SafeSpot.NO_HINT));
     }
 
+    /** Мир, где верх столбца по WORLD_SURFACE учитывает траву и снег слоем (как у игры), а не только пол. */
+    static final class Grassy implements SafeSpot.Probe {
+        final World base;
+        final java.util.Set<Long> plants = new java.util.HashSet<>();
+
+        Grassy(World base) {
+            this.base = base;
+        }
+
+        @Override
+        public Kind at(int x, int y, int z) {
+            return base.at(x, y, z);
+        }
+
+        @Override
+        public int top(int x, int z) {
+            int t = base.top(x, z);
+            return plants.contains(World.key(x, t + 1, z)) ? t + 1 : t;
+        }
+    }
+
+    @Test
+    void grassAndSnowLayerOnTopAreSteppedThrough() {
+        World w = new World(-64).groundAll(8, 70);
+        Grassy g = new Grassy(w);
+        for (int x = -8; x <= 8; x++) for (int z = -8; z <= 8; z++) g.plants.add(World.key(x, 71, z)); // трава везде
+        assertArrayEquals(new int[]{0, 71, 0}, SafeSpot.find(g, 0, 0, -64, 319, false, SafeSpot.NO_HINT));
+    }
+
     @Test
     void fenceOnTopMovesToNeighbour() {
         World w = new World(-64).groundAll(8, 70);
