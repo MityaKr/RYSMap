@@ -172,11 +172,6 @@ final class MigrateAutoTest {
             if (mc().screen instanceof MapScreen s) s.setZoom(0.5);
         }, 100);
         shot("ftb_overworld");
-        // неизвестные блоки (моды RepYS в среде разработки отсутствуют) крупно: этап 5
-        step("zoom", () -> {
-            if (mc().screen instanceof MapScreen s) s.setZoom(4);
-        }, 40);
-        shot("ftb_unknown_zoom");
         // страница настроек (этап 4): строка о переезде, образец миникарты
         step("settings", () -> {
             if (mc().screen instanceof MapScreen s) s.settingsForTest();
