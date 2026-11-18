@@ -1,0 +1,11 @@
+run/
+run-repys/
+build/
+.gradle/
+_stale/
+*.iml
+.idea/
+.vscode/
+out/
+run-server/
+run-duo/
