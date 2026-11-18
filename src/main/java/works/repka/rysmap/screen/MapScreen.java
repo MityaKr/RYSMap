@@ -595,7 +595,7 @@ public final class MapScreen extends ScaledScreen {
         PointStore.Point p = selectedPoint();
         LocalPlayer pl = Minecraft.getInstance().player;
         if (p == null || pl == null || !p.dimension.equals(dimension.location().toString()) || !pl.level().dimension().equals(dimension)) return;
-        float x0 = sx(pl.getX()), y0 = sy(pl.getZ()), x1 = sx(p.x + 0.5), y1 = sy(p.z + 0.5);
+        float x0 = sx(net.minecraft.util.Mth.lerp(partial, pl.xo, pl.getX())), y0 = sy(net.minecraft.util.Mth.lerp(partial, pl.zo, pl.getZ())), x1 = sx(p.x + 0.5), y1 = sy(p.z + 0.5);
         float[] c = clipLine(x0, y0, x1, y1, cx0, cy0, visibleRight(), cy0 + ch);
         if (c != null) Draw.dashed(g, c[0], c[1], c[2], c[3], 1f, 3, 2.5f, 0xE6F7F8FB);
     }
@@ -790,7 +790,7 @@ public final class MapScreen extends ScaledScreen {
     private void player(GuiGraphics g, float partial) {
         LocalPlayer p = Minecraft.getInstance().player;
         if (p == null || !p.level().dimension().equals(dimension)) return;
-        float x = sx(p.getX()), y = sy(p.getZ());
+        float x = sx(net.minecraft.util.Mth.lerp(partial, p.xo, p.getX())), y = sy(net.minecraft.util.Mth.lerp(partial, p.zo, p.getZ()));
         if (x < cx0 || x > cx0 + cw || y < cy0 || y > cy0 + ch) return;
         Draw.disc(g, x, y, 5.5f, 0x90101216);
         Icons.drawRotated(g, Icons.Shape.NAV, x - 6, y - 6, 12, p.getViewYRot(partial) + 180f, 0xFFF7F8FB);

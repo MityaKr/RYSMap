@@ -133,6 +133,35 @@ public final class Layers {
                     if (c.chunkX() >= cx0 && c.chunkX() <= cx1 && c.chunkZ() >= cz0 && c.chunkZ() <= cz1) chunks.put(RegionData.key(c.chunkX(), c.chunkZ()), c);
         if (chunks.isEmpty()) return;
         float side = (float) (16 * ppb);
+        // заливка: подряд идущие чанки строки одного цвета и вида сливаются в полосу и рисуются дробными квадами.
+        // Раньше каждый чанк шёл через Draw.round без радиуса, а тот округляет x и ширину до целых единиц по
+        // отдельности: соседи перекрывались полосой двойной прозрачности (сетка цвета команды) и прыгали шагом
+        // в единицу, пока тайлы под ними ехали плавно.
+        java.util.List<AreaChunk> sorted = new java.util.ArrayList<>(chunks.values());
+        sorted.sort((a, b) -> a.chunkZ() != b.chunkZ() ? Integer.compare(a.chunkZ(), b.chunkZ()) : Integer.compare(a.chunkX(), b.chunkX()));
+        float[] fill = new float[sorted.size() * 4];
+        int[] fillColors = new int[sorted.size()];
+        int runs = 0;
+        for (int i = 0; i < sorted.size(); ) {
+            AreaChunk first = sorted.get(i);
+            int j = i + 1;
+            while (j < sorted.size()) {
+                AreaChunk nx = sorted.get(j), pv = sorted.get(j - 1);
+                if (nx.chunkZ() != first.chunkZ() || nx.chunkX() != pv.chunkX() + 1 || nx.color() != first.color() || nx.style() != first.style()) break;
+                j++;
+            }
+            AreaChunk last = sorted.get(j - 1);
+            float sx0 = (float) (ox + first.chunkX() * 16 * ppb), sy0 = (float) (oz + first.chunkZ() * 16 * ppb);
+            float sx1 = (float) (ox + (last.chunkX() + 1) * 16 * ppb), sy1 = sy0 + side;
+            float fx0 = Math.max(sx0, clipX0), fy0 = Math.max(sy0, clipY0), fx1 = Math.min(sx1, clipX1), fy1 = Math.min(sy1, clipY1);
+            if (fx1 > fx0 && fy1 > fy0) {
+                float a = first.style() == MapApi.AreaStyle.FILL ? 0.22f : 0.12f;
+                fill[runs * 4] = fx0; fill[runs * 4 + 1] = fy0; fill[runs * 4 + 2] = fx1; fill[runs * 4 + 3] = fy1;
+                fillColors[runs++] = works.repka.ryscore.ui.Draw.alpha(first.color(), a);
+            }
+            i = j;
+        }
+        quads(g, fill, fillColors, runs);
         float[] xy = new float[chunks.size() * 16];
         int[] colors = new int[chunks.size() * 4];
         int n = 0;
@@ -141,8 +170,6 @@ public final class Layers {
             float sx1 = sx0 + side, sy1 = sy0 + side;
             float fx0 = Math.max(sx0, clipX0), fy0 = Math.max(sy0, clipY0), fx1 = Math.min(sx1, clipX1), fy1 = Math.min(sy1, clipY1);
             if (fx1 <= fx0 || fy1 <= fy0) continue;
-            float a = c.style() == MapApi.AreaStyle.FILL ? 0.22f : 0.12f;
-            works.repka.ryscore.ui.Draw.round(g, fx0, fy0, fx1 - fx0, fy1 - fy0, 0, works.repka.ryscore.ui.Draw.alpha(c.color(), a));
             // край группы: сверху, снизу, слева, справа
             int[][] dirs = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}};
             for (int[] d : dirs) {
@@ -165,6 +192,33 @@ public final class Layers {
             }
         }
         if (n > 0) works.repka.ryscore.ui.Draw.lines(g, xy, colors, n, 1f);
+    }
+
+    /**
+     * Прямоугольники с дробными краями одним проходом (по четыре числа x0, y0, x1, y1 и цвету ARGB на каждый). Соседние
+     * полосы делят общий край без зазора и перекрытия. Пачка ядра сбрасывается до рисования, чтобы порядок слоёв сохранился.
+     */
+    public static void quads(net.minecraft.client.gui.GuiGraphics g, float[] xy, int[] colors, int count) {
+        if (count <= 0) return;
+        works.repka.ryscore.ui.Batch.flush();
+        g.flush();
+        com.mojang.blaze3d.systems.RenderSystem.setShader(net.minecraft.client.renderer.GameRenderer::getPositionColorShader);
+        com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+        com.mojang.blaze3d.systems.RenderSystem.defaultBlendFunc();
+        org.joml.Matrix4f m = g.pose().last().pose();
+        com.mojang.blaze3d.vertex.BufferBuilder b = com.mojang.blaze3d.vertex.Tesselator.getInstance()
+            .begin(com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS, com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR);
+        for (int i = 0; i < count; i++) {
+            float x0 = xy[i * 4], y0 = xy[i * 4 + 1], x1 = xy[i * 4 + 2], y1 = xy[i * 4 + 3];
+            int c = colors[i];
+            b.addVertex(m, x0, y0, 0).setColor(c);
+            b.addVertex(m, x0, y1, 0).setColor(c);
+            b.addVertex(m, x1, y1, 0).setColor(c);
+            b.addVertex(m, x1, y0, 0).setColor(c);
+        }
+        var mesh = b.build();
+        if (mesh != null) com.mojang.blaze3d.vertex.BufferUploader.drawWithShader(mesh);
+        com.mojang.blaze3d.systems.RenderSystem.disableBlend();
     }
 
     private static void broken(MapApi.Layer layer, Throwable t) {

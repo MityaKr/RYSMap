@@ -125,7 +125,8 @@ public final class Minimap {
         int plateH = lines.size() * LINE + 4;
         float r = t.beveled() ? 0 : Math.max(2f, t.r("panel.radius"));
 
-        double px = p.getX(), pz = p.getZ();
+        // место игрока между тиками: тайлы, области и метки едут плавно и одним кадром со стрелкой
+        double px = net.minecraft.util.Mth.lerp(partial, p.xo, p.getX()), pz = net.minecraft.util.Mth.lerp(partial, p.zo, p.getZ());
         double ppb = ZOOM[ClientConfig.get().minimapZoom] / UiScale.pixels();
         ResourceKey<Level> dim = p.level().dimension();
         Draw.round(g, x, y, size, size, r, t.c("map.bg"));
