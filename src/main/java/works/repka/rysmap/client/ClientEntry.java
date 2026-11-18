@@ -224,6 +224,7 @@ public final class ClientEntry {
         if (s != null) s.close();
         Layers.clear();
         ServerRules.reset();
+        PlacesClient.reset();
         PingsLayer.clear();
         works.repka.rysmap.compat.Waystones.clear();
         works.repka.rysmap.hud.MobHeads.clear();

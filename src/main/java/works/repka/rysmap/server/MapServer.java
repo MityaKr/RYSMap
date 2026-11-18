@@ -53,6 +53,7 @@ public final class MapServer {
 
     public static void init() {
         TeamPings.listen();
+        PlacesServer.init();
         NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent e) -> {
             if (e.getEntity() instanceof ServerPlayer player) {
                 hello(player);
@@ -61,7 +62,7 @@ public final class MapServer {
         });
         NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.server.ServerStartingEvent e) -> {
             rules = MapRules.load(rulesFile(e.getServer()));
-            Teleports.clear();
+            Travel.INSTANCE.clear();
         });
         NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.entity.player.PermissionsChangedEvent e) -> {
             // событие идёт до смены уровня: правила уходят на следующем тике, когда уровень уже новый
@@ -126,6 +127,21 @@ public final class MapServer {
         RYSMap.LOG.info("[rysmap] {} изменил правила карты: телепорт {}, пауза {} с, миникарта {}, пещеры {}, игроки {}, мобы {}",
             player.getGameProfile().getName(), r.teleport, r.pause, r.minimap, r.caves, r.players, r.mobs);
         for (ServerPlayer p : server.getPlayerList().getPlayers()) sendRules(p);
+    }
+
+    /** Оператор правит блок «Перемещения» (0.2.0-p1): правила пишутся в файл, места и правила уходят всем. */
+    static void setPlaceRules(ServerPlayer player, works.repka.rysmap.places.PlaceRules places) {
+        MinecraftServer server = player.getServer();
+        if (server == null || !op(player)) return;
+        MapRules r = rules.copy();
+        r.places = places.copy().clamp();
+        rules = r;
+        r.save(rulesFile(server));
+        PlaceStore store = PlaceStore.get(server);
+        store.book().trimBack(r.places.backSize);
+        store.touch();
+        RYSMap.LOG.info("[rysmap] {} изменил правила мест: {}", player.getGameProfile().getName(), r.places.toJson());
+        PlacesServer.changedAll(server);
     }
 
     public static UUID worldId(MinecraftServer server) {

@@ -140,6 +140,8 @@ public final class ServerRules {
             if (mc.screen instanceof works.repka.rysmap.screen.MapScreen s) s.arrived();
             return;
         }
+        // отказ с причиной словами (приват, 0.2.0) приходит строкой уведомления мест
+        if (r.reason().equals("denied")) return;
         message(r.reason().equals("pause") ? pauseText(r.seconds())
             : fail(Component.translatable("rysmap.tp." + r.reason())));
     }

@@ -258,6 +258,7 @@ public final class MapNet {
         r.playToServer(Teleport.TYPE, Teleport.CODEC, (p, c) -> {
             if (c.player() instanceof ServerPlayer sp) works.repka.rysmap.server.Teleports.request(sp, p);
         });
+        PlaceNet.register(r);
     }
 
     private static void onHello(Hello hello, IPayloadContext context) {

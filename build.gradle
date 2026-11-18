@@ -94,6 +94,8 @@ test {
     useJUnitPlatform()
     maxHeapSize = '1G'
     systemProperty 'rysmap.ftbFixture', project.findProperty('ftbFixture') ?: project.file('../../_shared/_saved/fixtures/ftb-2026-11-18/client/ftbchunks').absolutePath
+    // данные FTB Essentials (места, дома, история) для шага places: копия с сервера 18.11
+    systemProperty 'rysmap.ftbEssentials', project.findProperty('ftbEssentials') ?: project.file('../../_shared/_saved/fixtures/ftb-2026-11-18/world/ftbessentials').absolutePath
 }
 
 processResources {

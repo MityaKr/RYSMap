@@ -19,7 +19,7 @@ import works.repka.rysmap.RYSMap;
  * <p>Пауза касается только тех, кто не оператор: оператору телепорт нужен для работы.
  */
 public final class MapRules {
-    public static final int V = 1;
+    public static final int V = 2;
     /** Кто телепортируется с карты. */
     public enum Teleport { OFF, OPS, ALL }
 
@@ -44,6 +44,8 @@ public final class MapRules {
     public java.util.List<String> teleportDimensions = new java.util.ArrayList<>(java.util.List.of("minecraft:overworld", "minecraft:the_nether"));
     /** Мобы на карте. */
     public boolean mobs = true;
+    /** «Места» (0.2.0-p1, версия файла 2): кто, паузы и числа перемещений. */
+    public works.repka.rysmap.places.PlaceRules places = new works.repka.rysmap.places.PlaceRules();
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
@@ -56,6 +58,7 @@ public final class MapRules {
         r.players = players;
         r.mobs = mobs;
         r.teleportDimensions = new java.util.ArrayList<>(teleportDimensions);
+        r.places = places.copy();
         return r;
     }
 
@@ -76,6 +79,8 @@ public final class MapRules {
                 r.teleportDimensions = new java.util.ArrayList<>();
                 for (var e : o.getAsJsonArray("teleportDimensions")) r.teleportDimensions.add(e.getAsString());
             }
+            // версия 1 раздела places не знала: умолчания как в FTB Essentials RepYS
+            if (o.has("places") && o.get("places").isJsonObject()) r.places = works.repka.rysmap.places.PlaceRules.fromJson(o.getAsJsonObject("places"));
         } catch (Exception e) {
             RYSMap.LOG.warn("[rysmap] {} не прочитался, правила по умолчанию: {}", file, e.toString());
         }
@@ -94,6 +99,7 @@ public final class MapRules {
         com.google.gson.JsonArray dims = new com.google.gson.JsonArray();
         for (String d : teleportDimensions) dims.add(d);
         o.add("teleportDimensions", dims);
+        o.add("places", places.toJson());
         try {
             Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
