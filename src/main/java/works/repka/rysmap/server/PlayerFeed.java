@@ -45,7 +45,7 @@ final class PlayerFeed {
     }
 
     /** Команда игрока; соло (команда из одного или своя UUID) считается без команды. */
-    private static UUID teamOf(TeamsApi teams, UUID player) {
+    static UUID teamOf(TeamsApi teams, UUID player) {
         try {
             UUID t = teams.teamOf(player);
             if (t == null || t.equals(player)) return null;

@@ -95,6 +95,9 @@ public final class MapScreen extends ScaledScreen {
     /** Мышь в прошлом кадре, единицы окна: клавиша T телепортирует под курсор. */
     private int lastMx = -1, lastMy = -1;
     static final ResourceLocation TELEPORT_ITEM = ResourceLocation.fromNamespaceAndPath("rysmap", "teleport");
+    static final ResourceLocation PING_ITEM = ResourceLocation.fromNamespaceAndPath("rysmap", "ping");
+    /** Игрок под курсором в прошлом кадре: клик ведёт к нему путь (Т2). */
+    private works.repka.rysmap.hud.Entities.@Nullable Dot lastHoverDot;
 
     private MapScreen(ResourceKey<Level> dimension, double x, double z) {
         super(Component.translatable("rysmap.screen.title"));
@@ -542,6 +545,7 @@ public final class MapScreen extends ScaledScreen {
         selectionLine(g, partial);
         MapApi.Marker hover = markers(g, canvas, mx, my);
         works.repka.rysmap.hud.Entities.Dot hoverDot = hover == null ? entities(g, canvas, mx, my, partial) : null;
+        lastHoverDot = hoverDot;
         player(g, partial);
         modes(g, t, mx, my);
         highlightChip(g, t, mx, my);
@@ -571,6 +575,7 @@ public final class MapScreen extends ScaledScreen {
                 lines.add(Words.distance(Math.sqrt(dx * dx + dz * dz)) + " · " + Words.direction(dx, dz));
             }
             if (hoverDot.kind() == works.repka.rysmap.hud.Entities.Kind.TEAM) lines.add(Component.translatable("rysmap.entity.team").getString());
+            if (hoverDot.player()) lines.add(Component.translatable("rysmap.entity.track").getString());
             tip = lines;
         } else if (overCanvas && !dragging && modeTooltip(mx, my) != null) {
             tip = modeTooltip(mx, my);
@@ -964,6 +969,16 @@ public final class MapScreen extends ScaledScreen {
 
     private @Nullable MapApi.Marker markers(GuiGraphics g, Theme canvas, int mx, int my) {
         MapApi.Marker hover = null;
+        // район поиска кругом (цель квеста, макет 19): под метками
+        for (MapApi.Layer layer : Layers.shown()) {
+            for (MapApi.Marker m : Layers.markers(layer, dimension)) {
+                if (m.radius() <= 0) continue;
+                float x = sx(m.x()), y = sy(m.z()), rr = (float) (m.radius() * zoom);
+                if (rr < 3 || x + rr < cx0 || x - rr > cx0 + cw || y + rr < cy0 || y - rr > cy0 + ch) continue;
+                Draw.disc(g, x, y, rr, Draw.alpha(m.color(), 0.14f));
+                Draw.ring(g, x, y, rr, 1f, Draw.alpha(m.color(), 0.8f));
+            }
+        }
         for (MapApi.Layer layer : Layers.shown()) {
             for (MapApi.Marker m : Layers.markers(layer, dimension)) {
                 float x = sx(m.x()), y = sy(m.z());
@@ -1012,9 +1027,10 @@ public final class MapScreen extends ScaledScreen {
     /** Метка: круг 11 с тёмной кромкой и значком, под ней подпись на плашке (макет {@code .wp}, {@code .wl}). */
     static void marker(GuiGraphics g, Theme canvas, MapApi.Marker m, float x, float y, boolean selected) {
         if (selected) Draw.disc(g, x, y, 8.5f, 0x38F7F8FB);
+        works.repka.rysmap.hud.Entities.pulse(g, m, x, y, 6.25f);
         Draw.disc(g, x, y, 6.25f, selected ? 0xFFF7F8FB : 0xCC0F1116);
         Draw.disc(g, x, y, 5.5f, m.color());
-        if (m.icon() != null) Icons.draw(g, m.icon(), x - 3.5f, y - 3.5f, 7, 0xFF15181F);
+        works.repka.rysmap.hud.Entities.look(g, m, x, y, 7);
         String label = m.label().getString();
         if (label.isEmpty()) return;
         float lw = Draw.labelWidth(label, 11, Weight.MEDIUM);
@@ -1646,6 +1662,12 @@ public final class MapScreen extends ScaledScreen {
                 }
             }
         }
+        works.repka.rysmap.hud.Entities.Dot d = lastHoverDot;
+        if (d != null && d.player() && Math.abs(mx - sx(d.x())) <= 6 && Math.abs(my - sy(d.z())) <= 6) {
+            // клик по игроку: путь к месту, где он сейчас (Т2, макет 11)
+            MapApi.get().track(MapApi.Target.builder(dimension, d.x(), d.y(), d.z()).radius(4).label(Component.literal(d.name())).build());
+            return;
+        }
         canvasClicked();
     }
 
@@ -1747,6 +1769,12 @@ public final class MapScreen extends ScaledScreen {
             } catch (Throwable ignored) {
                 // пункт чужого мода упал на вопросе: не показываем
             }
+        }
+        if (works.repka.rysmap.client.ServerRules.inTeam()) {
+            // свой пункт пинга (Т2); RYSTeams может заменить его своим, зарегистрировав тот же id rysmap:ping
+            boolean own = MapApi.menus().stream().anyMatch(i -> i.id().equals(PING_ITEM));
+            if (!own) items.add(MapApi.MenuItem.builder(PING_ITEM, Component.translatable("rysmap.menu.ping"))
+                .icon(Icons.Shape.BELL).order(10).run(sp -> works.repka.rysmap.client.ServerRules.ping(sp.dimension(), sp.x(), sp.y(), sp.z())).build());
         }
         if (works.repka.rysmap.client.ServerRules.teleportAllowed()) {
             items.add(MapApi.MenuItem.builder(TELEPORT_ITEM, Component.translatable("rysmap.menu.teleport"))

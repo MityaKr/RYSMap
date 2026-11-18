@@ -79,6 +79,17 @@ public final class ServerRules {
         return rules != null && rules.canTeleport();
     }
 
+    /** Игрок в команде RYSTeams (сервер с RYSMap 0.1.0-m8): есть пункт «Пинг команде». */
+    public static boolean inTeam() {
+        return rules != null && rules.team();
+    }
+
+    /** Пинг команде с карты. */
+    public static void ping(ResourceKey<Level> dimension, int x, int y, int z) {
+        if (!sendToServer(new MapNet.Ping(dimension.location().toString(), x, y, z, "here")))
+            message(new Message(Component.translatable("rysmap.ping.fail"), Component.translatable("rysmap.tp.no_server")));
+    }
+
     /** Может ли игрок править правила сервера (раздел «Сервер» в настройках). */
     public static boolean op() {
         return rules != null && rules.op();

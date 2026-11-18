@@ -52,6 +52,7 @@ public final class MapServer {
     private static int feedTick;
 
     public static void init() {
+        TeamPings.listen();
         NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent e) -> {
             if (e.getEntity() instanceof ServerPlayer player) {
                 hello(player);
@@ -100,7 +101,7 @@ public final class MapServer {
     public static void sendRules(ServerPlayer player) {
         MapRules r = rules;
         MapNet.send(player, new MapNet.Rules(r.teleport.ordinal(), r.pause, r.minimap, r.caves, r.players, r.mobs,
-            op(player), canTeleport(player), Teleports.pauseLeft(player)));
+            op(player), canTeleport(player), Teleports.pauseLeft(player), PlayerFeed.teamOf(works.repka.ryscore.team.TeamsApi.get(), player.getUUID()) != null));
     }
 
     /** Правка правил с клиента: только оператор. Новые правила пишутся в файл и уходят всем. */

@@ -67,6 +67,7 @@ public final class ClientEntry {
         MapApi.provide(new MapApiImpl());
         works.repka.rysmap.point.PointsLayer.register();
         works.repka.rysmap.hud.Entities.register();
+        PingsLayer.register();
         works.repka.ryscore.world.Labels.provide();
         works.repka.ryscore.migrate.Migrations.register(new works.repka.rysmap.migrate.FtbMapStep());
         modBus.addListener((RegisterKeyMappingsEvent e) -> {
@@ -218,6 +219,7 @@ public final class ClientEntry {
         if (s != null) s.close();
         Layers.clear();
         ServerRules.reset();
+        PingsLayer.clear();
         if (MapApi.get() instanceof MapApiImpl api) api.track(null);
     }
 

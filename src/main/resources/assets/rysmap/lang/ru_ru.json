@@ -211,5 +211,15 @@
   "rysmap.list.delete": "Удалить %s",
   "rysmap.list.delete.title": "Удалить точки: %s?",
   "rysmap.highlight": "Подсветка: %s",
-  "rysmap.rail.open": "Развернуть"
+  "rysmap.rail.open": "Развернуть",
+  "rysmap.menu.ping": "Пинг команде",
+  "rysmap.ping.fail": "Пинг не ушёл.",
+  "rysmap.layer.pings": "Пинги",
+  "rysmap.ping.kind.here": "здесь",
+  "rysmap.ping.kind.danger": "опасность",
+  "rysmap.ping.kind.help": "помощь",
+  "rysmap.ping.kind.loot": "добыча",
+  "rysmap.entity.track": "Клик: путь к игроку",
+  "rysmap.ping.kind.resource": "ресурс",
+  "rysmap.ping.kind.mark": "метка"
 }

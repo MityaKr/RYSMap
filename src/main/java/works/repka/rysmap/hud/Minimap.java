@@ -328,13 +328,15 @@ public final class Minimap {
                 float sx = v.sx(m.x(), m.z()), sy = v.sy(m.x(), m.z());
                 if (!v.inside(sx, sy, 3)) {
                     // участник и цель за краем прижаты к рамке, остальное не видно
-                    if (m.kind() != MapApi.Kind.PLAYER && m.kind() != MapApi.Kind.GOAL) continue;
+                    // участник, цель, пинг и тревога за краем прижаты к рамке, остальное не видно
+                    if (m.kind() == MapApi.Kind.POINT) continue;
                     float[] c = v.clamp(sx, sy, 3.5f);
                     sx = c[0];
                     sy = c[1];
                 }
+                Entities.pulse(g, m, sx, sy, 3.5f);
                 Draw.disc(g, sx, sy, 3.5f, m.color());
-                if (m.icon() != null) Icons.draw(g, m.icon(), sx - 2.5f, sy - 2.5f, 5, 0xFF101216);
+                Entities.look(g, m, sx, sy, 5);
                 drawn++;
             }
         }

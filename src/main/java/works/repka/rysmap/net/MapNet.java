@@ -57,21 +57,22 @@ public final class MapNet {
      * правила; {@code canTeleport}: правило пускает этого игрока; {@code pauseLeft}: сколько секунд паузы осталось.
      */
     public record Rules(int teleport, int pause, boolean minimap, boolean caves, boolean players, boolean mobs,
-                        boolean op, boolean canTeleport, int pauseLeft) implements CustomPacketPayload {
+                        boolean op, boolean canTeleport, int pauseLeft, boolean team) implements CustomPacketPayload {
         public static final Type<Rules> TYPE = new Type<>(id("rules"));
         public static final StreamCodec<FriendlyByteBuf, Rules> CODEC = CustomPacketPayload.codec(Rules::write, Rules::read);
 
         private void write(FriendlyByteBuf b) {
             b.writeVarInt(teleport);
             b.writeVarInt(pause);
-            int flags = (minimap ? 1 : 0) | (caves ? 2 : 0) | (players ? 4 : 0) | (mobs ? 8 : 0) | (op ? 16 : 0) | (canTeleport ? 32 : 0);
+            // бит 64 «в команде» (0.1.0-m8): клиент 0.1.0-m7 его не читает
+            int flags = (minimap ? 1 : 0) | (caves ? 2 : 0) | (players ? 4 : 0) | (mobs ? 8 : 0) | (op ? 16 : 0) | (canTeleport ? 32 : 0) | (team ? 64 : 0);
             b.writeVarInt(flags);
             b.writeVarInt(pauseLeft);
         }
 
         private static Rules read(FriendlyByteBuf b) {
             int teleport = b.readVarInt(), pause = b.readVarInt(), f = b.readVarInt(), left = b.readVarInt();
-            return new Rules(teleport, pause, (f & 1) != 0, (f & 2) != 0, (f & 4) != 0, (f & 8) != 0, (f & 16) != 0, (f & 32) != 0, left);
+            return new Rules(teleport, pause, (f & 1) != 0, (f & 2) != 0, (f & 4) != 0, (f & 8) != 0, (f & 16) != 0, (f & 32) != 0, left, (f & 64) != 0);
         }
 
         @Override
@@ -140,6 +141,55 @@ public final class MapNet {
         }
     }
 
+    /** Пинг команде с карты (Т2): место и вид («here»). */
+    public record Ping(String dimension, int x, int y, int z, String kind) implements CustomPacketPayload {
+        public static final Type<Ping> TYPE = new Type<>(id("ping"));
+        public static final StreamCodec<FriendlyByteBuf, Ping> CODEC = CustomPacketPayload.codec(Ping::write, Ping::read);
+
+        private void write(FriendlyByteBuf b) {
+            b.writeUtf(dimension, 256);
+            b.writeInt(x);
+            b.writeInt(y);
+            b.writeInt(z);
+            b.writeUtf(kind, 32);
+        }
+
+        private static Ping read(FriendlyByteBuf b) {
+            return new Ping(b.readUtf(256), b.readInt(), b.readInt(), b.readInt(), b.readUtf(32));
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
+    /** Пинг участника команды или союзника: метка на карте на минуту. */
+    public record PingShow(UUID by, String name, String dimension, int x, int y, int z, String kind, int color) implements CustomPacketPayload {
+        public static final Type<PingShow> TYPE = new Type<>(id("ping_show"));
+        public static final StreamCodec<FriendlyByteBuf, PingShow> CODEC = CustomPacketPayload.codec(PingShow::write, PingShow::read);
+
+        private void write(FriendlyByteBuf b) {
+            b.writeUUID(by);
+            b.writeUtf(name, 32);
+            b.writeUtf(dimension, 256);
+            b.writeInt(x);
+            b.writeInt(y);
+            b.writeInt(z);
+            b.writeUtf(kind, 32);
+            b.writeInt(color);
+        }
+
+        private static PingShow read(FriendlyByteBuf b) {
+            return new PingShow(b.readUUID(), b.readUtf(32), b.readUtf(256), b.readInt(), b.readInt(), b.readInt(), b.readUtf(32), b.readInt());
+        }
+
+        @Override
+        public Type<? extends CustomPacketPayload> type() {
+            return TYPE;
+        }
+    }
+
     /** Один игрок в {@link Players}. {@code team}: из команды получателя. */
     public record PlayerSpot(UUID id, String name, String dimension, int x, int y, int z, boolean team) {}
 
@@ -190,6 +240,12 @@ public final class MapNet {
         r.playToClient(Players.TYPE, Players.CODEC, (p, c) -> {
             if (FMLEnvironment.dist.isClient()) Client.players(p);
         });
+        r.playToClient(PingShow.TYPE, PingShow.CODEC, (p, c) -> {
+            if (FMLEnvironment.dist.isClient()) Client.ping(p);
+        });
+        r.playToServer(Ping.TYPE, Ping.CODEC, (p, c) -> {
+            if (c.player() instanceof ServerPlayer sp) works.repka.rysmap.server.TeamPings.request(sp, p);
+        });
         r.playToServer(SetRules.TYPE, SetRules.CODEC, (p, c) -> {
             if (c.player() instanceof ServerPlayer sp) works.repka.rysmap.server.MapServer.setRules(sp, p);
         });
@@ -218,6 +274,10 @@ public final class MapNet {
 
         static void players(Players players) {
             works.repka.rysmap.client.ServerRules.players(players);
+        }
+
+        static void ping(PingShow ping) {
+            works.repka.rysmap.client.PingsLayer.add(ping);
         }
     }
 

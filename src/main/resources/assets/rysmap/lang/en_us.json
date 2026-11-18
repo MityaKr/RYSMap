@@ -211,5 +211,15 @@
   "rysmap.list.delete": "Delete %s",
   "rysmap.list.delete.title": "Delete %s points?",
   "rysmap.highlight": "Highlight: %s",
-  "rysmap.rail.open": "Expand"
+  "rysmap.rail.open": "Expand",
+  "rysmap.menu.ping": "Ping the team",
+  "rysmap.ping.fail": "Ping not sent.",
+  "rysmap.layer.pings": "Pings",
+  "rysmap.ping.kind.here": "here",
+  "rysmap.ping.kind.danger": "danger",
+  "rysmap.ping.kind.help": "help",
+  "rysmap.ping.kind.loot": "loot",
+  "rysmap.entity.track": "Click: path to the player",
+  "rysmap.ping.kind.resource": "resource",
+  "rysmap.ping.kind.mark": "mark"
 }

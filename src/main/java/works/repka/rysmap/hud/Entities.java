@@ -155,6 +155,33 @@ public final class Entities {
         return out;
     }
 
+    /**
+     * Вид метки внутри кружка: голова игрока, если задана, потом предмет, потом значок ({@link MapApi.Marker#icon()}).
+     * {@code size}: сторона значка.
+     */
+    public static void look(GuiGraphics g, MapApi.Marker m, float cx, float cy, float size) {
+        if (m.head() != null) {
+            face(g, m.head(), cx - size / 2f, cy - size / 2f, size);
+        } else if (!m.item().isEmpty()) {
+            Batch.flush();
+            g.pose().pushPose();
+            g.pose().translate(cx - size / 2f, cy - size / 2f, 0);
+            g.pose().scale(size / 16f, size / 16f, 1f);
+            g.renderItem(m.item(), 0, 0);
+            g.pose().popPose();
+        } else if (m.icon() != null) {
+            Icons.draw(g, m.icon(), cx - size / 2f, cy - size / 2f, size, 0xFF15181F);
+        }
+    }
+
+    /** Пинг расходится кольцом, тревога пульсирует красным (Т2, Т5). */
+    public static void pulse(GuiGraphics g, MapApi.Marker m, float cx, float cy, float r) {
+        if (m.kind() != MapApi.Kind.PING && m.kind() != MapApi.Kind.ALERT) return;
+        float t = (System.currentTimeMillis() % 1400) / 1400f;
+        int color = m.kind() == MapApi.Kind.ALERT ? HOSTILE : m.color();
+        Draw.ring(g, cx, cy, r + 1 + t * r * 1.6f, 1f, Draw.alpha(color | 0xFF000000, 1f - t));
+    }
+
     /** Точка моба: кружок с тёмной кромкой. */
     public static void mob(GuiGraphics g, Dot d, float x, float y, float r) {
         Draw.disc(g, x, y, r + 0.6f, 0xCC101216);
