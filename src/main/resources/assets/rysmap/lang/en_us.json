@@ -210,5 +210,6 @@
   "rysmap.list.hide": "Hide %s",
   "rysmap.list.delete": "Delete %s",
   "rysmap.list.delete.title": "Delete %s points?",
-  "rysmap.highlight": "Highlight: %s"
+  "rysmap.highlight": "Highlight: %s",
+  "rysmap.rail.open": "Expand"
 }

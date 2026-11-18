@@ -368,6 +368,8 @@ public final class Minimap {
     private static List<Line> lines(Minecraft mc, LocalPlayer p) {
         List<Line> out = new ArrayList<>();
         out.add(new Line(0, null, "", true));
+        // маленькое окно (макет 07): миникарта S и под ней одна строка
+        if (UiScale.height() < 300 && ClientConfig.get().minimapSize == 0) return out;
         for (MapApi.StatusLine s : MapApi.statuses()) {
             if (out.size() >= 3) break;
             try {

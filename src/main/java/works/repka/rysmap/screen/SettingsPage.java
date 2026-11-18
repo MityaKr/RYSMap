@@ -41,12 +41,29 @@ final class SettingsPage {
     }
 
     boolean scrolled(double mx, double my, double dy) {
-        return cornerDrop.scrolled(mx, my, dy);
+        if (cornerDrop.scrolled(mx, my, dy)) return true;
+        if (maxScroll <= 0) return false;
+        scroll = Math.max(0, Math.min(maxScroll, scroll - (float) dy * 24));
+        return true;
     }
+
+    /** Прокрутка страницы: в сжатой раскладке и у оператора с разделом «Сервер» страница выше окна (макет 87). */
+    private float scroll, maxScroll;
+    /** Кадр: сжатая раскладка, мышь, куда класть подсказку пояснения. */
+    private boolean compactNow;
+    private int mouseX, mouseY;
+    private @Nullable MapScreen screen;
 
     void draw(GuiGraphics g, Theme t, Kit.Hits hits, MapScreen s, int mx, int my) {
         ClientConfig c = ClientConfig.get();
-        int top = s.wy + MapScreen.HEADER;
+        compactNow = s.compact();
+        mouseX = mx;
+        mouseY = my;
+        screen = s;
+        int viewTop = s.wy + MapScreen.HEADER, viewBottom = s.wy + s.wh - 2;
+        int top = viewTop - Math.round(scroll);
+        Draw.scissor(g, s.wx + 1, viewTop, s.wx + s.ww - 1, viewBottom);
+        hits.clip(viewTop, viewBottom);
         int lx = s.wx + 70, lw = 270, rx = s.wx + 364, rw = 166;
         if (s.ww < 560) {
             lx = s.wx + 14;
@@ -60,9 +77,10 @@ final class SettingsPage {
         Icons.draw(g, Icons.Shape.CHEVRON_LEFT, lx, top + 10, 6, t.c("link"));
         Draw.label(g, back, lx + 8, top + 13, 12.5f, Weight.MEDIUM, hotBack ? t.c("text.primary") : t.c("link"));
         hits.add(lx - 1, top + 7, (int) bw + 2, 12, b -> s.closeSettings());
-        Draw.label(g, Component.translatable("rysmap.settings.title").getString(), lx, top + 26.5f, 19, Weight.SEMIBOLD, t.c("text.primary"));
+        // в сжатой раскладке заголовка нет: о месте говорят «Назад: Карта» и нажатая шестерёнка (макет 87)
+        if (!compactNow) Draw.label(g, Component.translatable("rysmap.settings.title").getString(), lx, top + 26.5f, 19, Weight.SEMIBOLD, t.c("text.primary"));
 
-        int y = top + 38;
+        int y = top + (compactNow ? 20 : 38);
         Kit.caps(g, t, Component.translatable("rysmap.settings.minimap").getString(), lx, y + 4, 11, 0.44f);
         y += 10;
 
@@ -177,13 +195,15 @@ final class SettingsPage {
         });
 
         // сервер: видит только оператор (макет 50, раздел «Сервер»)
-        if (works.repka.rysmap.client.ServerRules.op()) server(g, t, hits, lx, lw, y + ROW + 4, mx, my);
+        int leftBottom = y + ROW;
+        if (works.repka.rysmap.client.ServerRules.op()) leftBottom = server(g, t, hits, lx, lw, y + ROW + 4, mx, my);
 
-        // справа: образец
+        // справа: образец (в сжатой раскладке его нет: настоящая миникарта видна за окном)
         int ry = top + 12;
+        int ph = compactNow ? 0 : 134;
+        if (!compactNow) {
         Kit.caps(g, t, Component.translatable("rysmap.settings.preview").getString(), rx, ry + 2, 11, 0.44f);
         ry += 8;
-        int ph = 134;
         if (t.beveled()) t.card(g, rx, ry, rw, ph);
         else Draw.roundBox(g, rx, ry, rw, ph, 5, t.c("card.bg"), t.c("panel.border"));
         int size = Math.min(Minimap.size(), 96);
@@ -199,6 +219,7 @@ final class SettingsPage {
             Draw.label(g, off, rx + (rw - Draw.labelWidth(off, 12, Weight.REGULAR)) / 2f, ry + ph / 2f, 12, Weight.REGULAR, t.c("text.muted"));
         }
         ry += ph + 10;
+        }
 
         // клавиши
         Kit.caps(g, t, Component.translatable("rysmap.settings.keys").getString(), rx, ry + 2, 11, 0.44f);
@@ -230,6 +251,19 @@ final class SettingsPage {
         ry += 19;
         if (ftbInfo == null && session != null) ftbInfo = ftbInfo(session.store.root());
         data(g, t, Component.translatable("rysmap.settings.data.ftb").getString(), ftbInfo == null ? "" : ftbInfo, rx, ry, rw);
+        ry += 19;
+
+        // прокрутка: высота содержимого по обоим столбцам
+        int contentBottom = Math.max(leftBottom, ry) + 8;
+        maxScroll = Math.max(0, contentBottom + Math.round(scroll) - viewBottom);
+        scroll = Math.min(scroll, maxScroll);
+        if (maxScroll > 0) {
+            float viewH = viewBottom - viewTop, total = viewH + maxScroll;
+            float bh = Math.max(16, viewH * viewH / total), by = viewTop + (viewH - bh) * (scroll / maxScroll);
+            Draw.round(g, s.wx + s.ww - 5, by, 2.5f, bh, 1.25f, Draw.alpha(t.c("text.muted"), 0.6f));
+        }
+        hits.unclip();
+        g.disableScissor();
 
         // раскрытый список угла поверх всего
         if (cornerDrop.open) {
@@ -251,9 +285,9 @@ final class SettingsPage {
      * Раздел «Сервер»: миникарта и пещеры у игроков, кто телепортируется с карты и пауза, чужие игроки и мобы на карте.
      * Каждое нажатие сразу уходит на сервер, сервер пишет файл и рассылает правила всем.
      */
-    private static void server(GuiGraphics g, Theme t, Kit.Hits hits, int lx, int lw, int y, int mx, int my) {
+    private int server(GuiGraphics g, Theme t, Kit.Hits hits, int lx, int lw, int y, int mx, int my) {
         works.repka.rysmap.net.MapNet.Rules r = works.repka.rysmap.client.ServerRules.rules();
-        if (r == null) return;
+        if (r == null) return y;
         Kit.caps(g, t, Component.translatable("rysmap.settings.server").getString(), lx, y + 4, 11, 0.44f);
         String only = Component.translatable("rysmap.settings.server.note").getString();
         Draw.label(g, only, lx + lw - Draw.labelWidth(only, 11, Weight.REGULAR), y + 4, 11, Weight.REGULAR, t.c("text.muted"));
@@ -288,6 +322,7 @@ final class SettingsPage {
             if (i == 0) send(r, r.teleport(), r.pause(), r.minimap(), r.caves(), !r.players(), r.mobs());
             else send(r, r.teleport(), r.pause(), r.minimap(), r.caves(), r.players(), !r.mobs());
         });
+        return y + ROW;
     }
 
     private static void send(works.repka.rysmap.net.MapNet.Rules r, int teleport, int pause, boolean minimap, boolean caves, boolean players, boolean mobs) {
@@ -306,8 +341,15 @@ final class SettingsPage {
         }
     }
 
-    private static void label(GuiGraphics g, Theme t, String key, @Nullable String note, int x, int y) {
+    private void label(GuiGraphics g, Theme t, String key, @Nullable String note, int x, int y) {
         String text = Component.translatable(key).getString();
+        if (note != null && compactNow) {
+            // сжатая раскладка: пояснение уходит в подсказку при наведении (макет 87)
+            Draw.label(g, text, x, y + 9, 13, Weight.REGULAR, t.c("text.body"));
+            if (screen != null && Kit.over(mouseX, mouseY, x, y + 3, (int) Draw.labelWidth(text, 13, Weight.REGULAR) + 2, 12))
+                screen.tooltip(List.of(text, Component.translatable(note).getString()));
+            return;
+        }
         if (note == null) {
             Draw.label(g, text, x, y + 9, 13, Weight.REGULAR, t.c("text.body"));
             return;

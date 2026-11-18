@@ -316,6 +316,34 @@ final class FixesAutoTest {
             ServerRules.setRules(1, r.pause(), r.minimap(), r.caves(), r.players(), r.mobs());
             ServerRules.closeMessage();
         }, 20);
+        // темы (М9): окно карты в glass и vanilla, затем сжатая раскладка в маленьком окне
+        step("theme glass", () -> {
+            works.repka.ryscore.theme.ThemeManager.select("ryscore:glass");
+            MapScreen.open();
+        }, 30);
+        shot("theme_glass_map");
+        step("theme vanilla", () -> works.repka.ryscore.theme.ThemeManager.select("ryscore:vanilla"), 20);
+        shot("theme_vanilla_map");
+        step("compact", () -> {
+            works.repka.ryscore.theme.ThemeManager.select("ryscore:slate");
+            mc().setScreen(null);
+            org.lwjgl.glfw.GLFW.glfwSetWindowSize(mc().getWindow().getWindow(), 960, 600);
+        }, 20);
+        step("compact open", () -> {
+            check("маленькое окно включает сжатую раскладку", works.repka.ryscore.ui.UiScale.compactNeeded());
+            MapScreen.open();
+        }, 30);
+        shot("compact_map");
+        step("compact rail", () -> screen().railForTest(true), 10);
+        shot("compact_rail");
+        step("compact settings", () -> {
+            screen().railForTest(false);
+            screen().settingsForTest();
+        }, 10);
+        shot("compact_settings");
+        step("compact hud", () -> mc().setScreen(null), 10);
+        shot("compact_hud");
+        step("big again", () -> org.lwjgl.glfw.GLFW.glfwSetWindowSize(mc().getWindow().getWindow(), 1280, 800), 30);
         step("teleport", () -> {
             tpX = baseX + 300;
             tpZ = baseZ + 300;

@@ -98,6 +98,8 @@ public final class MapScreen extends ScaledScreen {
 
     private MapScreen(ResourceKey<Level> dimension, double x, double z) {
         super(Component.translatable("rysmap.screen.title"));
+        // правило семьи: база 480×270, когда 640×400 не помещается при 100 % (макеты 80–87)
+        useCompactBase();
         this.dimension = dimension;
         this.centerX = x;
         this.centerZ = z;
@@ -130,9 +132,10 @@ public final class MapScreen extends ScaledScreen {
         wh = Math.min(H, height - 16);
         wx = (width - ww) / 2;
         wy = (height - wh) / 2;
-        cx0 = wx + SIDEBAR;
+        int side = compact() ? RAIL : SIDEBAR;
+        cx0 = wx + side;
         cy0 = wy + HEADER;
-        cw = ww - SIDEBAR;
+        cw = ww - side;
         ch = wh - HEADER;
         if (editor != null) for (works.repka.ryscore.ui.Field f : editor.fields()) addWidget(f);
         scanDimensions();
@@ -229,7 +232,8 @@ public final class MapScreen extends ScaledScreen {
         Icons.draw(g, Icons.Shape.COMPASS, wx + 11, y + 10, 8, 0xFFFFFFFF);
         String world = s.store.key().name();
         float bx = wx + 8 + 14 + 4.5f;
-        String shown = Draw.ellipsize(world, 110, 15, Weight.SEMIBOLD);
+        // сжатая раскладка: имя мира спрятано (макет 80)
+        String shown = compact() ? "" : Draw.ellipsize(world, 110, 15, Weight.SEMIBOLD);
         Draw.label(g, shown, bx, y + HEADER / 2f, 15, Weight.SEMIBOLD, t.c("text.primary"));
         int tx = (int) (bx + Draw.labelWidth(shown, 15, Weight.SEMIBOLD) + 9);
         tx += Kit.sectionTab(g, t, hits, tx, y, HEADER, Component.translatable("rysmap.screen.tab.map").getString(), settings == null && tab == null, mx, my, () -> {
@@ -293,6 +297,16 @@ public final class MapScreen extends ScaledScreen {
 
     private void sidebar(GuiGraphics g, Theme t, MapSession s, int mx, int my) {
         int top = wy + HEADER, bottom = wy + wh;
+        if (compact() && !railOpen) {
+            rail(g, t, top, bottom, mx, my);
+            return;
+        }
+        if (compact()) {
+            // раскрытая рейка ложится поверх полотна; клик мимо закрывает её
+            g.pose().pushPose();
+            g.pose().translate(0, 0, 200);
+            hits.add(wx, top, SIDEBAR, bottom - top, b -> {});
+        }
         float r = t.beveled() ? 0 : t.r("panel.radius");
         if (t.beveled()) {
             t.sidebar(g, wx, top, SIDEBAR, bottom - top);
@@ -393,6 +407,7 @@ public final class MapScreen extends ScaledScreen {
             String label = Component.translatable("rysmap.screen.point_here").getString();
             toolButton(g, t, wx + 6, footer + 5, SIDEBAR - 12, 14, Icons.Shape.PLUS, label, keyName(ClientEntry.NEW_POINT), true, mx, my, this::pointHere);
         }
+        if (compact()) g.pose().popPose();
     }
 
     private float group(GuiGraphics g, Theme t, String title, List<PointStore.Point> points, int x0, int rw, float y, @Nullable LocalPlayer player, int mx, int my) {
@@ -1097,6 +1112,54 @@ public final class MapScreen extends ScaledScreen {
         if (k > 0) Draw.lines(g, xy, k, 0.5f, Draw.alpha(canvas.c("map.grid") | 0xFF000000, 0.35f));
     }
 
+    // ---- сжатая раскладка (М9) ----
+
+    static final int RAIL = 24;
+    /** Рейка раскрыта в полный сайдбар поверх полотна. */
+    private boolean railOpen;
+
+    /**
+     * Рейка сжатой раскладки (макет {@code 80}): развернуть, мир, слои, точки, игроки; внизу «Точка здесь». Любой значок
+     * раскрывает полный сайдбар поверх полотна.
+     */
+    private void rail(GuiGraphics g, Theme t, int top, int bottom, int mx, int my) {
+        float r = t.beveled() ? 0 : t.r("panel.radius");
+        if (t.beveled()) t.sidebar(g, wx, top, RAIL, bottom - top);
+        else {
+            Draw.rect(g, wx + 1, top, RAIL - 1, (int) (bottom - top - r - 1), t.c("sidebar.bg"));
+            Draw.round(g, wx + 1, bottom - 2 * r - 1, RAIL - 1, 2 * r, r - 1, t.c("sidebar.bg"));
+            Draw.rect(g, wx + RAIL - (int) r, (int) (bottom - 2 * r - 1), (int) r, (int) (2 * r), t.c("sidebar.bg"));
+            Draw.rect(g, wx + RAIL - 1, top, 1, bottom - top - 1, t.c("panel.border"));
+        }
+        Icons.Shape[] icons = {Icons.Shape.SIDEBAR, Icons.Shape.COMPASS, Icons.Shape.LAYERS, Icons.Shape.FLAG, Icons.Shape.USERS};
+        String[] tips = {"rysmap.rail.open", "rysmap.screen.world", "rysmap.screen.layers", "rysmap.screen.points", "rysmap.layer.players"};
+        int y = top + 6;
+        for (int i = 0; i < icons.length; i++) {
+            int iy = y + i * 17 + (i > 0 ? 6 : 0);
+            boolean hot = Kit.over(mx, my, wx + 3, iy, RAIL - 6, 15);
+            if (hot) Draw.round(g, wx + 3, iy, RAIL - 6, 15, 3.5f, t.c("slot.hover"));
+            Icons.draw(g, icons[i], wx + RAIL / 2f - 4, iy + 3.5f, 8, hot ? t.c("text.primary") : t.c("text.muted"));
+            hits.add(wx + 3, iy, RAIL - 6, 15, b -> railOpen = true);
+            if (hot) tip = List.of(Component.translatable(tips[i]).getString());
+        }
+        int py = bottom - 6 - 15;
+        boolean hot = Kit.over(mx, my, wx + 3, py, RAIL - 6, 15);
+        if (hot) Draw.round(g, wx + 3, py, RAIL - 6, 15, 3.5f, t.c("slot.hover"));
+        Icons.draw(g, Icons.Shape.PLUS, wx + RAIL / 2f - 4, py + 3.5f, 8, hot ? t.c("text.primary") : t.c("text.muted"));
+        hits.add(wx + 3, py, RAIL - 6, 15, b -> pointHere());
+        if (hot) tip = List.of(Component.translatable("rysmap.screen.point_here").getString());
+    }
+
+    /** Подсказка от частей окна (страница настроек). */
+    void tooltip(List<String> lines) {
+        tip = lines;
+    }
+
+    /** Для автотеста: раскрыть рейку. */
+    public void railForTest(boolean open) {
+        railOpen = open;
+    }
+
     // ---- этажи пещер (М5) ----
 
     /** id тайлов полотна: поверхность или этаж. */
@@ -1496,6 +1559,10 @@ public final class MapScreen extends ScaledScreen {
             hits.click(x, y, button);
             return true;
         }
+        if (railOpen && compact() && !Kit.over(x, y, wx, cy0, SIDEBAR, ch)) {
+            railOpen = false;
+            if (Kit.over(x, y, cx0, cy0, cw, ch)) return true;
+        }
         if (tab != null) {
             if (hits.click(x, y, button)) return true;
             MapApi.Tab current = tab;
@@ -1639,7 +1706,7 @@ public final class MapScreen extends ScaledScreen {
             if (pv != null && x >= visibleRight() && Kit.over(x, y, cx0, cy0, cw, ch)) return safe(() -> pv.scroll(x, y, scrollY), false);
         }
         if (dimDrop.scrolled(x, y, scrollY)) return true;
-        if (Kit.over(x, y, wx, listTop, SIDEBAR, listBottom - listTop)) {
+        if ((!compact() || railOpen) && Kit.over(x, y, wx, listTop, SIDEBAR, listBottom - listTop)) {
             listScroll.by((float) (-scrollY * ROW * 2));
             return true;
         }
