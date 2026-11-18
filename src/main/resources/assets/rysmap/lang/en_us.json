@@ -268,5 +268,7 @@
   "rysmap.whatsnew.new.note": "floors underground, T over the map, waystones",
   "rysmap.whatsnew.open": "Open map",
   "rysmap.whatsnew.where": "Where is my land",
-  "rysmap.whatsnew.ok": "Got it"
+  "rysmap.whatsnew.ok": "Got it",
+  "rysmap.keys.hint": "New point, \"show all points\", land: no keys assigned.",
+  "rysmap.keys.hint.link": "Keys: map settings"
 }

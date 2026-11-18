@@ -79,8 +79,10 @@ public final class Baker {
         };
         int depth = RegionData.water(flags);
         if (depth == 0) {
-            int hn = neighborHeight(r, n, lx - 1, lz - 1);
-            rgb = shade(rgb, hn == RegionData.NO_HEIGHT ? 0 : h - hn);
+            // рельеф по двум соседям, западу и северу (скептик: от одного северо-западного карта плоская)
+            int hw = neighborHeight(r, n, lx - 1, lz), hn = neighborHeight(r, n, lx, lz - 1);
+            int dh = (hw == RegionData.NO_HEIGHT ? 0 : h - hw) + (hn == RegionData.NO_HEIGHT ? 0 : h - hn);
+            rgb = shade(rgb, dh);
         } else {
             int surface = multiply(colors.waterTexture(), at(water, biome));
             float t = depth == RegionData.WATER_UNKNOWN ? 0.75f : Math.min(0.9f, 0.62f + depth * 0.025f);
@@ -152,10 +154,13 @@ public final class Baker {
         return (r << 16) | (g << 8) | b;
     }
 
-    /** Тень по разнице высот: выше соседа светлее, ниже темнее, как на бумажной карте игры. */
+    /**
+     * Тень по сумме разниц высот с западным и северным соседом: выше светлее, ниже темнее, как на бумажной карте игры.
+     * Коэффициенты в 0.1.0-m10 сильнее (было 5 и 6 % на блок с потолком 1,16 и 0,74 от одного соседа).
+     */
     static int shade(int rgb, int dh) {
         if (dh == 0) return rgb & 0xFFFFFF;
-        float f = dh > 0 ? Math.min(1.16f, 1f + 0.05f * dh) : Math.max(0.74f, 1f + 0.06f * dh);
+        float f = dh > 0 ? Math.min(1.24f, 1f + 0.07f * dh) : Math.max(0.64f, 1f + 0.08f * dh);
         int r = Math.min(255, (int) (((rgb >> 16) & 0xFF) * f));
         int g = Math.min(255, (int) (((rgb >> 8) & 0xFF) * f));
         int b = Math.min(255, (int) ((rgb & 0xFF) * f));

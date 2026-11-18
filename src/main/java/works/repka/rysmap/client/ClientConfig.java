@@ -60,6 +60,8 @@ public final class ClientConfig {
     public int mobsRange = 16;
     /** Кого показывать. */
     public boolean mobsHostile = true, mobsPassive = true, mobsPets;
+    /** Строку «Клавиши: настройки карты» уже показали (при первом открытии карты). */
+    public boolean keysHintSeen;
     /** Карта темнеет ночью (М6). */
     public boolean night = true;
     /** Сколько последних мест гибели хранить: 0 (не ставить), 1, 3, 5. Точки FTB не в счёт. */
@@ -112,6 +114,7 @@ public final class ClientConfig {
                 if (json.has("minimapRotate")) c.minimapRotate = json.get("minimapRotate").getAsBoolean();
                 if (json.has("caves")) c.caves = json.get("caves").getAsBoolean();
                 if (json.has("night")) c.night = json.get("night").getAsBoolean();
+                if (json.has("keysHintSeen")) c.keysHintSeen = json.get("keysHintSeen").getAsBoolean();
                 if (json.has("entitiesAllLayers")) c.entitiesAllLayers = json.get("entitiesAllLayers").getAsBoolean();
                 if (c.entitiesAllLayers) c.mobsRange = 0;
                 c.mobsView = clamp(json, "mobsView", c.mobsView, 0, 2);
@@ -167,6 +170,7 @@ public final class ClientConfig {
         json.addProperty("minimapRotate", minimapRotate);
         json.addProperty("caves", caves);
         json.addProperty("night", night);
+        json.addProperty("keysHintSeen", keysHintSeen);
         json.remove("entitiesAllLayers");
         json.addProperty("mobsView", mobsView);
         json.addProperty("mobsRange", mobsRange);

@@ -549,6 +549,7 @@ public final class MapScreen extends ScaledScreen {
         player(g, partial);
         modes(g, t, mx, my);
         highlightChip(g, t, mx, my);
+        keysHint(g, t, mx, my);
         tools(g, t, mx, my);
         modePanel(g, t, mx, my);
         message(g, t, mx, my);
@@ -1112,6 +1113,43 @@ public final class MapScreen extends ScaledScreen {
         hits.add(crossX - 2, y + 2, 12, 12, b -> MapApi.get().highlight(null));
     }
 
+    /** Строку клавиш показали в этом окне: при закрытии она запоминается как увиденная. */
+    private boolean keysHintShown;
+
+    /**
+     * «Клавиши: настройки карты» при первом открытии карты (скептик): у новой точки, «показать все точки», земли клавиш
+     * по умолчанию нет, иначе их никто не найдёт. Клик ведёт в настройки управления, крестик прячет.
+     */
+    private void keysHint(GuiGraphics g, Theme t, int mx, int my) {
+        works.repka.rysmap.client.ClientConfig c = works.repka.rysmap.client.ClientConfig.get();
+        if (c.keysHintSeen || MapApi.highlighted() != null) return;
+        keysHintShown = true;
+        String text = Component.translatable("rysmap.keys.hint").getString();
+        String link = Component.translatable("rysmap.keys.hint.link").getString();
+        float tw = Draw.labelWidth(text, 12, Weight.REGULAR), lw = Draw.labelWidth(link, 12, Weight.MEDIUM);
+        int w = (int) Math.ceil(8 + 10 + tw + 5 + lw + 8 + 10 + 4), h = 16;
+        int x = (int) (cx0 + (visibleRight() - cx0 - w) / 2f), y = cy0 + ch - 6 - TOOL - 4 - h - 22;
+        Draw.roundBox(g, x, y, w, h, 4.5f, Draw.alpha(t.c("panel.bg"), 0.95f), t.c("panel.border"));
+        Icons.draw(g, Icons.Shape.KEY, x + 7, y + 4, 8, t.c("text.muted"));
+        Draw.label(g, text, x + 18, y + h / 2f, 12, Weight.REGULAR, t.c("text.secondary"));
+        float lx = x + 18 + tw + 5;
+        boolean hotL = Kit.over(mx, my, (int) lx - 1, y + 2, (int) lw + 2, 12);
+        Draw.label(g, link, lx, y + h / 2f, 12, Weight.MEDIUM, hotL ? t.c("text.primary") : t.c("link"));
+        hits.add(x, y, w, h, b -> {});
+        hits.add((int) lx - 1, y + 2, (int) lw + 2, 12, b -> {
+            c.keysHintSeen = true;
+            c.save();
+            Minecraft.getInstance().setScreen(new net.minecraft.client.gui.screens.options.controls.KeyBindsScreen(this, Minecraft.getInstance().options));
+        });
+        int crossX = x + w - 14;
+        boolean hot = Kit.over(mx, my, crossX - 2, y + 2, 12, 12);
+        Draw.cross(g, crossX, y + 5, hot ? t.c("text.primary") : t.c("text.muted"));
+        hits.add(crossX - 2, y + 2, 12, 12, b -> {
+            c.keysHintSeen = true;
+            c.save();
+        });
+    }
+
     /** С какого масштаба (единиц на блок) окно переходит на дальний план. */
     static final double FAR_ZOOM = 0.5;
 
@@ -1359,6 +1397,11 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     public void removed() {
+        if (keysHintShown && !works.repka.rysmap.client.ClientConfig.get().keysHintSeen
+            && !(Minecraft.getInstance().screen instanceof net.minecraft.client.gui.screens.options.controls.KeyBindsScreen)) {
+            works.repka.rysmap.client.ClientConfig.get().keysHintSeen = true;
+            works.repka.rysmap.client.ClientConfig.get().save();
+        }
         MapSession session = ClientEntry.session();
         if (session != null) session.viewFloor(null);
         setMode(null);

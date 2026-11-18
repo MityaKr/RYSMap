@@ -268,5 +268,7 @@
   "rysmap.whatsnew.new.note": "этажи под землёй, клавиша T над картой, камни пути",
   "rysmap.whatsnew.open": "Открыть карту",
   "rysmap.whatsnew.where": "Где моя земля",
-  "rysmap.whatsnew.ok": "Понятно"
+  "rysmap.whatsnew.ok": "Понятно",
+  "rysmap.keys.hint": "Новая точка, «показать все точки», земля: клавиши не назначены.",
+  "rysmap.keys.hint.link": "Клавиши: настройки карты"
 }

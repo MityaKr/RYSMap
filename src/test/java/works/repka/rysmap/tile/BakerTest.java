@@ -75,8 +75,8 @@ class BakerTest {
         r.set(0, 0, 80, stone, 0, 0);
         r.mark(0, 0, 1);
         int[] lower = new Baker(COLORS).bakeChunk(r, p, (x, z) -> {
-            assertEquals(511, x);
-            assertEquals(511, z);
+            // соседи на западе (511, 512) и севере (512, 511): с 0.1.0-m10 рельеф от двух соседей
+            assertTrue(x == 511 && z == 512 || x == 512 && z == 511, x + "," + z);
             return 60;
         }, 0, 0);
         int[] alone = new Baker(COLORS).bakeChunk(r, p, Baker.Neighbors.NONE, 0, 0);
