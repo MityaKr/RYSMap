@@ -17,5 +17,11 @@
   "rysmap.menu.copy": "Скопировать координаты",
   "rysmap.dimension.minecraft.overworld": "Верхний мир",
   "rysmap.dimension.minecraft.the_nether": "Нижний мир",
-  "rysmap.dimension.minecraft.the_end": "Край"
+  "rysmap.dimension.minecraft.the_end": "Край",
+  "rysmap.layer.points": "Точки",
+  "rysmap.point.death": "Место гибели",
+  "rysmap.point.unnamed": "Точка",
+  "rysmap.point.numbered": "Точка %s",
+  "rysmap.menu.point_here": "Точка здесь",
+  "rysmap.menu.route_here": "В путь сюда"
 }

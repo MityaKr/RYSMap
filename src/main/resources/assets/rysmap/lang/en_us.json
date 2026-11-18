@@ -17,5 +17,11 @@
   "rysmap.menu.copy": "Copy coordinates",
   "rysmap.dimension.minecraft.overworld": "Overworld",
   "rysmap.dimension.minecraft.the_nether": "The Nether",
-  "rysmap.dimension.minecraft.the_end": "The End"
+  "rysmap.dimension.minecraft.the_end": "The End",
+  "rysmap.layer.points": "Waypoints",
+  "rysmap.point.death": "Death point",
+  "rysmap.point.unnamed": "Waypoint",
+  "rysmap.point.numbered": "Waypoint %s",
+  "rysmap.menu.point_here": "Waypoint here",
+  "rysmap.menu.route_here": "Route here"
 }

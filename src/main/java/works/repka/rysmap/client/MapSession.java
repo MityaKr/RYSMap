@@ -55,6 +55,7 @@ public final class MapSession {
     private final DirtyColumns dirty = new DirtyColumns(2048);
     private final AtomicInteger pending = new AtomicInteger();
     public final TileTextures tiles;
+    private final works.repka.rysmap.point.PointStore points;
 
     private @Nullable String dimension;
     private boolean ceiling, noMap;
@@ -78,7 +79,34 @@ public final class MapSession {
         } catch (IOException e) {
             RYSMap.LOG.warn("[rysmap] world.json не записался: {}", e.toString());
         }
-        RYSMap.LOG.info("[rysmap] карта мира «{}» в {}", store.key().name(), store.root());
+        works.repka.rysmap.point.PointStore p;
+        try {
+            p = works.repka.rysmap.point.PointStore.load(store.root().resolve("points.json"));
+        } catch (IOException | RuntimeException e) {
+            RYSMap.LOG.warn("[rysmap] points.json не прочитался ({}), файл отложен, точки начнутся заново", e.toString());
+            try {
+                java.nio.file.Path f = store.root().resolve("points.json");
+                if (java.nio.file.Files.exists(f)) works.repka.rysmap.tile.RegionFile.quarantine(f);
+            } catch (IOException ignored) {
+                // не удалось отложить: файл останется на месте и перезапишется при первой правке
+            }
+            p = new works.repka.rysmap.point.PointStore();
+        }
+        this.points = p;
+        RYSMap.LOG.info("[rysmap] карта мира «{}» в {}, точек {}", store.key().name(), store.root(), points.points().size());
+    }
+
+    public works.repka.rysmap.point.PointStore points() {
+        return points;
+    }
+
+    /** Точки пишутся сразу: файл маленький, правка редкая. */
+    public void savePoints() {
+        try {
+            points.save(store.root().resolve("points.json"));
+        } catch (IOException e) {
+            RYSMap.LOG.warn("[rysmap] points.json не записался: {}", e.toString());
+        }
     }
 
     public @Nullable String dimension() {

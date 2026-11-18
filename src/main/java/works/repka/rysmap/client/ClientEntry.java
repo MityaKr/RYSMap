@@ -55,6 +55,7 @@ public final class ClientEntry {
         config = ClientConfig.load();
         SablePlots.setActive(ModList.get().isLoaded("sable"));
         MapApi.provide(new MapApiImpl());
+        works.repka.rysmap.point.PointsLayer.register();
         modBus.addListener((RegisterKeyMappingsEvent e) -> {
             e.register(OPEN);
             e.register(ZOOM_IN);
@@ -94,6 +95,10 @@ public final class ClientEntry {
                 while (ZOOM_IN.consumeClick()) Minimap.zoom(1);
                 while (ZOOM_OUT.consumeClick()) Minimap.zoom(-1);
             }
+        });
+        bus.addListener((net.neoforged.neoforge.client.event.ScreenEvent.Opening e) -> {
+            if (e.getNewScreen() instanceof net.minecraft.client.gui.screens.DeathScreen && !(e.getCurrentScreen() instanceof net.minecraft.client.gui.screens.DeathScreen))
+                works.repka.rysmap.point.PointsLayer.died();
         });
         bus.addListener((RenderFrameEvent.Pre e) -> {
             if (session != null) session.frame();

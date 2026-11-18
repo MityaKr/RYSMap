@@ -2,7 +2,7 @@
 
 Собрана `_shared/tools/make-map.py` 2026-11-18. Руками не править: после структурных правок пересобрать.
 
-Java: 36 файлов, 5433 строк. Переводы: `src/main/resources/assets/rysmap/lang/en_us.json`, `src/main/resources/assets/rysmap/lang/ru_ru.json`.
+Java: 40 файлов, 5985 строк. Переводы: `src/main/resources/assets/rysmap/lang/en_us.json`, `src/main/resources/assets/rysmap/lang/ru_ru.json`.
 Читать сначала: `CLAUDE.md`, `README.md`.
 
 ## Точки входа
@@ -12,7 +12,7 @@ Java: 36 файлов, 5433 строк. Переводы: `src/main/resources/as
 ## Папки
 - `docs/` — 1 файлов
 - `gradle/` — 2 файлов
-- `src/` — 40 файлов
+- `src/` — 44 файлов
 
 ## `src/autotest/java` — пакет `works.repka.rysmap.dev`
 
@@ -29,8 +29,8 @@ Java: 36 файлов, 5433 строк. Переводы: `src/main/resources/as
 
 **client** (3)
 - `ClientConfig` 126 — Настройки игрока: config/rysmap/client.json.
-- `ClientEntry` 150 — Клиентская часть: сессия карты на вход в мир, события чанков, тик, кадр, строка F3, реализация MapApi.
-- `MapSession` 387 — Карта одного входа в мир.
+- `ClientEntry` 155 — Клиентская часть: сессия карты на вход в мир, события чанков, тик, кадр, строка F3, реализация MapApi.
+- `MapSession` 415 — Карта одного входа в мир.
 
 **compat** (1)
 - `SablePlots` 37 — Участки Sable: блоки летающих построек лежат в далёких чанках того же измерения.
@@ -41,11 +41,16 @@ Java: 36 файлов, 5433 строк. Переводы: `src/main/resources/as
 **layer** (1)
 - `Layers` 137 — Слои карты: чужие из реестра ядра (layers()) с глазом игрока.
 
-**migrate** (1)
+**migrate** (2)
+- `FtbPoints` 74 — Точки FTB Chunks (/waypoints.json) в наши (план 10.6, шаг 2): default становится личной точкой со значком флага и ближайшим из двенадцати цветов, death местом гибели, hidden выключ…
 - `FtbRegionReader` 277 — Читатель разведанной карты FTB Chunks 2101.1.22 (local/ftbchunks/data//).
 
 **mixin** (1)
 - `ClientLevelMixin` 23 · миксин — Правки блоков на клиенте для карты.
+
+**point** (2)
+- `PointStore` 185 — Личные точки и места гибели одного мира: points.json в папке карты (план 9.1).
+- `PointsLayer` 134 — Свой слой «Точки»: личные точки и места гибели из points.json текущего мира, клик ведёт путь к точке.
 
 **scan** (5)
 - `ChunkQueue` 87 — Чанки, ждущие снимка, по расстоянию до игрока: ближний первым.
@@ -80,6 +85,9 @@ Java: 36 файлов, 5433 строк. Переводы: `src/main/resources/as
 **migrate** (2)
 - `FtbFixtureTest` 141 — Настоящая карта FTB Chunks клиента автора на 18.11 (_shared/_saved/fixtures/ftb-2026-11-18/client/ftbchunks).
 - `FtbRegionReaderTest` 171 — Заготовка того же формата, что у FTB Chunks 2101.1.22, собирается в тесте: в git настоящих файлов нет.
+
+**point** (1)
+- `PointStoreTest` 126
 
 **tile** (5)
 - `BakerTest` 98
