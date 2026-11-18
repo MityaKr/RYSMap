@@ -31,6 +31,8 @@ import works.repka.rysmap.screen.Words;
  * Подписи точек в мире сквозь стены (решение автора 18.11): свёрнутая метка это значок цвета точки, раскрытая это
  * тёмная плашка slate со значком, именем и расстоянием. Раскрыта одна метка у прицела, цель пути и последнее место
  * гибели всегда, все сразу, пока зажата клавиша «показать все точки». Что видно и что раскрыто, решает {@link LabelPlan}.
+ * Рядом со своими точками идут подписи модов семьи из ядра ({@link works.repka.ryscore.world.Labels}, 1.12): пинги,
+ * тревоги и цели закреплены, остальные слушаются режима игрока.
  *
  * <p>Как рисуется. Матрица проекции и поворота камеры снимается в {@code RenderLevelStageEvent} на стадии
  * {@code AFTER_LEVEL} (та же, по которой игра нарисовала мир, с покачиванием и тошнотой), а сами метки рисуются слоем
@@ -128,6 +130,25 @@ public final class WorldLabels {
             double x = target.x(), y = target.y() + 1.0, z = target.z();
             int k = PLAN.add(SPOT_GOAL, distance(x, y, z), LabelPlan.PINNED);
             put(k, x, y, z, Icons.Shape.TARGET, GOAL_COLOR, true, target);
+        }
+        // подписи модов семьи через ядро (world.Labels, 1.12): пинги и тревоги закреплены, «always» видны в любом режиме
+        for (works.repka.ryscore.world.Labels.Source src : works.repka.ryscore.world.Labels.sources()) {
+            java.util.Collection<works.repka.ryscore.world.Labels.Label> list;
+            try {
+                list = src.labels(mc.player.level().dimension());
+            } catch (Throwable e) {
+                continue;
+            }
+            for (works.repka.ryscore.world.Labels.Label l : list) {
+                if (!l.dimension().location().toString().equals(dim)) continue;
+                var kind = l.kind();
+                boolean pin = kind == works.repka.ryscore.world.Labels.Kind.PING || kind == works.repka.ryscore.world.Labels.Kind.ALERT
+                    || kind == works.repka.ryscore.world.Labels.Kind.GOAL;
+                int flag = (pin ? LabelPlan.PINNED : 0) | (l.always() ? LabelPlan.ALWAYS : 0);
+                int k = PLAN.add(l.id(), distance(l.x(), l.y(), l.z()), flag);
+                Icons.Shape icon = l.icon() != null ? l.icon() : l.head() != null ? Icons.Shape.USERS : Icons.Shape.DOT;
+                put(k, l.x(), l.y(), l.z(), icon, l.color(), kind == works.repka.ryscore.world.Labels.Kind.GOAL, l);
+            }
         }
         PLAN.choose(LabelPlan.Mode.of(c.worldLabels), c.labelRange, c.labelLimit, ClientEntry.SHOW_POINTS.isDown());
         if (PLAN.chosenCount() == 0) return false;
@@ -234,10 +255,12 @@ public final class WorldLabels {
     /** Имя и расстояние раскрытой метки: строки строятся заново, только когда меняется имя или видимое число. */
     private static void texts(LabelPlan.Anim a, int i, double d) {
         Object src = sources[i];
-        Object nameKey = src instanceof PointStore.Point p ? p.name : src;
-        if (a.name == null || a.source != nameKey) {
+        Object nameKey = src instanceof PointStore.Point p ? p.name
+            : src instanceof works.repka.ryscore.world.Labels.Label l ? l.text().getString() : src;
+        if (a.name == null || !java.util.Objects.equals(a.source, nameKey)) {
             String name;
             if (src instanceof PointStore.Point p) name = PointsLayer.name(p);
+            else if (src instanceof works.repka.ryscore.world.Labels.Label l) name = (String) nameKey;
             else if (src instanceof MapApi.Target target && !target.label().getString().isEmpty()) name = target.label().getString();
             else name = Component.translatable("rysmap.labels.goal").getString();
             a.name = Draw.ellipsize(name, NAME_MAX, NAME_PX, Type.Weight.SEMIBOLD);

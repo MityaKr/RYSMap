@@ -67,6 +67,7 @@ public final class ClientEntry {
         MapApi.provide(new MapApiImpl());
         works.repka.rysmap.point.PointsLayer.register();
         works.repka.rysmap.hud.Entities.register();
+        works.repka.ryscore.world.Labels.provide();
         works.repka.ryscore.migrate.Migrations.register(new works.repka.rysmap.migrate.FtbMapStep());
         modBus.addListener((RegisterKeyMappingsEvent e) -> {
             e.register(OPEN);

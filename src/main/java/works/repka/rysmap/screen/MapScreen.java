@@ -69,6 +69,14 @@ public final class MapScreen extends ScaledScreen {
 
     private record Menu(int x, int y, MapApi.Spot spot, List<MapApi.MenuItem> items) {}
 
+    /** Чужая вкладка окна ({@link MapApi#tab}) вместо карты или null. */
+    private MapApi.@Nullable Tab tab;
+    /** Режим полотна ({@link MapApi#mode}) и его вид, пока он включён; null: «Обзор». */
+    private MapApi.@Nullable Mode mode;
+    private MapApi.@Nullable ModeView modeView;
+    private final CanvasSurface surface = new CanvasSurface();
+    private boolean modeMouse;
+
     /** Мышь в прошлом кадре, единицы окна: клавиша T телепортирует под курсор. */
     private int lastMx = -1, lastMy = -1;
     static final ResourceLocation TELEPORT_ITEM = ResourceLocation.fromNamespaceAndPath("rysmap", "teleport");
@@ -152,6 +160,19 @@ public final class MapScreen extends ScaledScreen {
             if (tip != null) Kit.tooltip(g, t, tip, mx, my);
             return;
         }
+        if (tab != null && !safeAvailable(tab)) setTab(null);
+        if (tab != null) {
+            MapApi.Tab current = tab;
+            try {
+                current.render(g, t, wx, wy + HEADER, ww, wh - HEADER, compact(), hits, mx, my);
+            } catch (Throwable e) {
+                works.repka.rysmap.RYSMap.LOG.error("[rysmap] вкладка {} упала", current.id(), e);
+                tab = null;
+            }
+            header(g, t, s, mx, my);
+            if (tip != null) Kit.tooltip(g, t, tip, mx, my);
+            return;
+        }
         canvas(g, t, canvas, s, mx, my, partial);
         PointStore.Point sel = selectedPoint();
         if (sel != null) {
@@ -186,7 +207,17 @@ public final class MapScreen extends ScaledScreen {
         String shown = Draw.ellipsize(world, 110, 15, Weight.SEMIBOLD);
         Draw.label(g, shown, bx, y + HEADER / 2f, 15, Weight.SEMIBOLD, t.c("text.primary"));
         int tx = (int) (bx + Draw.labelWidth(shown, 15, Weight.SEMIBOLD) + 9);
-        Kit.sectionTab(g, t, hits, tx, y, HEADER, Component.translatable("rysmap.screen.tab.map").getString(), settings == null, mx, my, this::closeSettings);
+        tx += Kit.sectionTab(g, t, hits, tx, y, HEADER, Component.translatable("rysmap.screen.tab.map").getString(), settings == null && tab == null, mx, my, () -> {
+            closeSettings();
+            setTab(null);
+        });
+        for (MapApi.Tab other : MapApi.tabs()) {
+            if (!safeAvailable(other)) continue;
+            tx += Kit.sectionTab(g, t, hits, tx, y, HEADER, other.name().getString(), settings == null && tab == other, mx, my, () -> {
+                closeSettings();
+                setTab(other);
+            });
+        }
         int closeX = wx + ww - 7 - 18;
         Kit.close(g, t, hits, closeX, y + 5, mx, my, this::onClose);
         int gearX = closeX - 4 - 18;
@@ -391,12 +422,24 @@ public final class MapScreen extends ScaledScreen {
         Draw.round(g, cx0 + cw - 2 * r - 1, cy0, 2 * r, ch - 1, r - 1, canvas.c("map.bg"));
         String dim = dimension.location().toString();
         s.tiles.draw(g, dim, centerX, centerZ, zoom, cx0, cy0, cw, ch, clips(r));
-        areas(g);
+        MapApi.ModeView view = modeView;
+        if (view != null && safe(view::dimTiles, false)) Draw.rect(g, cx0, cy0, cw - (int) r, ch - 1, 0x99101216);
+        if (view == null || safe(view::drawAreas, true)) areas(g);
+        if (view != null) {
+            try {
+                view.render(g, canvas, surface, mx, my);
+            } catch (Throwable e) {
+                works.repka.rysmap.RYSMap.LOG.error("[rysmap] режим {} упал", mode == null ? "?" : mode.id(), e);
+                setMode(null);
+            }
+        }
         selectionLine(g, partial);
         MapApi.Marker hover = markers(g, canvas, mx, my);
         works.repka.rysmap.hud.Entities.Dot hoverDot = hover == null ? entities(g, canvas, mx, my, partial) : null;
         player(g, partial);
+        modes(g, t, mx, my);
         tools(g, t, mx, my);
+        modePanel(g, t, mx, my);
         message(g, t, mx, my);
 
         boolean overCanvas = Kit.over(mx, my, cx0, cy0, cw, ch) && menu == null && !dimDrop.open && !overTools(mx, my);
@@ -422,6 +465,8 @@ public final class MapScreen extends ScaledScreen {
             }
             if (hoverDot.kind() == works.repka.rysmap.hud.Entities.Kind.TEAM) lines.add(Component.translatable("rysmap.entity.team").getString());
             tip = lines;
+        } else if (overCanvas && !dragging && modeTooltip(mx, my) != null) {
+            tip = modeTooltip(mx, my);
         } else if (overCanvas && !dragging) {
             int chx = Math.floorDiv((int) Math.floor(blockX(mx)), 16), chz = Math.floorDiv((int) Math.floor(blockZ(my)), 16);
             List<Component> chunkTip = Layers.tooltip(dimension, chx, chz);
@@ -451,6 +496,8 @@ public final class MapScreen extends ScaledScreen {
 
     /** Правый край видимого полотна: открытая панель точки закрывает его часть. */
     int visibleRight() {
+        MapApi.PanelView pv = modeView == null ? null : safe(modeView::panel, null);
+        if (pv != null) return cx0 + cw - pv.width();
         return cx0 + cw - (selectedPoint() != null ? PointPanel.W : 0);
     }
 
@@ -878,6 +925,172 @@ public final class MapScreen extends ScaledScreen {
         g.pose().popPose();
     }
 
+    // ---- вкладки и режимы модов (ядро 1.12) ----
+
+    private static <T> T safe(java.util.function.Supplier<T> call, T fallback) {
+        try {
+            T v = call.get();
+            return v == null ? fallback : v;
+        } catch (Throwable e) {
+            works.repka.rysmap.RYSMap.LOG.error("[rysmap] вкладка или режим мода упали", e);
+            return fallback;
+        }
+    }
+
+    private static boolean safeAvailable(MapApi.Tab t) {
+        return safe(t::available, false);
+    }
+
+    private @Nullable List<String> modeTooltip(int mx, int my) {
+        MapApi.ModeView view = modeView;
+        if (view == null) return null;
+        List<Component> lines = safe(() -> view.tooltip(surface, mx, my), null);
+        if (lines == null) return null;
+        List<String> out = new ArrayList<>();
+        for (Component c : lines) out.add(c.getString());
+        return out;
+    }
+
+    /** Вкладка мода или карта (null). */
+    public void setTab(MapApi.@Nullable Tab next) {
+        if (next == tab) return;
+        MapApi.Tab old = tab;
+        if (old != null) safe(() -> {
+            old.closed();
+            return Boolean.TRUE;
+        }, Boolean.TRUE);
+        tab = next;
+        menu = null;
+        if (next != null) safe(() -> {
+            next.opened();
+            return Boolean.TRUE;
+        }, Boolean.TRUE);
+    }
+
+    /** Режим полотна или «Обзор» (null). */
+    public void setMode(MapApi.@Nullable Mode next) {
+        MapApi.ModeView old = modeView;
+        if (old != null) safe(() -> {
+            old.close();
+            return Boolean.TRUE;
+        }, Boolean.TRUE);
+        modeView = null;
+        mode = null;
+        modeMouse = false;
+        if (next != null) {
+            MapApi.ModeView v = safe(() -> next.open(surface), null);
+            if (v != null) {
+                mode = next;
+                modeView = v;
+                selected = null;
+                zoom = Math.max(zoom, minZoom());
+            }
+        }
+    }
+
+    @Override
+    public void removed() {
+        setMode(null);
+        setTab(null);
+        super.removed();
+    }
+
+    /** Для {@link works.repka.rysmap.api.MapApiImpl#openTab}. */
+    public static void openTab(ResourceLocation id) {
+        if (!(Minecraft.getInstance().screen instanceof MapScreen)) open();
+        if (Minecraft.getInstance().screen instanceof MapScreen s)
+            for (MapApi.Tab t : MapApi.tabs()) if (t.id().equals(id) && safeAvailable(t)) s.setTab(t);
+    }
+
+    /** Для {@link works.repka.rysmap.api.MapApiImpl#openMode}. */
+    public static void openMode(ResourceLocation id, MapApi.@Nullable Target at) {
+        if (at != null) open(at);
+        else if (!(Minecraft.getInstance().screen instanceof MapScreen)) open();
+        if (Minecraft.getInstance().screen instanceof MapScreen s) {
+            s.setTab(null);
+            for (MapApi.Mode m : MapApi.modes()) if (m.id().equals(id) && safe(m::available, false)) s.setMode(m);
+        }
+    }
+
+    /** «Обзор | режимы модов» слева сверху полотна (макет {@code 10}); без режимов ничего. */
+    private void modes(GuiGraphics g, Theme t, int mx, int my) {
+        List<MapApi.Mode> list = new ArrayList<>();
+        for (MapApi.Mode m : MapApi.modes()) if (safe(m::available, false)) list.add(m);
+        if (list.isEmpty()) {
+            if (mode != null) setMode(null);
+            return;
+        }
+        int x = cx0 + 6, y = cy0 + 6;
+        String overview = Component.translatable("rysmap.screen.mode.overview").getString();
+        float w = 4 + modePillWidth(overview, mode == null);
+        for (MapApi.Mode m : list) w += 1 + modePillWidth(m.name().getString(), mode == m);
+        int bw = (int) Math.ceil(w), bh = 18;
+        hits.add(x, y, bw, bh, b -> {});
+        if (t.beveled()) t.input(g, x, y, bw, bh, false);
+        else Draw.roundBox(g, x, y, bw, bh, 4.5f, Draw.alpha(t.c("panel.bg"), 0.92f), t.c("panel.border"));
+        int px = x + 2;
+        px += modePill(g, t, px, y + 2, Icons.Shape.COMPASS, overview, mode == null, mx, my, () -> setMode(null)) + 1;
+        for (MapApi.Mode m : list) px += modePill(g, t, px, y + 2, m.icon(), m.name().getString(), mode == m, mx, my, () -> setMode(m)) + 1;
+    }
+
+    private static int modePillWidth(String label, boolean active) {
+        return (int) Math.ceil(Draw.labelWidth(label, 12.5f, active ? Weight.MEDIUM : Weight.REGULAR)) + 12 + 12;
+    }
+
+    private int modePill(GuiGraphics g, Theme t, int x, int y, Icons.Shape icon, String label, boolean active, int mx, int my, Runnable run) {
+        Weight weight = active ? Weight.MEDIUM : Weight.REGULAR;
+        int w = modePillWidth(label, active), h = 14;
+        boolean hot = Kit.over(mx, my, x, y, w, h);
+        if (active) Draw.round(g, x, y, w, h, 4f, t.c("filter.active.bg"));
+        else if (hot) Draw.round(g, x, y, w, h, 4f, Draw.alpha(t.c("filter.active.bg"), 0.5f));
+        int fg = active ? t.c("text.primary") : t.c("text.muted");
+        Icons.draw(g, icon, x + 5, y + 3, 8, fg);
+        Draw.label(g, label, x + 17, y + h / 2f, 12.5f, weight, fg);
+        hits.add(x, y, w, h, b -> run.run());
+        return w;
+    }
+
+    /** Правая панель режима поверх полотна. */
+    private void modePanel(GuiGraphics g, Theme t, int mx, int my) {
+        if (modeView == null) return;
+        MapApi.PanelView pv = safe(modeView::panel, null);
+        if (pv == null) return;
+        int w = pv.width(), x = cx0 + cw - w;
+        hits.add(x, cy0, w, ch, b -> {});
+        Draw.rect(g, x, cy0, w - 1, ch - 1, t.c("panel.bg"));
+        Draw.rect(g, x, cy0, 1, ch - 1, t.c("panel.border"));
+        try {
+            pv.render(g, t, x, cy0, w, ch, hits, mx, my);
+        } catch (Throwable e) {
+            works.repka.rysmap.RYSMap.LOG.error("[rysmap] панель режима упала", e);
+        }
+    }
+
+    /** Полотно для режимов модов: координаты окна, тот же перевод, что у карты. */
+    private final class CanvasSurface implements MapApi.Surface {
+        @Override public ResourceKey<Level> dimension() { return dimension; }
+        @Override public int x() { return cx0; }
+        @Override public int y() { return cy0; }
+        @Override public int width() { return visibleRight() - cx0; }
+        @Override public int height() { return ch; }
+        @Override public double pixelsPerBlock() { return zoom; }
+        @Override public double screenX(double blockX) { return sx(blockX); }
+        @Override public double screenY(double blockZ) { return sy(blockZ); }
+        @Override public double blockX(double screenX) { return MapScreen.this.blockX(screenX); }
+        @Override public double blockZ(double screenY) { return MapScreen.this.blockZ(screenY); }
+
+        @Override
+        public void center(double blockX, double blockZ) {
+            centerX = blockX;
+            centerZ = blockZ;
+        }
+
+        @Override
+        public void zoom(double pixelsPerBlock) {
+            setZoom(pixelsPerBlock);
+        }
+    }
+
     // ---- телепорт и строка сообщения ----
 
     /** Телепорт в столбец карты: место ищет сервер (макет {@code 15b}, этап М8). Отказ приходит строкой сообщения. */
@@ -893,6 +1106,10 @@ public final class MapScreen extends ScaledScreen {
     /** Строка сообщения внизу полотна (макет {@code 24}): значок, заголовок жирным, пояснение, крестик. Одна за раз. */
     private void message(GuiGraphics g, Theme t, int mx, int my) {
         works.repka.rysmap.client.ServerRules.Message m = works.repka.rysmap.client.ServerRules.message();
+        if (m == null && modeView != null) {
+            Component text = safe(modeView::message, null);
+            if (text != null) m = new works.repka.rysmap.client.ServerRules.Message(text, Component.empty());
+        }
         if (m == null) return;
         String title = m.title().getString(), text = m.text().getString();
         float size = 12.5f;
@@ -980,7 +1197,7 @@ public final class MapScreen extends ScaledScreen {
 
     private void zoomAt(double x, double y, int dir) {
         double bx = blockX(x), bz = blockZ(y);
-        zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, dir > 0 ? zoom * 2 : zoom / 2));
+        zoom = Math.max(minZoom(), Math.min(MAX_ZOOM, dir > 0 ? zoom * 2 : zoom / 2));
         // точка под курсором остаётся под курсором
         centerX = bx - (x - cx0 - cw / 2.0) / zoom;
         centerZ = bz - (y - cy0 - ch / 2.0) / zoom;
@@ -991,6 +1208,11 @@ public final class MapScreen extends ScaledScreen {
         if (settings != null) {
             hits.click(x, y, button);
             return true;
+        }
+        if (tab != null) {
+            if (hits.click(x, y, button)) return true;
+            MapApi.Tab current = tab;
+            return safe(() -> current.mouse(x, y, button, MapApi.MouseAction.PRESS), false);
         }
         if (dialog != null) {
             hits.click(x, y, button);
@@ -1016,6 +1238,11 @@ public final class MapScreen extends ScaledScreen {
         }
         if (hits.click(x, y, button)) return true;
         if (!Kit.over(x, y, cx0, cy0, cw, ch)) return super.onClick(x, y, button);
+        MapApi.ModeView view = modeView;
+        if (view != null && x < visibleRight() && safe(() -> view.mouse(surface, x, y, button, MapApi.MouseAction.PRESS), false)) {
+            modeMouse = true;
+            return true;
+        }
         if (button == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
             openMenu((int) x, (int) y);
             return true;
@@ -1030,6 +1257,16 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     protected boolean onRelease(double x, double y, int button) {
+        if (tab != null) {
+            MapApi.Tab current = tab;
+            return safe(() -> current.mouse(x, y, button, MapApi.MouseAction.RELEASE), false);
+        }
+        if (modeMouse) {
+            modeMouse = false;
+            MapApi.ModeView view = modeView;
+            if (view != null) safe(() -> view.mouse(surface, x, y, button, MapApi.MouseAction.RELEASE), false);
+            return true;
+        }
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && dragging) {
             dragging = false;
             if (!dragged) clickMarker(x, y);
@@ -1071,6 +1308,15 @@ public final class MapScreen extends ScaledScreen {
 
     @Override
     protected boolean onDrag(double x, double y, int button, double dx, double dy) {
+        if (tab != null) {
+            MapApi.Tab current = tab;
+            return safe(() -> current.mouse(x, y, button, MapApi.MouseAction.DRAG), false);
+        }
+        if (modeMouse) {
+            MapApi.ModeView view = modeView;
+            if (view != null) safe(() -> view.mouse(surface, x, y, button, MapApi.MouseAction.DRAG), false);
+            return true;
+        }
         if (dragging && button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
             centerX -= dx / zoom;
             centerZ -= dy / zoom;
@@ -1083,6 +1329,14 @@ public final class MapScreen extends ScaledScreen {
     @Override
     protected boolean onScroll(double x, double y, double scrollX, double scrollY) {
         if (settings != null) return settings.scrolled(x, y, scrollY);
+        if (tab != null) {
+            MapApi.Tab current = tab;
+            return safe(() -> current.scroll(x, y, scrollY), false);
+        }
+        if (modeView != null) {
+            MapApi.PanelView pv = safe(modeView::panel, null);
+            if (pv != null && x >= visibleRight() && Kit.over(x, y, cx0, cy0, cw, ch)) return safe(() -> pv.scroll(x, y, scrollY), false);
+        }
         if (dimDrop.scrolled(x, y, scrollY)) return true;
         if (Kit.over(x, y, wx, listTop, SIDEBAR, listBottom - listTop)) {
             listScroll.by((float) (-scrollY * ROW * 2));
@@ -1095,7 +1349,13 @@ public final class MapScreen extends ScaledScreen {
 
     /** Масштаб окна, единиц на блок (автотест, будущая настройка). */
     public void setZoom(double z) {
-        zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+        zoom = Math.max(minZoom(), Math.min(MAX_ZOOM, z));
+    }
+
+    /** Самый мелкий масштаб: режим может не пускать дальше ({@link MapApi.ModeView#minChunkSize()}). */
+    private double minZoom() {
+        float chunk = modeView == null ? 0 : safe(modeView::minChunkSize, 0f);
+        return Math.max(MIN_ZOOM, chunk / 16.0);
     }
 
     /** Для автотеста: меню правой кнопки чуть правее и ниже середины полотна. */
@@ -1118,7 +1378,7 @@ public final class MapScreen extends ScaledScreen {
         }
         if (works.repka.rysmap.client.ServerRules.teleportAllowed()) {
             items.add(MapApi.MenuItem.builder(TELEPORT_ITEM, Component.translatable("rysmap.menu.teleport"))
-                .icon(Icons.Shape.NAV).order(900).run(s -> teleport(s.dimension(), s.x(), s.z())).build());
+                .icon(Icons.Shape.TELEPORT).order(900).run(s -> teleport(s.dimension(), s.x(), s.z())).build());
         }
         items.add(MapApi.MenuItem.builder(ResourceLocation.fromNamespaceAndPath("rysmap", "copy"), Component.translatable("rysmap.menu.copy"))
             .icon(Icons.Shape.COPY).order(1000).run(s -> Minecraft.getInstance().keyboardHandler.setClipboard(s.x() + " " + s.y() + " " + s.z())).build());
@@ -1160,7 +1420,22 @@ public final class MapScreen extends ScaledScreen {
                 }
             }
         }
+        if (tab != null) {
+            MapApi.Tab current = tab;
+            if (safe(() -> current.key(key, scan, modifiers), false)) return true;
+            if (ClientEntry.OPEN.matches(key, scan)) {
+                onClose();
+                return true;
+            }
+            return super.keyPressed(key, scan, modifiers);
+        }
+        MapApi.ModeView view = modeView;
+        if (view != null && safe(() -> view.key(key, scan, modifiers), false)) return true;
         if (dimDrop.keyPressed(key)) return true;
+        if (key == GLFW.GLFW_KEY_ESCAPE && modeView != null && selected == null && menu == null) {
+            setMode(null);
+            return true;
+        }
         if (key == GLFW.GLFW_KEY_ESCAPE && selected != null) {
             selected = null;
             return true;
@@ -1182,6 +1457,15 @@ public final class MapScreen extends ScaledScreen {
             return true;
         }
         return super.keyPressed(key, scan, modifiers);
+    }
+
+    @Override
+    public boolean charTyped(char c, int modifiers) {
+        if (tab != null && settings == null) {
+            MapApi.Tab current = tab;
+            if (safe(() -> current.charTyped(c, modifiers), false)) return true;
+        }
+        return super.charTyped(c, modifiers);
     }
 
     @Override

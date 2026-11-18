@@ -178,5 +178,6 @@
   "rysmap.settings.server.mobs": "Мобы",
   "rysmap.layer.players": "Игроки",
   "rysmap.layer.mobs": "Мобы",
-  "rysmap.entity.team": "Твоя команда"
+  "rysmap.entity.team": "Твоя команда",
+  "rysmap.screen.mode.overview": "Обзор"
 }

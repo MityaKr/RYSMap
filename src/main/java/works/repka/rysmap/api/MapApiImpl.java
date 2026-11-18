@@ -28,6 +28,16 @@ public final class MapApiImpl implements MapApi {
     }
 
     @Override
+    public void openTab(net.minecraft.resources.ResourceLocation tab) {
+        works.repka.rysmap.screen.MapScreen.openTab(tab);
+    }
+
+    @Override
+    public void openMode(net.minecraft.resources.ResourceLocation mode, @Nullable Target at) {
+        works.repka.rysmap.screen.MapScreen.openMode(mode, at);
+    }
+
+    @Override
     public void track(@Nullable Target target) {
         tracked = target;
         trackedPoint = null;

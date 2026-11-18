@@ -178,5 +178,6 @@
   "rysmap.settings.server.mobs": "Mobs",
   "rysmap.layer.players": "Players",
   "rysmap.layer.mobs": "Mobs",
-  "rysmap.entity.team": "Your team"
+  "rysmap.entity.team": "Your team",
+  "rysmap.screen.mode.overview": "Overview"
 }
