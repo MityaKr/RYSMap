@@ -103,7 +103,7 @@ public final class MapServer {
         MapRules r = rules;
         MapNet.send(player, new MapNet.Rules(r.teleport.ordinal(), r.pause, r.minimap, r.caves, r.players != MapRules.Players.NEVER, r.mobs,
             op(player), canTeleport(player), Teleports.pauseLeft(player), PlayerFeed.teamOf(works.repka.ryscore.team.TeamsApi.get(), player.getUUID()) != null,
-            r.players.ordinal()));
+            r.players.ordinal(), r.slime));
     }
 
     /** Правка правил с клиента: только оператор. Новые правила пишутся в файл и уходят всем. */
@@ -122,6 +122,7 @@ public final class MapServer {
         MapRules.Players[] pm = MapRules.Players.values();
         r.players = pm[Math.max(0, Math.min(pm.length - 1, set.playersMode()))];
         r.mobs = set.mobs();
+        if (set.slime() != 0) r.slime = set.slime() == 2;
         rules = r;
         r.save(rulesFile(server));
         RYSMap.LOG.info("[rysmap] {} изменил правила карты: телепорт {}, пауза {} с, миникарта {}, пещеры {}, игроки {}, мобы {}",

@@ -109,6 +109,8 @@ public final class ColorTable implements MapColors {
         while (pending.hasNext()) {
             Block block = pending.next();
             try {
+                int glow = block.defaultBlockState().getLightEmission();
+                if (glow > 0) lightsBuilding.put(BuiltInRegistries.BLOCK.getKey(block).toString(), glow);
                 building.put(block, describe(block));
             } catch (Throwable t) {
                 // модель мода упала на вопросе: блок остаётся видимым, цвет из цвета карты
@@ -126,6 +128,8 @@ public final class ColorTable implements MapColors {
         blocks = java.util.Collections.unmodifiableMap(building);
         byName = java.util.Collections.unmodifiableMap(names);
         building = new IdentityHashMap<>();
+        lights = Map.copyOf(lightsBuilding);
+        lightsBuilding = new HashMap<>();
         pending = null;
         version.incrementAndGet();
         ready = true;
@@ -276,6 +280,16 @@ public final class ColorTable implements MapColors {
         } catch (NumberFormatException ex) {
             return null;
         }
+    }
+
+    /** Блоки, которые светят сами, по имени: свет 1–15 (слой «Свет»). */
+    private volatile Map<String, Integer> lights = Map.of();
+    private Map<String, Integer> lightsBuilding = new HashMap<>();
+
+    @Override
+    public int light(String blockId) {
+        Integer l = lights.get(blockId);
+        return l == null ? 0 : l;
     }
 
     // ---- MapColors для пекаря ----

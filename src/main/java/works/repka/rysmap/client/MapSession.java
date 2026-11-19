@@ -203,6 +203,13 @@ public final class MapSession {
             }
             colorsSeen = colors.version();
         }
+        // слои «Высоты» и «Свет»: пекарь красит иначе, тайлы перепекаются
+        int ov = OverlayLayers.bits();
+        if (ov != works.repka.rysmap.tile.Baker.overlay()) {
+            works.repka.rysmap.tile.Baker.overlay(ov);
+            tiles.invalidate();
+            overview.invalidate();
+        }
         if (ticks % 20 == 0) {
             tiles.tick();
             overview.tick();

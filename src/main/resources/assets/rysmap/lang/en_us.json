@@ -493,5 +493,10 @@
   "rysmap.point.lifetime.2": "1 hour",
   "rysmap.point.lifetime.3": "1 day",
   "rysmap.point.temp_name": "Marker",
-  "rysmap.menu.temp_here": "Marker for 10 minutes"
+  "rysmap.menu.temp_here": "Marker for 10 minutes",
+  "rysmap.layer.slime": "Slime chunks",
+  "rysmap.slime.tip": "Slime chunk: they spawn below Y 40",
+  "rysmap.settings.server.slime": "Slimes",
+  "rysmap.layer.heights": "Heights",
+  "rysmap.layer.light": "Light sources"
 }

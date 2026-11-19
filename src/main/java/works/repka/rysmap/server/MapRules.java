@@ -44,6 +44,8 @@ public final class MapRules {
     public java.util.List<String> teleportDimensions = new java.util.ArrayList<>(java.util.List.of("minecraft:overworld", "minecraft:the_nether"));
     /** Мобы на карте. */
     public boolean mobs = true;
+    /** Слой «Слизни» (0.2.3): сервер считает чанки слизней по сиду, сам сид не отдаёт. */
+    public boolean slime = true;
     /** «Места» (0.2.0-p1, версия файла 2): кто, паузы и числа перемещений. */
     public works.repka.rysmap.places.PlaceRules places = new works.repka.rysmap.places.PlaceRules();
 
@@ -57,6 +59,7 @@ public final class MapRules {
         r.pause = pause;
         r.players = players;
         r.mobs = mobs;
+        r.slime = slime;
         r.teleportDimensions = new java.util.ArrayList<>(teleportDimensions);
         r.places = places.copy();
         return r;
@@ -75,6 +78,7 @@ public final class MapRules {
             if (o.has("playersMode")) r.players = players(o.get("playersMode").getAsString());
             else if (o.has("players")) r.players = o.get("players").getAsBoolean() ? Players.NEAR : Players.NEVER;
             if (o.has("mobs")) r.mobs = o.get("mobs").getAsBoolean();
+            if (o.has("slime")) r.slime = o.get("slime").getAsBoolean();
             if (o.has("teleportDimensions") && o.get("teleportDimensions").isJsonArray()) {
                 r.teleportDimensions = new java.util.ArrayList<>();
                 for (var e : o.getAsJsonArray("teleportDimensions")) r.teleportDimensions.add(e.getAsString());
@@ -96,6 +100,7 @@ public final class MapRules {
         o.addProperty("pause", pause);
         o.addProperty("playersMode", players.name().toLowerCase(java.util.Locale.ROOT));
         o.addProperty("mobs", mobs);
+        o.addProperty("slime", slime);
         com.google.gson.JsonArray dims = new com.google.gson.JsonArray();
         for (String d : teleportDimensions) dims.add(d);
         o.add("teleportDimensions", dims);

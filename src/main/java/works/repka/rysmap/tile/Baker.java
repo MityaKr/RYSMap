@@ -17,11 +17,25 @@ public final class Baker {
         Neighbors NONE = (x, z) -> RegionData.NO_HEIGHT;
     }
 
+    /** Слои подсветки поверх цвета (0.2.3): бит {@link #HEIGHTS} высоты горизонталями, бит {@link #LIGHT} источники света. */
+    public static final int HEIGHTS = 1, LIGHT = 2;
+    private static volatile int overlay;
+
+    /** Ставит главный поток по видимости слоёв «Высоты» и «Свет»; после смены тайлы перепекаются. */
+    public static void overlay(int bits) {
+        overlay = bits;
+    }
+
+    public static int overlay() {
+        return overlay;
+    }
+
     private final MapColors colors;
     private Palette palette;
     private long version = Long.MIN_VALUE;
     private int[] blockArgb = new int[0], blockTint = new int[0];
     private boolean[] blockUnknown = new boolean[0];
+    private int[] blockLight = new int[0];
     private int[] grass = new int[0], foliage = new int[0], water = new int[0];
 
     public Baker(MapColors colors) {
@@ -78,17 +92,53 @@ public final class Baker {
             default -> multiply(base, tint);
         };
         int depth = RegionData.water(flags);
+        int ov = overlay;
         if (depth == 0) {
             // рельеф по двум соседям, западу и северу (скептик: от одного северо-западного карта плоская)
             int hw = neighborHeight(r, n, lx - 1, lz), hn = neighborHeight(r, n, lx, lz - 1);
             int dh = (hw == RegionData.NO_HEIGHT ? 0 : h - hw) + (hn == RegionData.NO_HEIGHT ? 0 : h - hn);
             rgb = shade(rgb, dh);
+            if ((ov & HEIGHTS) != 0) rgb = heights(rgb, h, hw, hn);
         } else {
             int surface = multiply(colors.waterTexture(), at(water, biome));
             float t = depth == RegionData.WATER_UNKNOWN ? 0.75f : Math.min(0.9f, 0.62f + depth * 0.025f);
             rgb = mix(rgb, surface, t);
         }
+        if ((ov & LIGHT) != 0) rgb = light(rgb, !unknown && block < blockLight.length ? blockLight[block] : 0);
         return toAbgr(rgb);
+    }
+
+    /** Шаг горизонталей слоя «Высоты», блоки. */
+    static final int CONTOUR = 8;
+
+    /**
+     * Слой «Высоты»: цвет высоты (низины синие, равнины зелёные, холмы жёлтые, горы бурые, вершины белые) поверх цвета блока
+     * и горизонталь через каждые {@link #CONTOUR} блоков: пиксель темнее там, где сосед с запада или севера в другом поясе.
+     */
+    static int heights(int rgb, int h, int hw, int hn) {
+        int band = Math.floorDiv(h, CONTOUR);
+        boolean line = hw != RegionData.NO_HEIGHT && Math.floorDiv(hw, CONTOUR) != band || hn != RegionData.NO_HEIGHT && Math.floorDiv(hn, CONTOUR) != band;
+        int c = mix(rgb, heightColor(h), 0.5f);
+        return line ? mix(c, 0x000000, 0.45f) : c;
+    }
+
+    /** Цвет высоты от 0 до 255 по высоте блока. */
+    static int heightColor(int h) {
+        int[] stops = {-64, 0x2B4C8C, 40, 0x3E7FBF, 63, 0x4FA35A, 90, 0xB8C24A, 130, 0xC98A3E, 180, 0x8C5A3A, 240, 0xF2F2F2};
+        if (h <= stops[0]) return stops[1];
+        for (int i = 2; i < stops.length; i += 2) {
+            if (h <= stops[i]) {
+                float t = (h - stops[i - 2]) / (float) (stops[i] - stops[i - 2]);
+                return mix(stops[i - 1], stops[i + 1], t);
+            }
+        }
+        return stops[stops.length - 1];
+    }
+
+    /** Слой «Свет»: блок, который светит сам, ярко-жёлтый тем ярче, чем сильнее свет; остальное приглушено. */
+    static int light(int rgb, int glow) {
+        if (glow <= 0) return mix(rgb, 0x101418, 0.45f);
+        return mix(rgb, 0xFFE45A, 0.55f + 0.03f * glow);
     }
 
     /** Светлая полоса штриховки неизвестного блока: тот же цвет, на пятую часть к белому. */
@@ -112,6 +162,7 @@ public final class Baker {
             blockArgb = new int[0];
             blockTint = new int[0];
             blockUnknown = new boolean[0];
+            blockLight = new int[0];
             grass = foliage = water = new int[0];
         }
         if (blockArgb.length < p.blockCount()) {
@@ -119,8 +170,10 @@ public final class Baker {
             blockArgb = Arrays.copyOf(blockArgb, p.blockCount());
             blockTint = Arrays.copyOf(blockTint, p.blockCount());
             blockUnknown = Arrays.copyOf(blockUnknown, p.blockCount());
+            blockLight = Arrays.copyOf(blockLight, p.blockCount());
             for (int id = from; id < p.blockCount(); id++) {
                 String name = p.blockName(id);
+                blockLight[id] = colors.light(name);
                 int c = colors.block(name);
                 blockUnknown[id] = c == 0;
                 blockArgb[id] = c == 0 ? colors.unknown() : c;

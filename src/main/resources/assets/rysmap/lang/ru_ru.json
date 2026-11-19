@@ -493,5 +493,10 @@
   "rysmap.point.lifetime.2": "1 час",
   "rysmap.point.lifetime.3": "1 день",
   "rysmap.point.temp_name": "Метка",
-  "rysmap.menu.temp_here": "Метка на 10 минут"
+  "rysmap.menu.temp_here": "Метка на 10 минут",
+  "rysmap.layer.slime": "Слизни",
+  "rysmap.slime.tip": "Чанк слизней: появляются ниже Y 40",
+  "rysmap.settings.server.slime": "Слизни",
+  "rysmap.layer.heights": "Высоты",
+  "rysmap.layer.light": "Свет"
 }

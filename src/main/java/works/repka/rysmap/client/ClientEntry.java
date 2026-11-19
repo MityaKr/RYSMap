@@ -67,6 +67,8 @@ public final class ClientEntry {
         MapApi.provide(new MapApiImpl());
         works.repka.rysmap.point.PointsLayer.register();
         PlacesLayer.register();
+        MapApi.get().layer(new SlimeLayer());
+        OverlayLayers.register();
         PlaceActions.register();
         works.repka.rysmap.hud.Entities.register();
         PingsLayer.register();
@@ -227,6 +229,7 @@ public final class ClientEntry {
         Layers.clear();
         ServerRules.reset();
         PlacesClient.reset();
+        SlimeLayer.clear();
         PingsLayer.clear();
         works.repka.rysmap.compat.Waystones.clear();
         works.repka.rysmap.hud.MobHeads.clear();

@@ -70,6 +70,11 @@ public final class ServerRules {
         return rules == null || rules.playersMode() != 0;
     }
 
+    /** Слой «Слизни»: только с серверной частью RYSMap 0.2.3 (сид знает сервер), если оператор не выключил. */
+    public static boolean slimeAllowed() {
+        return rules != null && rules.slime();
+    }
+
     public static boolean mobsAllowed() {
         return rules == null || rules.mobs();
     }
@@ -212,6 +217,13 @@ public final class ServerRules {
 
     /** Оператор меняет правила сервера. */
     public static void setRules(int teleport, int pause, boolean minimap, boolean caves, int playersMode, boolean mobs) {
-        sendToServer(new MapNet.SetRules(teleport, pause, minimap, caves, playersMode != 0, mobs, playersMode));
+        sendToServer(new MapNet.SetRules(teleport, pause, minimap, caves, playersMode != 0, mobs, playersMode, rules == null ? 0 : rules.slime() ? 2 : 1));
+    }
+
+    /** Оператор включает или выключает слой «Слизни». */
+    public static void setSlime(boolean on) {
+        MapNet.Rules r = rules;
+        if (r == null) return;
+        sendToServer(new MapNet.SetRules(r.teleport(), r.pause(), r.minimap(), r.caves(), r.playersMode() != 0, r.mobs(), r.playersMode(), on ? 2 : 1));
     }
 }

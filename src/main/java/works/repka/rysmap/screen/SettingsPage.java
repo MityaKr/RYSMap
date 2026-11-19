@@ -352,9 +352,11 @@ final class SettingsPage {
         y += 10;
         label(g, t, "rysmap.settings.server.maps", null, lx, y);
         pills(g, t, hits, lx + lw, y, new String[]{Component.translatable("rysmap.settings.server.minimap").getString(),
-            Component.translatable("rysmap.settings.server.caves").getString()}, new boolean[]{r.minimap(), r.caves()}, mx, my, i -> {
+            Component.translatable("rysmap.settings.server.caves").getString(), Component.translatable("rysmap.settings.server.slime").getString()},
+            new boolean[]{r.minimap(), r.caves(), r.slime()}, mx, my, i -> {
             if (i == 0) send(r, r.teleport(), r.pause(), !r.minimap(), r.caves(), r.playersMode(), r.mobs());
-            else send(r, r.teleport(), r.pause(), r.minimap(), !r.caves(), r.playersMode(), r.mobs());
+            else if (i == 1) send(r, r.teleport(), r.pause(), r.minimap(), !r.caves(), r.playersMode(), r.mobs());
+            else works.repka.rysmap.client.ServerRules.setSlime(!r.slime());
         });
         y += ROW;
         label(g, t, "rysmap.settings.server.players", "rysmap.settings.server.players.note", lx, y);
