@@ -378,20 +378,30 @@ public final class MapScreen extends ScaledScreen {
         y += 15;
         listTop = y;
         listBottom = footer - 1;
-        List<PointStore.Point> mine = new ArrayList<>(), deaths = new ArrayList<>();
         String dim = dimension.location().toString();
-        for (PointStore.Point p : s.points().points()) {
-            if (!p.dimension.equals(dim)) continue;
-            (p.death() ? deaths : mine).add(p);
-        }
         LocalPlayer player = Minecraft.getInstance().player;
-        Comparator<PointStore.Point> near = Comparator.comparingDouble(p -> distance(player, p));
-        mine.sort(switch (listSort) {
-            case 1 -> Comparator.comparing((PointStore.Point p) -> PointsLayer.name(p).toLowerCase(java.util.Locale.ROOT));
-            case 2 -> Comparator.comparingLong((PointStore.Point p) -> p.created).reversed();
-            default -> near;
-        });
-        deaths.sort(Comparator.comparingLong((PointStore.Point p) -> p.created).reversed());
+        // список точек сортируется по ревизии точек, измерению, порядку и (для «ближе») клетке игрока 8×8,
+        // а не каждый кадр (разбор логики 19.11, п. 9)
+        long cell = player == null ? 0 : ((long) (player.getBlockX() >> 3) << 32) ^ (player.getBlockZ() >> 3);
+        java.util.List<Object> listKey = java.util.List.of(s.points().revision(), s.points().hashCode(), dim, listSort, listSort == 0 ? cell : 0L);
+        if (!listKey.equals(pointListKey)) {
+            List<PointStore.Point> m = new ArrayList<>(), dd = new ArrayList<>();
+            for (PointStore.Point p : s.points().points()) {
+                if (!p.dimension.equals(dim)) continue;
+                (p.death() ? dd : m).add(p);
+            }
+            Comparator<PointStore.Point> near = Comparator.comparingDouble(p -> distance(player, p));
+            m.sort(switch (listSort) {
+                case 1 -> Comparator.comparing((PointStore.Point p) -> PointsLayer.name(p).toLowerCase(java.util.Locale.ROOT));
+                case 2 -> Comparator.comparingLong((PointStore.Point p) -> p.created).reversed();
+                default -> near;
+            });
+            dd.sort(Comparator.comparingLong((PointStore.Point p) -> p.created).reversed());
+            pointListMine = m;
+            pointListDeaths = dd;
+            pointListKey = listKey;
+        }
+        List<PointStore.Point> mine = pointListMine, deaths = pointListDeaths;
         List<Object> placeRows = placeRows();
         int content = placeRowsHeight(placeRows);
         if (!mine.isEmpty()) content += 10 + mine.size() * ROW;
@@ -425,6 +435,9 @@ public final class MapScreen extends ScaledScreen {
         }
         if (compact()) g.pose().popPose();
     }
+
+    private @Nullable Object pointListKey;
+    private List<PointStore.Point> pointListMine = List.of(), pointListDeaths = List.of();
 
     private float group(GuiGraphics g, Theme t, String title, List<PointStore.Point> points, int x0, int rw, float y, @Nullable LocalPlayer player, int mx, int my) {
         if (points.isEmpty()) return y;

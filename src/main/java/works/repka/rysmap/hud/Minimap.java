@@ -384,7 +384,25 @@ public final class Minimap {
 
     private record Line(int dot, Icons.Shape icon, String text, boolean coords) {}
 
+    private static List<Line> cachedLines = List.of();
+    private static long linesAt = Long.MIN_VALUE;
+    private static int linesHeight;
+
+    /**
+     * Строки под миникартой собираются раз в 5 тиков, а не каждый кадр (разбор логики 19.11, п. 9): строки модов, этаж,
+     * путь. Координаты в первой строке рисуются из игрока каждый кадр.
+     */
     private static List<Line> lines(Minecraft mc, LocalPlayer p) {
+        long now = mc.level == null ? 0 : mc.level.getGameTime();
+        if (now - linesAt >= 5 || now < linesAt || UiScale.height() != linesHeight) {
+            cachedLines = buildLines(mc, p);
+            linesAt = now;
+            linesHeight = UiScale.height();
+        }
+        return cachedLines;
+    }
+
+    private static List<Line> buildLines(Minecraft mc, LocalPlayer p) {
         List<Line> out = new ArrayList<>();
         out.add(new Line(0, null, "", true));
         // маленькое окно (макет 07): миникарта S и под ней одна строка
