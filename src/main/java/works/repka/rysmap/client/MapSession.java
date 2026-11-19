@@ -622,10 +622,14 @@ public final class MapSession {
         }
     }
 
-    /** Сам чанк и соседи с востока и юга: их тень смотрит на этот чанк. */
+    /**
+     * Сам чанк и соседи с востока и юга: их тень (и горизонтали «Высот») смотрит на запад и север, то есть на этот чанк.
+     * Юго-восточный сосед смотрит на восточного и южного, не на этот: его не печём (разбор логики 19.11, п. 1).
+     */
     private void patches(DimensionMap d, String id, int chunkX, int chunkZ) {
         for (int dz = 0; dz <= 1; dz++) {
             for (int dx = 0; dx <= 1; dx++) {
+                if (dx == 1 && dz == 1) continue;
                 int[] px = d.bakeChunk(chunkX + dx, chunkZ + dz);
                 if (px != null && (dx == 0 && dz == 0 || hasChunk(d, chunkX + dx, chunkZ + dz)))
                     results.add(new TileTextures.Patch(id, chunkX + dx, chunkZ + dz, px));
