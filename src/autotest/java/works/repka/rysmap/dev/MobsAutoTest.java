@@ -112,13 +112,15 @@ final class MobsAutoTest {
             long us = Minimap.frameMicrosAndReset();
             long surface = mobs(around(null));
             RYSMap.LOG.info("[autotest] замер кадра миникарты с толпой ({} мобов на поверхности): {} мкс", surface, us);
-            check("с поверхности (±16 от игрока) видна ферма, но не пещера: " + surface, surface >= 190 && surface <= 200);
+            // ферма 200 и естественные мобы мира в ±16 блоков (ночь 19.11: 205); что пещера не видна, проверяет «Все слои» ниже
+            check("с поверхности (±16 от игрока) видна ферма: " + surface, surface >= 190 && surface <= 230);
             check("кадр миникарты с толпой дешевле 2 мс: " + us + " мкс", us < 2000);
             long cave = mobs(around(Floors.of(-30)));
             check("на этаже пещеры только мобы пещеры: " + cave, cave == 2);
             ClientConfig.get().mobsRange = 0;
             long all = mobs(around(null));
             check("«Все слои»: видны все: " + all, all >= 200);
+            check("с поверхности пещера не видна: все слои " + all + ", поверхность " + surface + ", пещера " + cave, all >= surface + cave);
             ClientConfig.get().mobsRange = 16;
             ClientConfig.get().mobsHostile = false;
             long peaceful = mobs(around(null));

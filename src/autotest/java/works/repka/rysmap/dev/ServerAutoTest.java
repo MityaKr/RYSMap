@@ -46,7 +46,8 @@ import works.repka.rysmap.screen.MapScreen;
  */
 final class ServerAutoTest {
     private static JsonObject plan;
-    private static int breakTicks;
+    private static int breakTicks;
+    private static String digDeny = "";
     private static BlockState leverBefore;
 
     private ServerAutoTest() {}
@@ -212,8 +213,10 @@ final class ServerAutoTest {
                 check("окно «Земля» открылось: " + e, false);
             }
         }, 60);
-        step("land screen check", () -> check("окно «Земля» открыто: " + (mc().screen == null ? "нет" : mc().screen.getClass().getSimpleName()),
-            mc().screen != null && mc().screen.getClass().getSimpleName().equals("LandScreen")), 2);
+        // с RYSClaims 0.0.18 (З7) «Земля» при RYSMap это вкладка окна карты, своё окно только без карты
+        step("land screen check", () -> check("«Земля» открыта вкладкой карты: " + (mc().screen == null ? "нет" : mc().screen.getClass().getSimpleName())
+            + (mc().screen instanceof MapScreen m ? " " + m.tabForTest() : ""),
+            mc().screen instanceof MapScreen m && m.tabForTest().equals("rysclaims:land")), 2);
         shot("land_screen");
         step("map", () -> {
             mc().setScreen(null);
@@ -270,17 +273,20 @@ final class ServerAutoTest {
             clearDeny();
             aimFrom("planks", planks, 0.5);
             breakTicks = 0;
+            digDeny = "";
         }, 20);
         when("dig planks", () -> {
             if (breakTicks == 0) mc().gameMode.startDestroyBlock(planks, Direction.NORTH);
             else mc().gameMode.continueDestroyBlock(planks, Direction.NORTH);
             mc().player.swing(InteractionHand.MAIN_HAND);
+            if (!denyText().isEmpty()) digDeny = denyText();
             return ++breakTicks >= 120;
         }, () -> mc().gameMode.stopDestroyBlock(), 20);
         shot("planks_denied");
         step("planks check", () -> {
             check("доски на чужой земле целы после 6 секунд копания: " + mc().level.getBlockState(planks), mc().level.getBlockState(planks).is(net.minecraft.world.level.block.Blocks.OAK_PLANKS));
-            check("замок у прицела после копания: «" + denyText() + "»", !denyText().isEmpty());
+            // замок горит, пока игрок упирается в отказ, и гаснет вскоре после; смотрим, был ли он во время копания
+            check("замок у прицела во время копания: «" + digDeny + "»", !digDeny.isEmpty());
         }, 2);
         step("aim chest", () -> {
             clearDeny();

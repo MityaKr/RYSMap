@@ -306,7 +306,7 @@ final class FixesAutoTest {
         shot("hud_neighbors");
         step("neighbors back", () -> MapScreen.open(), 20);
         step("highlight", () -> {
-            screen().keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0);
+            // night-1119: Esc на только что открытой карте закрывал само окно (нечего было закрывать)
             screen().setZoom(1);
             var biome = mc().level.getBiome(mc().player.blockPosition()).unwrapKey().orElseThrow();
             MapApi.get().highlight(MapApi.Highlight.builder(ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "autotest_hl"),
@@ -331,7 +331,7 @@ final class FixesAutoTest {
         shot("map_list");
         step("list back", () -> screen().listForTest(false, 0), 2);
         step("settings", () -> {
-            screen().keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0);
+            // night-1119: Esc после закрытого списка закрывал окно карты
             screen().settingsForTest();
         }, 20);
         shot("settings_server");
@@ -383,8 +383,10 @@ final class FixesAutoTest {
         shot("compact_hud");
         step("big again", () -> org.lwjgl.glfw.GLFW.glfwSetWindowSize(mc().getWindow().getWindow(), 1280, 800), 30);
         step("teleport", () -> {
-            tpX = baseX + 300;
-            tpZ = baseZ + 300;
+            int[] land = landTarget(baseX + 300, baseZ + 300);
+            tpX = land[0];
+            tpZ = land[1];
+            RYSMap.LOG.info("[autotest] цель телепорта на суше: {} {}", land[0], land[1]);
             mc().player.getAbilities().flying = false;
             mc().player.onUpdateAbilities();
             ServerRules.teleport(Level.OVERWORLD, (int) tpX, SafeSpot.NO_HINT, (int) tpZ);
@@ -395,7 +397,9 @@ final class FixesAutoTest {
             RYSMap.LOG.info("[autotest] телепорт: игрок {} {} {}, до столбца {} блоков, на земле {}", p.getX(), p.getY(), p.getZ(), d, p.onGround());
             check("телепорт в неразведанное место: рядом со столбцом (" + Math.round(d) + " бл.)", d <= SafeSpot.RADIUS + 1);
             check("стоит на земле, не в воде и не в лаве", p.onGround() && !p.isInWater() && !p.isInLava());
-            check("сообщения об отказе нет", ServerRules.message() == null);
+            var tm = ServerRules.message();
+            if (tm != null) RYSMap.LOG.info("[autotest] строка сообщения после телепорта: {} {}", tm.title().getString(), tm.text().getString());
+            check("сообщения об отказе нет", tm == null);
         }, 20);
         shot("teleported");
         step("whats new", () -> works.repka.rysmap.screen.WhatsNewScreen.openForTest(13, 340), 20);
@@ -405,5 +409,30 @@ final class FixesAutoTest {
             RYSMap.LOG.info(MapAutoTest.failures == 0 ? "[autotest] PASS" : "[autotest] FAILED: {}", MapAutoTest.failures);
             mc().stop();
         }, 0);
+    }
+    /**
+     * Цель телепорта на суше в неразведанном месте (ночные проверки 19.11: в мире с зерном 42 у базы +300 океан, мод
+     * правильно отказывал). Биом берётся шумом генератора, чанки не грузятся: идём от точки на восток, пока сам столбец и
+     * четыре точки вокруг на 32 блока не окажутся не океаном, не рекой, не пляжем и не болотом.
+     */
+    private static int[] landTarget(int x0, int z0) {
+        var level = mc().getSingleplayerServer().overworld();
+        var chunks = level.getChunkSource();
+        var sampler = chunks.randomState().sampler();
+        var biomes = chunks.getGenerator().getBiomeSource();
+        for (int d = 0; d <= 4000; d += 32) {
+            int x = x0 + d, z = z0;
+            boolean land = true;
+            for (int[] o : new int[][] {{0, 0}, {32, 0}, {-32, 0}, {0, 32}, {0, -32}}) {
+                var b = biomes.getNoiseBiome((x + o[0]) >> 2, 64 >> 2, (z + o[1]) >> 2, sampler);
+                if (b.is(net.minecraft.tags.BiomeTags.IS_OCEAN) || b.is(net.minecraft.tags.BiomeTags.IS_RIVER) || b.is(net.minecraft.tags.BiomeTags.IS_BEACH)
+                    || b.is(net.minecraft.world.level.biome.Biomes.SWAMP) || b.is(net.minecraft.world.level.biome.Biomes.MANGROVE_SWAMP)) {
+                    land = false;
+                    break;
+                }
+            }
+            if (land) return new int[] {x, z};
+        }
+        return new int[] {x0, z0};
     }
 }
