@@ -131,24 +131,23 @@ public final class WorldLabels {
             int k = PLAN.add(SPOT_GOAL, distance(x, y, z), LabelPlan.PINNED);
             put(k, x, y, z, Icons.Shape.TARGET, GOAL_COLOR, true, target);
         }
-        // подписи модов семьи через ядро (world.Labels, 1.12): пинги и тревоги закреплены, «always» видны в любом режиме
-        for (works.repka.ryscore.world.Labels.Source src : works.repka.ryscore.world.Labels.sources()) {
-            java.util.Collection<works.repka.ryscore.world.Labels.Label> list;
-            try {
-                list = src.labels(mc.player.level().dimension());
-            } catch (Throwable e) {
-                continue;
-            }
-            for (works.repka.ryscore.world.Labels.Label l : list) {
-                if (!l.dimension().location().toString().equals(dim)) continue;
-                var kind = l.kind();
-                boolean pin = kind == works.repka.ryscore.world.Labels.Kind.PING || kind == works.repka.ryscore.world.Labels.Kind.ALERT
-                    || kind == works.repka.ryscore.world.Labels.Kind.GOAL;
-                int flag = (pin ? LabelPlan.PINNED : 0) | (l.always() ? LabelPlan.ALWAYS : 0);
-                int k = PLAN.add(l.id(), distance(l.x(), l.y(), l.z()), flag);
-                Icons.Shape icon = l.icon() != null ? l.icon() : l.head() != null ? Icons.Shape.USERS : Icons.Shape.DOT;
-                put(k, l.x(), l.y(), l.z(), icon, l.color(), kind == works.repka.ryscore.world.Labels.Kind.GOAL, l);
-            }
+        // подписи модов семьи через ядро: с 1.15 готовый отбор Labels.visible (общий лимит ближних, одна отсечка по
+        // дальности подписей игрока, пинги любого мода источником ядра); пинги и тревоги закреплены, «always» видны всегда
+        works.repka.ryscore.world.Labels.setCutoff(c.labelRange);
+        java.util.List<works.repka.ryscore.world.Labels.Label> mods;
+        try {
+            mods = works.repka.ryscore.world.Labels.visible(mc.player.level().dimension(), mc.player.getX(), mc.player.getY(), mc.player.getZ());
+        } catch (Throwable e) {
+            mods = java.util.List.of();
+        }
+        for (works.repka.ryscore.world.Labels.Label l : mods) {
+            var kind = l.kind();
+            boolean pin = kind == works.repka.ryscore.world.Labels.Kind.PING || kind == works.repka.ryscore.world.Labels.Kind.ALERT
+                || kind == works.repka.ryscore.world.Labels.Kind.GOAL;
+            int flag = (pin ? LabelPlan.PINNED : 0) | (l.always() ? LabelPlan.ALWAYS : 0);
+            int k = PLAN.add(l.id(), distance(l.x(), l.y(), l.z()), flag);
+            Icons.Shape icon = l.icon() != null ? l.icon() : l.head() != null ? Icons.Shape.USERS : Icons.Shape.DOT;
+            put(k, l.x(), l.y(), l.z(), icon, l.color(), kind == works.repka.ryscore.world.Labels.Kind.GOAL, l);
         }
         PLAN.choose(LabelPlan.Mode.of(c.worldLabels), c.labelRange, c.labelLimit, ClientEntry.SHOW_POINTS.isDown());
         if (PLAN.chosenCount() == 0) return false;
@@ -246,6 +245,12 @@ public final class WorldLabels {
             }
         }
         if (goals[i]) Draw.round(g, x - r - 2f, y - r - 2f, 2 * r + 4f, 2 * r + 4f, r + 2f, Draw.alpha(0x60F7F8FB, alpha));
+        if (sources[i] instanceof works.repka.ryscore.world.Labels.Label l && l.ring()) {
+            // кольцо пинга (ядро 1.15): мягко дышит цветом метки
+            float pulse = 0.5f + 0.5f * (float) Math.sin(System.currentTimeMillis() / 220.0);
+            float rr = r + 2.5f + 2.5f * pulse;
+            Draw.round(g, x - rr, y - rr, 2 * rr, 2 * rr, rr, Draw.alpha(colors[i], alpha * (0.45f - 0.25f * pulse)));
+        }
         Draw.round(g, x - r - 0.75f, y - r - 0.75f, 2 * r + 1.5f, 2 * r + 1.5f, r + 0.75f, Draw.alpha(RIM, alpha));
         Draw.round(g, x - r, y - r, 2 * r, 2 * r, r, Draw.alpha(colors[i], alpha));
         float is = 6.5f * scale;

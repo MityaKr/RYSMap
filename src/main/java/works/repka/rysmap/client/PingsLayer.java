@@ -31,12 +31,22 @@ public final class PingsLayer implements MapApi.Layer {
     }
 
     public static void add(MapNet.PingShow p) {
+        for (Entry e : PINGS) if (e.ping().by().equals(p.by())) works.repka.ryscore.world.Labels.removePing(e.id());
         PINGS.removeIf(e -> e.ping().by().equals(p.by())); // у игрока один пинг: новый заменяет прежний
-        PINGS.add(new Entry(p, System.currentTimeMillis(), UUID.randomUUID()));
+        Entry entry = new Entry(p, System.currentTimeMillis(), UUID.randomUUID());
+        PINGS.add(entry);
         revision++;
+        // в мире пинг рисуется подписью с кольцом через ядро (1.15): тот же срок, что на карте
+        ResourceLocation dim = ResourceLocation.tryParse(p.dimension());
+        if (dim != null) works.repka.ryscore.world.Labels.ping(works.repka.ryscore.world.Labels.Label.builder(entry.id())
+            .pos(ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, dim), p.x() + 0.5, p.y() + 1.0, p.z() + 0.5)
+            .kind(works.repka.ryscore.world.Labels.Kind.PING).icon(Icons.Shape.BELL).color(p.color())
+            .text(Component.literal(p.name() + " · " + Component.translatable("rysmap.ping.kind." + p.kind()).getString()))
+            .ring(true).lifetime(LIFE_MS / 1000.0).build());
     }
 
     public static void clear() {
+        for (Entry e : PINGS) works.repka.ryscore.world.Labels.removePing(e.id());
         PINGS.clear();
         revision++;
     }
@@ -50,7 +60,10 @@ public final class PingsLayer implements MapApi.Layer {
     public long revision() {
         long now = System.currentTimeMillis();
         if (PINGS.removeIf(e -> now - e.at() > LIFE_MS)) revision++;
-        return revision;
+        // пинги других модов через ядро (Labels.ping, 1.15): ревизия по их набору
+        long foreign = 0;
+        for (works.repka.ryscore.world.Labels.Label l : works.repka.ryscore.world.Labels.pings()) foreign = foreign * 31 + l.id().hashCode();
+        return revision * 1_000_003L + foreign;
     }
 
     @Override
@@ -65,6 +78,16 @@ public final class PingsLayer implements MapApi.Layer {
                 .icon(Icons.Shape.BELL).color(p.color()).label(Component.literal(p.name())).note(kind)
                 .click(() -> MapApi.get().track(MapApi.Target.builder(dimension, p.x() + 0.5, p.y(), p.z() + 0.5)
                     .label(Component.literal(p.name())).build()))
+                .build());
+        }
+        // пинги других модов через ядро; свои уже выше
+        java.util.Set<UUID> own = new java.util.HashSet<>();
+        for (Entry e : PINGS) own.add(e.id());
+        for (works.repka.ryscore.world.Labels.Label l : works.repka.ryscore.world.Labels.pings()) {
+            if (own.contains(l.id()) || !l.dimension().equals(dimension)) continue;
+            out.add(MapApi.Marker.builder(l.id()).pos(dimension, l.x(), l.y(), l.z()).kind(MapApi.Kind.PING)
+                .icon(l.icon() != null ? l.icon() : Icons.Shape.BELL).color(l.color()).label(l.text())
+                .click(() -> MapApi.get().track(MapApi.Target.builder(dimension, l.x(), l.y(), l.z()).label(l.text()).build()))
                 .build());
         }
         return out;
