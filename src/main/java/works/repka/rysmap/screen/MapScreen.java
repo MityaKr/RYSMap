@@ -2068,6 +2068,52 @@ public final class MapScreen extends ScaledScreen {
         return y;
     }
 
+    /**
+     * Экспорт в PNG (0.2.4): видимая часть полотна или вся разведанная карта измерения. Файл в
+     * {@code screenshots/rysmap/}, по готовности уведомление, клик открывает папку.
+     */
+    void exportPng(boolean all) {
+        MapSession s = ClientEntry.session();
+        if (s == null) return;
+        String dim = dimension.location().toString();
+        int[] box;
+        if (all) {
+            box = s.exploredBounds(dim);
+            if (box == null) {
+                works.repka.ryscore.ui.Notice.row(works.repka.ryscore.ui.Notice.MAP, "export").icon(Icons.Shape.MAP)
+                    .title(Component.translatable("rysmap.export.empty").getString()).show();
+                return;
+            }
+        } else {
+            box = new int[]{(int) Math.floor(blockX(cx0)), (int) Math.floor(blockZ(cy0)), (int) Math.floor(blockX(visibleRight())) - 1,
+                (int) Math.floor(blockZ(cy0 + ch)) - 1};
+        }
+        works.repka.rysmap.tile.MapExport.Plan plan = works.repka.rysmap.tile.MapExport.plan(box[0], box[1], box[2], box[3], works.repka.rysmap.tile.MapExport.MAX);
+        String world = s.store.key().name().replaceAll("[^\\p{L}\\p{N}._-]+", "_");
+        String time = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
+        java.nio.file.Path dir = Minecraft.getInstance().gameDirectory.toPath().resolve("screenshots").resolve("rysmap");
+        java.nio.file.Path file = dir.resolve(world + "-" + dimension.location().getPath().replace('/', '_') + "-" + time + ".png");
+        works.repka.ryscore.ui.Notice.row(works.repka.ryscore.ui.Notice.MAP, "export").icon(Icons.Shape.SAVE)
+            .title(Component.translatable("rysmap.export.started", plan.width(), plan.height()).getString()).show();
+        s.exportPng(dim, plan, file).whenComplete((path, err) -> Minecraft.getInstance().execute(() -> {
+            if (err != null) {
+                works.repka.rysmap.RYSMap.LOG.warn("[rysmap] экспорт не записался: {}", err.toString());
+                works.repka.ryscore.ui.Notice.row(works.repka.ryscore.ui.Notice.MAP, "export").icon(Icons.Shape.WARN)
+                    .title(Component.translatable("rysmap.export.failed").getString()).bad().show();
+                return;
+            }
+            works.repka.rysmap.RYSMap.LOG.info("[rysmap] экспорт карты: {}", path);
+            works.repka.ryscore.ui.Notice.card(works.repka.ryscore.ui.Notice.MAP, "export").icon(Icons.Shape.SAVE)
+                .title(Component.translatable("rysmap.export.done").getString()).lines(path.getFileName().toString())
+                .action(() -> net.minecraft.Util.getPlatform().openFile(dir.toFile())).millis(8000).show();
+        }));
+    }
+
+    /** Для автотеста: экспорт вида. */
+    public void exportForTest(boolean all) {
+        exportPng(all);
+    }
+
     public void openMenuForTest() {
         openMenu(cx0 + cw / 2 + 30, cy0 + ch / 2 + 20);
     }
@@ -2095,6 +2141,8 @@ public final class MapScreen extends ScaledScreen {
             items.add(MapApi.MenuItem.builder(TELEPORT_ITEM, Component.translatable("rysmap.menu.teleport"))
                 .icon(Icons.Shape.TELEPORT).order(900).run(s -> teleport(s.dimension(), s.x(), s.z())).build());
         }
+        items.add(MapApi.MenuItem.builder(ResourceLocation.fromNamespaceAndPath("rysmap", "export_view"), Component.translatable("rysmap.menu.export"))
+            .icon(Icons.Shape.SAVE).order(990).run(s -> exportPng(false)).build());
         items.add(MapApi.MenuItem.builder(ResourceLocation.fromNamespaceAndPath("rysmap", "copy"), Component.translatable("rysmap.menu.copy"))
             .icon(Icons.Shape.COPY).order(1000).run(s -> Minecraft.getInstance().keyboardHandler.setClipboard(s.x() + " " + s.y() + " " + s.z())).build());
         menu = new Menu(x, y, spot, items);

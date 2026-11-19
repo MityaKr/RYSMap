@@ -269,6 +269,31 @@ final class PlacesAutoTest {
             check("список мест сервера в колесе: " + (list == null ? 0 : list.list().size()), list != null && list.list().size() == placesAfterFirst);
             mc().setScreen(null);
         }, 10);
+        // экспорт вида в PNG (0.2.4) и слои подсветки
+        step("export", () -> {
+            MapScreen.open();
+        }, 20);
+        step("export run", () -> screen().exportForTest(false), 100);
+        step("export check", () -> {
+            Path dir = mc().gameDirectory.toPath().resolve("screenshots").resolve("rysmap");
+            long n = 0;
+            try (Stream<Path> s = Files.exists(dir) ? Files.list(dir) : Stream.empty()) {
+                n = s.filter(f -> f.toString().endsWith(".png")).count();
+            } catch (Exception ignored) {
+                // нет папки
+            }
+            check("экспорт вида в PNG записал файл: " + n, n > 0);
+            works.repka.rysmap.layer.Layers.setVisible(works.repka.ryscore.map.MapApi.layers().stream()
+                .filter(l -> l.id().getPath().equals("heights")).findFirst().orElseThrow(), true);
+        }, 60);
+        shot("map_heights");
+        step("light layer", () -> {
+            for (var l : works.repka.ryscore.map.MapApi.layers()) {
+                if (l.id().getPath().equals("heights")) works.repka.rysmap.layer.Layers.setVisible(l, false);
+                if (l.id().getPath().equals("light") || l.id().getPath().equals("slime")) works.repka.rysmap.layer.Layers.setVisible(l, true);
+            }
+        }, 60);
+        shot("map_light_slime");
         step("finish", () -> {
             mc().setScreen(null);
             RYSMap.LOG.info(MapAutoTest.failures == 0 ? "[autotest] PASS" : "[autotest] FAILED: {}", MapAutoTest.failures);

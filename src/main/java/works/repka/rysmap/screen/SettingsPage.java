@@ -308,6 +308,13 @@ final class SettingsPage {
         if (ftbInfo == null && session != null) ftbInfo = ftbInfo(session.store.root());
         data(g, t, Component.translatable("rysmap.settings.data.ftb").getString(), ftbInfo == null ? "" : ftbInfo, rx, ry, rw);
         ry += 19;
+        // экспорт всей разведанной карты измерения в PNG (0.2.4)
+        String export = Component.translatable("rysmap.settings.data.export").getString();
+        float ew = Draw.labelWidth(export, 11.5f, Weight.REGULAR);
+        boolean hotE = Kit.over(mx, my, rx, ry, (int) ew + 1, 10);
+        Draw.label(g, export, rx, ry + 5, 11.5f, Weight.REGULAR, hotE ? t.c("text.primary") : t.c("link"));
+        hits.add(rx, ry, (int) ew + 1, 10, b -> s.exportPng(true));
+        ry += 14;
 
         // прокрутка: высота содержимого по обоим столбцам
         int contentBottom = Math.max(leftBottom, ry) + 8;

@@ -477,6 +477,81 @@ public final class MapSession {
         return out;
     }
 
+    /**
+     * Экспорт области в PNG (0.2.4): регионы пекутся по одному в рабочем потоке (сканер не стоит долго), картинка пишется
+     * в отдельном потоке. Будущее даёт путь к файлу. Неразведанное прозрачно.
+     */
+    public java.util.concurrent.CompletableFuture<java.nio.file.Path> exportPng(String dimensionId, works.repka.rysmap.tile.MapExport.Plan plan,
+                                                                             java.nio.file.Path file) {
+        java.util.concurrent.CompletableFuture<java.nio.file.Path> out = new java.util.concurrent.CompletableFuture<>();
+        if (closed) {
+            out.completeExceptionally(new IOException("карта закрыта"));
+            return out;
+        }
+        java.util.List<int[]> regions = new java.util.ArrayList<>();
+        java.nio.file.Path dir = store.dimension(dimensionId);
+        for (int[] r : plan.regions()) if (java.nio.file.Files.isRegularFile(store.region(dimensionId, r[0], r[1]))) regions.add(r);
+        int[] image = new int[plan.width() * plan.height()];
+        java.util.concurrent.atomic.AtomicInteger left = new java.util.concurrent.atomic.AtomicInteger(regions.size());
+        Runnable write = () -> new Thread(() -> {
+            try {
+                java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(plan.width(), plan.height(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                img.setRGB(0, 0, plan.width(), plan.height(), image, 0, plan.width());
+                java.nio.file.Files.createDirectories(file.getParent());
+                javax.imageio.ImageIO.write(img, "png", file.toFile());
+                out.complete(file);
+            } catch (Throwable t) {
+                out.completeExceptionally(t);
+            }
+        }, "rysmap-export").start();
+        if (regions.isEmpty()) {
+            write.run();
+            return out;
+        }
+        RYSMap.LOG.info("[rysmap] экспорт {}: {} регионов из {}, {}×{} точек, шаг {}", dimensionId, regions.size(), dir, plan.width(), plan.height(), plan.step());
+        for (int[] r : regions) {
+            worker.submit(() -> {
+                try {
+                    int[] px = dim(dimensionId).bakeRegion(r[0], r[1]);
+                    if (px != null) works.repka.rysmap.tile.MapExport.compose(plan, px, r[0], r[1], image);
+                } catch (Throwable t) {
+                    RYSMap.LOG.warn("[rysmap] экспорт: регион {} {} не испёкся: {}", r[0], r[1], t.toString());
+                }
+                if (left.decrementAndGet() == 0) write.run();
+            });
+        }
+        return out;
+    }
+
+    /** Разведанные регионы измерения по файлам на диске: {minX, minZ, maxX, maxZ} в блоках или null. */
+    public int @org.jetbrains.annotations.Nullable [] exploredBounds(String dimensionId) {
+        java.nio.file.Path dir = store.dimension(dimensionId);
+        if (!java.nio.file.Files.isDirectory(dir)) return null;
+        int x0 = Integer.MAX_VALUE, z0 = Integer.MAX_VALUE, x1 = Integer.MIN_VALUE, z1 = Integer.MIN_VALUE;
+        try (var files = java.nio.file.Files.list(dir)) {
+            for (java.nio.file.Path f : (Iterable<java.nio.file.Path>) files::iterator) {
+                String n = f.getFileName().toString();
+                if (!n.startsWith("r.") || !n.endsWith(".rmap")) continue;
+                String[] parts = n.substring(2, n.length() - 5).split(java.util.regex.Pattern.quote("."));
+                if (parts.length != 2) continue;
+                try {
+                    int rx = Integer.parseInt(parts[0]), rz = Integer.parseInt(parts[1]);
+                    x0 = Math.min(x0, rx);
+                    z0 = Math.min(z0, rz);
+                    x1 = Math.max(x1, rx);
+                    z1 = Math.max(z1, rz);
+                } catch (NumberFormatException ignored) {
+                    // чужой файл
+                }
+            }
+        } catch (IOException e) {
+            return null;
+        }
+        if (x0 == Integer.MAX_VALUE) return null;
+        int size = works.repka.rysmap.tile.RegionData.SIZE;
+        return new int[]{x0 * size, z0 * size, (x1 + 1) * size - 1, (z1 + 1) * size - 1};
+    }
+
     /** Карта закрыта (выход из мира или смена ключа). */
     public boolean closed() {
         return closed;

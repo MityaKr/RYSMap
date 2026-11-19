@@ -498,5 +498,11 @@
   "rysmap.slime.tip": "Чанк слизней: появляются ниже Y 40",
   "rysmap.settings.server.slime": "Слизни",
   "rysmap.layer.heights": "Высоты",
-  "rysmap.layer.light": "Свет"
+  "rysmap.layer.light": "Свет",
+  "rysmap.menu.export": "Сохранить вид в PNG",
+  "rysmap.settings.data.export": "Вся карта измерения в PNG",
+  "rysmap.export.empty": "В этом измерении ещё ничего не разведано",
+  "rysmap.export.started": "Сохраняю карту %s × %s…",
+  "rysmap.export.failed": "Карта в PNG не сохранилась, причина в логе",
+  "rysmap.export.done": "Карта сохранена: screenshots/rysmap"
 }
