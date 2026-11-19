@@ -56,6 +56,7 @@ public final class MapServer {
         PlacesServer.init();
         NeoForge.EVENT_BUS.addListener((PlayerEvent.PlayerLoggedInEvent e) -> {
             if (e.getEntity() instanceof ServerPlayer player) {
+                PlayerFeed.forget(player.getUUID());
                 hello(player);
                 sendRules(player);
             }
@@ -63,6 +64,10 @@ public final class MapServer {
         NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.server.ServerStartingEvent e) -> {
             rules = MapRules.load(rulesFile(e.getServer()));
             Travel.INSTANCE.clear();
+            PlayerFeed.clear();
+            SlimeChunks.clear();
+            // id FTB читается один раз при запуске, а не на каждом входе (разбор логики 19.11, п. 8)
+            ftbIdCache = readFtbId(e.getServer());
         });
         NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.entity.player.PermissionsChangedEvent e) -> {
             // событие идёт до смены уровня: правила уходят на следующем тике, когда уровень уже новый
@@ -154,8 +159,16 @@ public final class MapServer {
         return data.id;
     }
 
-    /** id сервера FTB или пустая строка: файла нет или он не читается. */
+    private static @org.jetbrains.annotations.Nullable String ftbIdCache;
+
+    /** id сервера FTB или пустая строка: файла нет или он не читается. Прочитан при запуске сервера. */
     public static String ftbId(MinecraftServer server) {
+        String c = ftbIdCache;
+        if (c == null) ftbIdCache = c = readFtbId(server);
+        return c;
+    }
+
+    private static String readFtbId(MinecraftServer server) {
         Path file = server.getWorldPath(LevelResource.ROOT).resolve("ftbteams").resolve("ftbteams.snbt");
         if (!Files.isRegularFile(file)) return "";
         try {

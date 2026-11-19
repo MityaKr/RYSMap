@@ -15,13 +15,54 @@ import works.repka.rysmap.net.MapNet;
  * При «Только рядом» чужих мест сервер не шлёт: клиент рисует тех, кого игра и так ему показывает.
  */
 final class PlayerFeed {
+    /**
+     * Что и когда ушло каждому (разбор логики 19.11, п. 7): тот же список повторно не шлётся, только подтверждение раз в
+     * {@link #KEEP_MS} (клиент считает места старше 5 с устаревшими), пустой список один раз.
+     */
+    private static final java.util.Map<UUID, List<MapNet.PlayerSpot>> LAST = new java.util.HashMap<>();
+    private static final java.util.Map<UUID, Long> LAST_AT = new java.util.HashMap<>();
+    static final long KEEP_MS = 4000;
+
     private PlayerFeed() {}
+
+    static void clear() {
+        LAST.clear();
+        LAST_AT.clear();
+    }
+
+    /** Игрок вошёл: первый список уходит ему целиком, даже если он такой же, как до выхода. */
+    static void forget(UUID player) {
+        LAST.remove(player);
+        LAST_AT.remove(player);
+    }
+
+    /** Нужно ли слать этот список: изменился, или пора подтвердить непустой. Чистая проверка для тестов. */
+    static boolean due(@org.jetbrains.annotations.Nullable List<MapNet.PlayerSpot> last, long lastAt, List<MapNet.PlayerSpot> now, long time) {
+        if (last == null || !last.equals(now)) return true;
+        return !now.isEmpty() && time - lastAt >= KEEP_MS;
+    }
+
+    private static void push(ServerPlayer to, List<MapNet.PlayerSpot> out) {
+        long time = System.currentTimeMillis();
+        UUID id = to.getUUID();
+        if (!due(LAST.get(id), LAST_AT.getOrDefault(id, 0L), out, time)) return;
+        LAST.put(id, out);
+        LAST_AT.put(id, time);
+        MapNet.send(to, new MapNet.Players(out));
+    }
 
     static void send(MinecraftServer server, MapRules rules) {
         List<ServerPlayer> all = server.getPlayerList().getPlayers();
+        // ушедшие из памяти
+        if (LAST.size() > all.size()) {
+            java.util.Set<UUID> online = new java.util.HashSet<>();
+            for (ServerPlayer p : all) online.add(p.getUUID());
+            LAST.keySet().retainAll(online);
+            LAST_AT.keySet().retainAll(online);
+        }
         if (all.size() < 2) {
-            // одному игроку слать нечего, но пустой список гасит старые метки у клиента
-            for (ServerPlayer p : all) MapNet.send(p, new MapNet.Players(List.of()));
+            // одному игроку слать нечего, но пустой список (один раз) гасит старые метки у клиента
+            for (ServerPlayer p : all) if (p.connection.hasChannel(MapNet.Players.TYPE)) push(p, List.of());
             return;
         }
         TeamsApi teams = TeamsApi.get();
@@ -55,7 +96,7 @@ final class PlayerFeed {
                 out.add(new MapNet.PlayerSpot(p.getUUID(), p.getGameProfile().getName(), p.level().dimension().location().toString(),
                     p.getBlockX(), p.getBlockY(), p.getBlockZ(), same));
             }
-            MapNet.send(to, new MapNet.Players(out));
+            push(to, out);
         }
     }
 
