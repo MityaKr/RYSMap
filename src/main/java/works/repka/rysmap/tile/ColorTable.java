@@ -342,4 +342,9 @@ public final class ColorTable implements MapColors {
     public int blockCount() {
         return byName.size();
     }
+
+    /** Таблица хоть раз построена: пекарю есть чем красить (во время перестройки служит старая). */
+    public boolean built() {
+        return !byName.isEmpty();
+    }
 }

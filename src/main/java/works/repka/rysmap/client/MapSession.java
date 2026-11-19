@@ -73,7 +73,7 @@ public final class MapSession {
     private int minFloor, maxFloor;
     private int ticks;
     private int pinnedX = Integer.MIN_VALUE, pinnedZ = Integer.MIN_VALUE;
-    private long colorsSeen = -1;
+    private final works.repka.rysmap.tile.ColorGate colorGate = new works.repka.rysmap.tile.ColorGate();
     private volatile boolean closed;
 
     // замеры для отчёта и строки F3
@@ -200,14 +200,18 @@ public final class MapSession {
         // точки на время: раз в секунду убрать истёкшие
         if (ticks % 20 == 0 && points.expire(System.currentTimeMillis() / 1000) > 0) savePoints();
         ColorTable colors = ColorTable.INSTANCE;
-        if (!colors.step(2_000_000L)) return;
-        if (colorsSeen != colors.version()) {
-            if (colorsSeen >= 0) {
-                tiles.invalidate();
-                overview.invalidate();
-            }
-            colorsSeen = colors.version();
+        boolean ready = colors.step(2_000_000L);
+        // тайлы ждут первой таблицы цветов, любая смена версии (первая тоже) перепекает их: иначе регионы, заказанные
+        // миникартой до готовности таблицы, оставались серыми со штриховкой до перезахода (баг 19.11, ColorGate)
+        works.repka.rysmap.tile.ColorGate.Step step = colorGate.update(colors.built(), colors.version());
+        boolean hold = step == works.repka.rysmap.tile.ColorGate.Step.HOLD;
+        tiles.hold(hold);
+        overview.hold(hold);
+        if (step == works.repka.rysmap.tile.ColorGate.Step.DROP) {
+            tiles.invalidate();
+            overview.invalidate();
         }
+        if (!ready) return;
         // слои «Высоты» и «Свет»: пекарь красит иначе, тайлы перепекаются
         int ov = OverlayLayers.bits();
         if (ov != works.repka.rysmap.tile.Baker.overlay()) {

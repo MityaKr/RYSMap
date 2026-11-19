@@ -75,6 +75,8 @@ public final class TileTextures {
     private int cap;
     private long idleNanos;
     private int inFlight, textures;
+    /** Таблица цветов ещё не построена: новые текстуры не заказываются (иначе испекутся серыми, баг 19.11). */
+    private boolean held;
     private @Nullable IntBuffer scratch;
     private long uploads;
 
@@ -186,14 +188,14 @@ public final class TileTextures {
         if (t != null) {
             t.lastUsed = now;
             // устаревшая текстура перепекается, пока её видно; старая рисуется до прихода новой (перепроверка 18.11, пункт 9)
-            if (t.stale && t.state != REQUESTED && now - t.staleAt > STALE_NANOS && inFlight < MAX_IN_FLIGHT) {
+            if (!held && t.stale && t.state != REQUESTED && now - t.staleAt > STALE_NANOS && inFlight < MAX_IN_FLIGHT) {
                 t.stale = false;
                 inFlight++;
                 source.request(dimension, rx, rz);
             }
             return t;
         }
-        if (inFlight >= MAX_IN_FLIGHT) return null;
+        if (held || inFlight >= MAX_IN_FLIGHT) return null;
         if (textures + inFlight >= cap && !evictOne(now)) return null;
         t = new Tile(dimension, rx, rz, now);
         map.put(key, t);
@@ -319,12 +321,25 @@ public final class TileTextures {
         }
     }
 
-    /** Перерисовать всё: таблица цветов перестроена. Текстуры отпускаются, следующие кадры закажут их заново. */
+    /** Пока {@code true}, новые текстуры не заказываются, готовые рисуются: таблица цветов ещё не построена. */
+    public void hold(boolean held) {
+        this.held = held;
+    }
+
+    /**
+     * Перерисовать всё: таблица цветов перестроена. Текстуры отпускаются, следующие кадры закажут их заново. Заказанная
+     * раньше и ещё не пришедшая испечена старой таблицей: она помечается устаревшей и перепечётся сразу по приходу.
+     */
     public void invalidate() {
+        long now = System.nanoTime();
         for (Long2ObjectOpenHashMap<Tile> map : tiles.values()) {
             for (Iterator<Tile> it = map.values().iterator(); it.hasNext(); ) {
                 Tile t = it.next();
-                if (t.state == REQUESTED) continue;
+                if (t.state == REQUESTED) {
+                    t.stale = true;
+                    t.staleAt = now - STALE_NANOS - 1;
+                    continue;
+                }
                 release(t);
                 it.remove();
             }
