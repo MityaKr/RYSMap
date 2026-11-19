@@ -97,10 +97,44 @@ public final class Entities {
         @Override public long revision() { return 0; }
         @Override public Collection<MapApi.Marker> markers(ResourceKey<Level> dimension) { return List.of(); }
 
-        /** Число в списке слоёв: сколько сейчас видно в измерении. */
+        private int counted;
+        private long countedAt = Long.MIN_VALUE;
+        private @Nullable Object countedFor;
+
+        /** Число в списке слоёв: сколько сейчас видно в измерении. Считается раз в 10 тиков (разбор логики 19.11, п. 2). */
         public int count(ResourceKey<Level> dimension, @Nullable Integer floor) {
-            return collect(dimension, -3e7, -3e7, 3e7, 3e7, 1f, id.equals(PLAYERS), id.equals(MOBS), floor).size();
+            long now = gameTime();
+            Object key = java.util.Arrays.asList(dimension, floor);
+            if (now - countedAt >= 10 || now < countedAt || !key.equals(countedFor)) {
+                counted = collect(dimension, -3e7, -3e7, 3e7, 3e7, 1f, id.equals(PLAYERS), id.equals(MOBS), floor).size();
+                countedAt = now;
+                countedFor = key;
+            }
+            return counted;
         }
+    }
+
+    private static long gameTime() {
+        Minecraft mc = Minecraft.getInstance();
+        return mc.level == null ? 0 : mc.level.getGameTime();
+    }
+
+    /** Мобы вокруг игрока: собираются раз в тик рамкой дальности прорисовки, кадры берут готовый список. */
+    private static List<Mob> mobs = List.of();
+    private static long mobsAt = Long.MIN_VALUE;
+    private static @Nullable Level mobsLevel;
+
+    private static List<Mob> mobsNow(Minecraft mc) {
+        long now = mc.level.getGameTime();
+        if (now != mobsAt || mobsLevel != mc.level) {
+            double r = (mc.options.getEffectiveRenderDistance() + 1) * 16.0;
+            net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(mc.player.getX() - r, mc.level.getMinBuildHeight(), mc.player.getZ() - r,
+                mc.player.getX() + r, mc.level.getMaxBuildHeight(), mc.player.getZ() + r);
+            mobs = mc.level.getEntitiesOfClass(Mob.class, box, e -> !e.isInvisible() && e.isAlive());
+            mobsAt = now;
+            mobsLevel = mc.level;
+        }
+        return mobs;
     }
 
     private static boolean shown(ResourceLocation layer) {
@@ -179,8 +213,8 @@ public final class Entities {
         works.repka.rysmap.client.ClientConfig cfg = works.repka.rysmap.client.ClientConfig.get();
         if (mobs && here && ServerRules.mobsAllowed() && cfg.mobsView != 0) {
             int n = 0;
-            for (Entity e : mc.level.entitiesForRendering()) {
-                if (!(e instanceof Mob) || e.isInvisible() || !e.isAlive()) continue;
+            for (Mob e : mobsNow(mc)) {
+                if (e.isRemoved() || !e.isAlive()) continue;
                 Kind kind = e instanceof Enemy ? Kind.HOSTILE
                     : e instanceof net.minecraft.world.entity.OwnableEntity own && own.getOwnerUUID() != null ? Kind.PET : Kind.PASSIVE;
                 if (kind == Kind.HOSTILE && !cfg.mobsHostile || kind == Kind.PASSIVE && !cfg.mobsPassive || kind == Kind.PET && !cfg.mobsPets) continue;
