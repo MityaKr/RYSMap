@@ -178,9 +178,14 @@ public final class MapSession {
         boolean inFloor = false;
         for (int f : floors) inFloor |= works.repka.rysmap.scan.Floors.of(pos.getY()) >= f - 1 && works.repka.rysmap.scan.Floors.of(pos.getY()) <= f;
         if (!ceiling && !inFloor) {
-            // глубоко под поверхностью правка карты не меняет: шахта под базой не перерисовывает чанк (кроме снимаемых этажей)
+            // поверхность меняет только правка верха столбца (поставили, сломали верхний блок) или дна под водой: фермы и
+            // редстоун под крышей больше не ставят чанк на срочный перескан (разбор логики 19.11, п. 5)
             int surface = level.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ());
-            if (pos.getY() < surface - ChunkSnapshot.BELOW) return;
+            if (pos.getY() < surface - 1) {
+                if (pos.getY() < surface - ChunkSnapshot.BELOW) return;
+                BlockPos top = new BlockPos(pos.getX(), surface - 1, pos.getZ());
+                if (level.getBlockState(top).getFluidState().isEmpty()) return;
+            }
         }
         dirty.add(cx, cz);
     }
@@ -245,6 +250,8 @@ public final class MapSession {
         for (int i = 0; i < fl.length; i++) floorIndex[i] = index(works.repka.rysmap.scan.Floors.id(dimension, fl[i]));
         int now = (int) (System.currentTimeMillis() / 1000);
         int rescan = config.rescanMinutes * 60;
+        // после входа и телепорта в очереди сотни недавно снятых чанков: раз в 10 тиков убрать их одним проходом
+        if (ticks % 10 == 0) queue.dropNormal(k -> recent(index, floorIndex, ChunkQueue.x(k), ChunkQueue.z(k), now, rescan));
         while (pending.get() < MAX_PENDING_SNAPSHOTS && System.nanoTime() - start < budget) {
             long key = queue.pollNearest(pcx, pcz, k -> queue.isUrgent(k) || indexReady(index, floorIndex, ChunkQueue.x(k), ChunkQueue.z(k)));
             if (key == Long.MIN_VALUE) break;
@@ -304,6 +311,17 @@ public final class MapSession {
                 results.poll();
             }
         }
+    }
+
+    /** Чанк недавно снят и на поверхности, и на всех снимаемых этажах: в очереди ему делать нечего. */
+    static boolean recent(ConcurrentHashMap<Long, int[]> surface, ConcurrentHashMap<Long, int[]>[] floors, int cx, int cz, int now, int rescan) {
+        int sc = DimensionMap.scanned(surface, cx, cz);
+        if (sc <= 0 || now - sc >= rescan) return false;
+        for (ConcurrentHashMap<Long, int[]> f : floors) {
+            int fs = DimensionMap.scanned(f, cx, cz);
+            if (fs <= 0 || now - fs >= rescan) return false;
+        }
+        return true;
     }
 
     private static boolean indexReady(ConcurrentHashMap<Long, int[]> surface, ConcurrentHashMap<Long, int[]>[] floors, int cx, int cz) {

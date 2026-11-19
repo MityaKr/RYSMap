@@ -75,6 +75,16 @@ public final class ChunkQueue {
         return best;
     }
 
+    /**
+     * Убрать из обычной очереди чанки, которые снимать не нужно (недавно сняты): один проход вместо того, чтобы каждый
+     * снимок искал ближний среди них заново (разбор логики 19.11, п. 6). Срочные не трогаются. Возвращает число убранных.
+     */
+    public int dropNormal(LongPredicate skip) {
+        int before = normal.size();
+        normal.removeIf(skip::test);
+        return before - normal.size();
+    }
+
     public int size() {
         return normal.size() + urgent.size();
     }
