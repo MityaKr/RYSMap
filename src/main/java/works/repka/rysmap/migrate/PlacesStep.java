@@ -8,6 +8,7 @@ import works.repka.rysmap.places.FtbPlaces;
 import works.repka.rysmap.places.PlaceBook;
 import works.repka.rysmap.server.MapServer;
 import works.repka.rysmap.server.PlaceStore;
+import works.repka.rysmap.server.PlacesServer;
 
 /**
  * Шаг {@code places} переезда с FTB Essentials (порядок 50, сервер; план Essentials 6): места сервера (варпы), дома
@@ -64,6 +65,8 @@ public final class PlacesStep implements Migrations.Step {
         PlaceBook book = store.book();
         FtbPlaces.Counts n = FtbPlaces.apply(book, src.data(), src.players(), MapServer.rules().places.backSize, System.currentTimeMillis());
         store.touch();
+        // игрокам в сети новые места (шаг мог идти на работающем сервере, `/rys migrate run`): колесо и список без перезахода
+        PlacesServer.changedAll(server);
         // база одним сохранением до отметки «сделано»
         server.overworld().getDataStorage().save();
         Migrations.Report r = Migrations.Report.create().count("places", n.places).count("homes", n.homes).count("back", n.back).count("players", n.players);

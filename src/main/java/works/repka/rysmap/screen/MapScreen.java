@@ -300,6 +300,11 @@ public final class MapScreen extends ScaledScreen {
     }
 
     /** Для автотеста: страница настроек. */
+    /** Открытая чужая вкладка окна или пусто (проверки: «Земля» RYSClaims это вкладка {@code rysclaims:land}). */
+    public String tabForTest() {
+        return tab == null ? "" : tab.id().toString();
+    }
+
     public void settingsForTest() {
         openSettings();
     }
