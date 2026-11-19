@@ -34,7 +34,7 @@ api.layer(new MapApi.Layer() { ... id "rysquests:goals", name «Цели кве�
 
 Публичного чтения прогресса в `rysquests.api.QuestsApi` нет (запрос сборки: KubeJS читает `ProgressStore.allProgress()` через `Java.loadClass`). Это класс RYSQuests, правится в сессии RYSQuests; предложение: `QuestsApi.isCompleted(UUID owner, ResourceLocation quest)` и `QuestsApi.completed(UUID owner) -> Set<ResourceLocation>`.
 
-## RYScope: «где найти» (Т4)
+## RYSIndex: «где найти» (Т4)
 
 ```java
 MapApi.get().highlight(MapApi.Highlight.builder(id, Component.literal("Равнины, y 60–90"))
