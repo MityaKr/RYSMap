@@ -78,6 +78,27 @@ public final class PlacesLayer implements MapApi.Layer {
         return out;
     }
 
+    /** Поиск окна карты ({@code /}): дома, дом команды, места сервера по части имени или описания. */
+    @Override
+    public List<MapApi.Hit> search(String query) {
+        PlacesClient.Data d = PlacesClient.data();
+        String q = query.strip().toLowerCase(java.util.Locale.ROOT);
+        if (!d.present || q.isEmpty()) return List.of();
+        List<MapApi.Hit> out = new ArrayList<>();
+        for (PlacesClient.Place p : all(d)) {
+            String name = name(p);
+            if (!name.toLowerCase(java.util.Locale.ROOT).contains(q) && !p.note().toLowerCase(java.util.Locale.ROOT).contains(q)) continue;
+            String kind = Component.translatable(switch (p.kind()) {
+                case "home" -> "rysmap.place.panel.home";
+                case "team_home" -> "rysmap.place.team_home";
+                default -> "rysmap.place.panel.place";
+            }).getString();
+            out.add(MapApi.Hit.builder(Component.literal(name), MapApi.Target.builder(p.key(), p.x(), p.y(), p.z()).label(Component.literal(name)).build())
+                .note(Component.literal(kind)).icon(icon(p)).color(color(p)).build());
+        }
+        return out;
+    }
+
     /** Дома, дом команды, места сервера. */
     public static List<PlacesClient.Place> all(PlacesClient.Data d) {
         List<PlacesClient.Place> out = new ArrayList<>(d.homes);
@@ -180,6 +201,7 @@ public final class PlacesLayer implements MapApi.Layer {
         if (!d.present) return Component.translatable("rysmap.place.no_server").getString();
         PlaceRules.Fn fn = fn(p);
         if (!d.allowed(fn)) return Component.translatable("rysmap.travel.off").getString();
+        if (d.pvpLeft() > 0) return Component.translatable("rysmap.travel.pvp", d.pvpLeft()).getString();
         if (p.lock() != null && !p.death()) return Component.translatable("rysmap.travel.claimed", p.lock()).getString();
         return null;
     }
@@ -240,9 +262,38 @@ public final class PlacesLayer implements MapApi.Layer {
         if (p.kind().equals("place") && d.manage && editor != null)
             b.action(MapApi.Action.builder(Component.translatable("rysmap.place.edit"), () -> editor.editPlace(p, p.key(), (int) p.x(), (int) p.y(), (int) p.z()))
                 .icon(Icons.Shape.PENCIL).build());
+        if (p.kind().equals("place") && d.manage) {
+            // описание правится строкой чата, «кто видит» по кругу: все, модераторы, операторы
+            b.action(MapApi.Action.builder(Component.translatable("rysmap.place.note"), () -> Minecraft.getInstance().setScreen(
+                new net.minecraft.client.gui.screens.ChatScreen(PlacesClient.cmd("warpnote") + " " + works.repka.rysmap.places.PlaceNames.quote(p.name()) + " " + p.note())))
+                .icon(Icons.Shape.NOTE).build());
+            String next = switch (p.vis()) {
+                case "all" -> "moderators";
+                case "moderators" -> "operators";
+                default -> "all";
+            };
+            b.action(MapApi.Action.builder(Component.translatable("rysmap.place.vis_button", Component.translatable("rysmap.place.vis." + p.vis())),
+                () -> {
+                    JsonObject e = new JsonObject();
+                    e.addProperty("name", p.name());
+                    e.addProperty("newName", p.name());
+                    e.addProperty("icon", p.icon());
+                    e.addProperty("color", p.color());
+                    e.addProperty("note", p.note());
+                    e.addProperty("vis", next);
+                    PlacesClient.op("editwarp", e);
+                }).icon(Icons.Shape.EYE).build());
+        }
         if (canEdit(p)) {
             b.action(MapApi.Action.builder(Component.translatable("rysmap.place.move_here"), () -> moveHere(p)).icon(Icons.Shape.MOVE).build());
             b.action(MapApi.Action.builder(Component.translatable("rysmap.place.delete"), () -> delete(p)).icon(Icons.Shape.TRASH).build());
+        }
+        if (p.kind().equals("back")) {
+            b.action(MapApi.Action.builder(Component.translatable("rysmap.place.forget"), () -> {
+                JsonObject o = new JsonObject();
+                o.addProperty("index", p.index());
+                PlacesClient.op("delback", o);
+            }).icon(Icons.Shape.TRASH).build());
         }
         return b.build();
     }

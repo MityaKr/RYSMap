@@ -478,5 +478,9 @@
   "rysmap.team_card.none": "No team home",
   "rysmap.team_card.how": "Stand on the spot and type %s or press the button",
   "rysmap.team_card.set_here": "Set here",
-  "rysmap.team_card.distance": "%s from here"
+  "rysmap.team_card.distance": "%s from here",
+  "rysmap.place.bad_vis": "Visible to: all, moderators or operators.",
+  "rysmap.place.note": "Description",
+  "rysmap.place.vis_button": "Visible: %s",
+  "rysmap.place.forget": "Remove from history"
 }

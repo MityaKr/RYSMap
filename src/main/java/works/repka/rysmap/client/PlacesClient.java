@@ -43,6 +43,8 @@ public final class PlacesClient {
     /** Что сейчас известно с сервера. */
     public static final class Data {
         public boolean present, ftb, manage, op, bypass, teams, teamHomePerm, teamTp;
+        /** Секунд боя («после урона от игрока») на момент пакета. */
+        int pvp;
         public PlaceRules rules = new PlaceRules();
         public final Map<String, Boolean> allowed = new HashMap<>();
         public final Map<String, Integer> left = new HashMap<>();
@@ -57,6 +59,13 @@ public final class PlacesClient {
             Integer l = left.get(fn.id);
             if (l == null || l <= 0) return 0;
             long ms = at + l * 1000L - System.currentTimeMillis();
+            return ms <= 0 ? 0 : (int) ((ms + 999) / 1000);
+        }
+
+        /** Сколько секунд ещё нельзя телепортироваться после урона от игрока. */
+        public int pvpLeft() {
+            if (pvp <= 0) return 0;
+            long ms = at + pvp * 1000L - System.currentTimeMillis();
             return ms <= 0 ? 0 : (int) ((ms + 999) / 1000);
         }
 
@@ -110,6 +119,7 @@ public final class PlacesClient {
             d.teams = bool(o, "teams");
             d.teamHomePerm = bool(o, "teamHomePerm");
             d.teamTp = bool(o, "teamTp");
+            d.pvp = o.has("pvp") ? o.get("pvp").getAsInt() : 0;
             if (o.has("rules") && o.get("rules").isJsonObject()) d.rules = PlaceRules.fromJson(o.getAsJsonObject("rules"));
             if (o.has("allowed")) for (var e : o.getAsJsonObject("allowed").entrySet()) d.allowed.put(e.getKey(), e.getValue().getAsBoolean());
             if (o.has("left")) for (var e : o.getAsJsonObject("left").entrySet()) d.left.put(e.getKey(), e.getValue().getAsInt());
@@ -282,6 +292,11 @@ public final class PlacesClient {
         }
         PacketDistributor.sendToServer(new PlaceNet.Op(op, args.toString()));
         return true;
+    }
+
+    /** Команда мест для чата с учётом FTB Essentials: {@code /warpnote} или {@code /rys place warpnote}. */
+    public static String cmd(String sub) {
+        return (data.ftb ? "/rys place " : "/") + sub;
     }
 
     /** Место с координатами для действия «поставить здесь». */

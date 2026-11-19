@@ -40,6 +40,8 @@ public final class PlaceCommands {
             new Spec("warps", n -> simple(n, Places::listWarps), "listwarps"),
             new Spec("setwarp", n -> named(n, true, (p, name) -> Places.setWarp(p, name, null, null), PlaceCommands::warps)),
             new Spec("delwarp", n -> named(n, true, Places::delWarp, PlaceCommands::warps)),
+            new Spec("warpnote", PlaceCommands::warpNote),
+            new Spec("warpvis", PlaceCommands::warpVis),
             new Spec("back", n -> simple(n, p -> Places.back(p, 0))),
             new Spec("spawn", n -> simple(n, Places::spawn)),
             new Spec("playerspawn", n -> simple(n, Places::bed)),
@@ -82,6 +84,26 @@ public final class PlaceCommands {
                 .executes(c -> reply(c, run.apply(c.getSource().getPlayerOrException(), StringArgumentType.getString(c, "name")))));
         if (!required) node.executes(c -> reply(c, run.apply(c.getSource().getPlayerOrException(), "")));
         return node;
+    }
+
+    /** {@code /warpnote <имя> [текст]}: описание места сервера, без текста убирает. */
+    private static LiteralArgumentBuilder<CommandSourceStack> warpNote(String name) {
+        return Commands.literal(name).requires(CommandSourceStack::isPlayer)
+            .then(Commands.argument("name", StringArgumentType.string()).suggests(PlaceCommands::warps)
+                .executes(c -> reply(c, Places.noteWarp(c.getSource().getPlayerOrException(), StringArgumentType.getString(c, "name"), "")))
+                .then(Commands.argument("text", StringArgumentType.greedyString())
+                    .executes(c -> reply(c, Places.noteWarp(c.getSource().getPlayerOrException(), StringArgumentType.getString(c, "name"),
+                        StringArgumentType.getString(c, "text"))))));
+    }
+
+    /** {@code /warpvis <имя> all|moderators|operators}: кто видит место сервера. */
+    private static LiteralArgumentBuilder<CommandSourceStack> warpVis(String name) {
+        return Commands.literal(name).requires(CommandSourceStack::isPlayer)
+            .then(Commands.argument("name", StringArgumentType.string()).suggests(PlaceCommands::warps)
+                .then(Commands.argument("vis", StringArgumentType.word())
+                    .suggests((c, b) -> SharedSuggestionProvider.suggest(java.util.List.of("all", "moderators", "operators"), b))
+                    .executes(c -> reply(c, Places.visWarp(c.getSource().getPlayerOrException(), StringArgumentType.getString(c, "name"),
+                        StringArgumentType.getString(c, "vis"))))));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> target(String name, boolean required, BiFunction<ServerPlayer, ServerPlayer, Places.Reply> run) {

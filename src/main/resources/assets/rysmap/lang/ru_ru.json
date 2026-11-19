@@ -478,5 +478,9 @@
   "rysmap.team_card.none": "Дом команды не поставлен",
   "rysmap.team_card.how": "Встань на место и набери %s или нажми кнопку",
   "rysmap.team_card.set_here": "Поставить здесь",
-  "rysmap.team_card.distance": "отсюда %s"
+  "rysmap.team_card.distance": "отсюда %s",
+  "rysmap.place.bad_vis": "Кто видит: all, moderators или operators.",
+  "rysmap.place.note": "Описание",
+  "rysmap.place.vis_button": "Видят: %s",
+  "rysmap.place.forget": "Убрать из истории"
 }

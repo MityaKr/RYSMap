@@ -300,12 +300,26 @@ public final class Travel implements TravelApi {
 
     /** Урон игроку: срывает разогрев; урон от другого игрока запоминается для правила «после урона». */
     void hurt(ServerPlayer player, boolean byPlayer) {
-        if (byPlayer) pvp.put(player.getUUID(), System.currentTimeMillis());
+        if (byPlayer) {
+            boolean was = pvpLeft(player) > 0;
+            pvp.put(player.getUUID(), System.currentTimeMillis());
+            // клиенту: места в колесе серые, пока идёт отсчёт «после урона от игрока»
+            if (!was && MapServer.rules().places.pvpDelay > 0) PlacesServer.changed(player);
+        }
         Warmup w = warmups.remove(player.getUUID());
         if (w != null) {
             PlacesServer.note(player, PlacesServer.Note.WARMUP_END, Component.translatable("rysmap.travel.hurt"), 0, w.trip.reason().id());
             if (w.done != null) w.done.accept(false, Component.translatable("rysmap.travel.hurt"), "hurt");
         }
+    }
+
+    /** Сколько секунд ещё нельзя телепортироваться после урона от игрока (правило «после урона»). */
+    int pvpLeft(ServerPlayer player) {
+        int delay = MapServer.rules().places.pvpDelay;
+        Long hurt = pvp.get(player.getUUID());
+        if (delay <= 0 || hurt == null) return 0;
+        long left = hurt + delay * 1000L - System.currentTimeMillis();
+        return left <= 0 ? 0 : (int) ((left + 999) / 1000);
     }
 
     boolean warming(ServerPlayer player) {

@@ -59,6 +59,9 @@ public final class PlaceActions {
         if (!d.allowed(fn)) return Action.State.off(Component.translatable("rysmap.place.off_short").getString());
         if (p == null) return Action.State.off(missing);
         if (p.lock() != null && !p.death()) return Action.State.off(Component.translatable("rysmap.place.locked_short", p.lock()).getString());
+        // бой: правило «после урона от игрока»
+        int pvp = d.pvpLeft();
+        if (pvp > 0) return Action.State.pause(pvp);
         int left = d.left(fn);
         return left > 0 ? Action.State.pause(left) : Action.State.ready();
     }

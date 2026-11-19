@@ -324,6 +324,32 @@ public final class Places {
         return Reply.ok(Component.translatable("rysmap.place.place_edited", upd.name));
     }
 
+    /** Описание места сервера (команда {@code warpnote}): пустой текст убирает. */
+    public static Reply noteWarp(ServerPlayer p, String name, String note) {
+        PlaceBook.Place w = store(p).book().place(name);
+        if (w == null) return Reply.fail(Component.translatable("rysmap.place.no_place", name));
+        PlaceBook.Place m = w.copy();
+        m.name = "";
+        m.note = note == null ? "" : note;
+        return editWarp(p, w.name, m);
+    }
+
+    /** Кто видит место сервера (команда {@code warpvis}): all, moderators, operators. */
+    public static Reply visWarp(ServerPlayer p, String name, String vis) {
+        PlaceBook.Place w = store(p).book().place(name);
+        if (w == null) return Reply.fail(Component.translatable("rysmap.place.no_place", name));
+        PlaceBook.Place m = w.copy();
+        m.name = "";
+        m.vis = switch (vis.toLowerCase(java.util.Locale.ROOT)) {
+            case "moderators", "mods" -> PlaceBook.Vis.MODERATORS;
+            case "operators", "ops" -> PlaceBook.Vis.OPERATORS;
+            case "all" -> PlaceBook.Vis.ALL;
+            default -> null;
+        };
+        if (m.vis == null) return Reply.fail(Component.translatable("rysmap.place.bad_vis"));
+        return editWarp(p, w.name, m);
+    }
+
     public static Reply delWarp(ServerPlayer p, String name) {
         if (!PlacesServer.PLACE_MANAGE.test(p)) return Reply.fail(Component.translatable("rysmap.place.manage_perm"));
         PlaceBook.Place w = store(p).book().place(name);

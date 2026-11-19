@@ -233,6 +233,7 @@ public final class PlacesServer {
         }
         o.add("allowed", allowed);
         o.add("left", left);
+        o.addProperty("pvp", Travel.INSTANCE.pvpLeft(p));
         JsonArray homes = new JsonArray();
         for (PlaceBook.Place h : book.homes(p.getUUID())) {
             JsonObject j = place(h);

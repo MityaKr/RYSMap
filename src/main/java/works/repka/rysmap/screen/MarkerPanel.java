@@ -74,7 +74,7 @@ final class MarkerPanel {
 
         // кнопки: главная широкая, остальные под ней рядами до трёх; если их больше трёх, первая (обычно «В путь»)
         // идёт своим широким рядом (макет Essentials 04: «Телепорт», «В путь», «Изменить · Сюда · Удалить»)
-        List<MapApi.Action> actions = p.actions().size() > 6 ? p.actions().subList(0, 6) : p.actions();
+        List<MapApi.Action> actions = p.actions().size() > 8 ? p.actions().subList(0, 8) : p.actions();
         if (actions.isEmpty()) return;
         MapApi.Action primary = null;
         for (MapApi.Action a : actions) if (a.primary()) primary = a;
@@ -83,7 +83,7 @@ final class MarkerPanel {
         List<List<MapApi.Action>> rows = new java.util.ArrayList<>();
         if (rest.size() > 3) {
             rows.add(List.of(rest.get(0)));
-            rows.add(rest.subList(1, rest.size()));
+            for (int i = 1; i < rest.size(); i += 3) rows.add(rest.subList(i, Math.min(rest.size(), i + 3)));
         } else if (!rest.isEmpty()) {
             rows.add(rest);
         }
