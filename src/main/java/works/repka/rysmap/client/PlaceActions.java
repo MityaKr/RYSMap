@@ -147,6 +147,12 @@ public final class PlaceActions {
                 return state(PlaceRules.Fn.RANDOM, d.present ? d.spawn : null, "");
             })
             .run(() -> PlacesClient.op("rtp", new JsonObject())).register();
+        // «Новая точка» (кольцо «Моё» ядра 1.15 ждёт rysmap:new_point): то же окно, что клавиша новой точки
+        Action.builder(id("new_point")).label(Component.translatable("rysmap.action.new_point")).icon(Icons.Shape.FLAG).group(Action.Group.PLACES).order(8)
+            .state(() -> ClientEntry.session() == null ? Action.State.off("") : Action.State.ready())
+            .run(() -> {
+                if (Minecraft.getInstance().screen == null) works.repka.rysmap.screen.QuickPointScreen.open();
+            }).register();
         // каждое место сервера и каждый дом (если их больше одного): на них вешают свои клавиши
         Actions.provider(id("place_list"), () -> {
             List<Action> out = new ArrayList<>(placeActions());

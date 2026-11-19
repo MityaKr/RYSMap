@@ -504,5 +504,6 @@
   "rysmap.export.empty": "Nothing explored in this dimension yet",
   "rysmap.export.started": "Saving map %s × %s…",
   "rysmap.export.failed": "Map PNG was not saved, see the log",
-  "rysmap.export.done": "Map saved: screenshots/rysmap"
+  "rysmap.export.done": "Map saved: screenshots/rysmap",
+  "rysmap.action.new_point": "New point"
 }

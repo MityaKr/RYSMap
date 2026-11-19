@@ -504,5 +504,6 @@
   "rysmap.export.empty": "В этом измерении ещё ничего не разведано",
   "rysmap.export.started": "Сохраняю карту %s × %s…",
   "rysmap.export.failed": "Карта в PNG не сохранилась, причина в логе",
-  "rysmap.export.done": "Карта сохранена: screenshots/rysmap"
+  "rysmap.export.done": "Карта сохранена: screenshots/rysmap",
+  "rysmap.action.new_point": "Новая точка"
 }
