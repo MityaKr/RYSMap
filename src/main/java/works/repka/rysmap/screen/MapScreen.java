@@ -305,6 +305,11 @@ public final class MapScreen extends ScaledScreen {
         openSettings();
     }
 
+    /** Для автотеста: вкладка страницы настроек (minimap, world, server, places, keys). */
+    public void settingsTabForTest(String id) {
+        if (settings != null) settings.tab(id);
+    }
+
     /** Для автотеста: прокрутить страницу настроек. */
     public void settingsScrollForTest(float value) {
         if (settings != null) settings.scrollTo(value);

@@ -240,9 +240,10 @@ final class PlacesAutoTest {
             screen().keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0);
             screen().settingsForTest();
         }, 15);
-        step("settings scroll", () -> screen().settingsScrollForTest(150), 10);
+        // 0.2.10: «Перемещения» своя вкладка, «Сервер» соседняя
+        step("settings places tab", () -> screen().settingsTabForTest("places"), 10);
         shot("settings_places_07");
-        step("settings scroll more", () -> screen().settingsScrollForTest(400), 10);
+        step("settings server tab", () -> screen().settingsTabForTest("server"), 10);
         shot("settings_places_07b");
         // макет 05: запрос, свой запрос, разогрев, отказ
         step("hud", () -> {

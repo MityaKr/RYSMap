@@ -51,12 +51,12 @@ final class PlacesSettings {
         PlacesClient.op("rules", pending.toJson());
     }
 
-    /** Блок под разделом «Сервер»: возвращает низ. */
+    /** Вкладка «Перемещения» страницы настроек: возвращает низ. */
     static int draw(GuiGraphics g, Theme t, Kit.Hits hits, int lx, int lw, int y, int mx, int my) {
         PlacesClient.Data d = PlacesClient.data();
         if (!d.present || !d.op) return y;
         PlaceRules r = rules();
-        Kit.caps(g, t, Component.translatable("rysmap.settings.places").getString(), lx, y + 4, 11, 0.44f);
+        // своя вкладка «Перемещения» (0.2.10): заголовок раздела не повторяет её название, остаётся подсказка о кликах
         String like = Component.translatable("rysmap.settings.places.note").getString();
         Draw.label(g, like, lx + lw - Draw.labelWidth(like, 11, Weight.REGULAR), y + 4, 11, Weight.REGULAR, t.c("text.muted"));
         y += 12;

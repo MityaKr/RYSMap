@@ -68,6 +68,8 @@ public final class ClientConfig {
     public int deathsKept = 3;
     /** Какие точки подписаны в мире: {@code goal} (цель и гибель), {@code nearby} (все рядом), {@code all} (все). */
     public String worldLabels = "nearby";
+    /** Последняя открытая вкладка страницы настроек карты (0.2.10): minimap, world, server, places, keys. */
+    public String settingsTab = "minimap";
     /** Дальность подписей в мире, блоки: дальше не рисуются (кроме цели пути и места гибели; в режиме «Все» без предела). */
     public int labelRange = 512;
     /** Метка раскрывается, когда она ближе к прицелу, чем столько единиц интерфейса; 0 не раскрывает у прицела. */
@@ -110,6 +112,7 @@ public final class ClientConfig {
                 if (c.minimapSize != 0 && c.minimapSize != 72 && c.minimapSize != 96 && c.minimapSize != 128) c.minimapSize = 0;
                 c.minimapZoom = clamp(json, "minimapZoom", c.minimapZoom, 0, 2);
                 if (json.has("minimapCorner") && json.get("minimapCorner").isJsonPrimitive()) c.minimapCorner = json.get("minimapCorner").getAsString();
+                if (json.has("settingsTab") && json.get("settingsTab").isJsonPrimitive()) c.settingsTab = json.get("settingsTab").getAsString();
                 if (json.has("minimapCircle")) c.minimapCircle = json.get("minimapCircle").getAsBoolean();
                 if (json.has("minimapRotate")) c.minimapRotate = json.get("minimapRotate").getAsBoolean();
                 if (json.has("caves")) c.caves = json.get("caves").getAsBoolean();
@@ -181,6 +184,7 @@ public final class ClientConfig {
         else json.remove("minimapCorner");
         json.addProperty("deathsKept", deathsKept);
         json.addProperty("worldLabels", worldLabels);
+        json.addProperty("settingsTab", settingsTab);
         json.addProperty("labelRange", labelRange);
         json.addProperty("labelFocus", labelFocus);
         json.addProperty("labelLimit", labelLimit);
