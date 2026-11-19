@@ -135,80 +135,127 @@ public final class Layers {
      */
     public static void drawAreas(net.minecraft.client.gui.GuiGraphics g, MapApi.Layer layer, ResourceKey<Level> dimension, int cx0, int cz0, int cx1, int cz1,
                                  double ox, double oz, double ppb, float clipX0, float clipY0, float clipX1, float clipY1, float @Nullable [] strips) {
-        it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<AreaChunk> chunks = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
-        for (int rz = cz0 >> 5; rz <= cz1 >> 5; rz++)
-            for (int rx = cx0 >> 5; rx <= cx1 >> 5; rx++)
-                for (AreaChunk c : areas(layer, dimension, rx, rz))
-                    if (c.chunkX() >= cx0 && c.chunkX() <= cx1 && c.chunkZ() >= cz0 && c.chunkZ() <= cz1) chunks.put(RegionData.key(c.chunkX(), c.chunkZ()), c);
-        if (chunks.isEmpty()) return;
+        // геометрия областей (полосы и края) кэшируется по ревизиям региона и соседей (разбор логики 19.11, п. 3): кадр
+        // только переводит числа чанков в экран. Полоса заливки дробными квадами: Draw.round округлял бы каждый чанк до
+        // целых единиц, и соседи перекрывались сеткой цвета команды.
         float side = (float) (16 * ppb);
-        // заливка: подряд идущие чанки строки одного цвета и вида сливаются в полосу и рисуются дробными квадами.
-        // Раньше каждый чанк шёл через Draw.round без радиуса, а тот округляет x и ширину до целых единиц по
-        // отдельности: соседи перекрывались полосой двойной прозрачности (сетка цвета команды) и прыгали шагом
-        // в единицу, пока тайлы под ними ехали плавно.
-        java.util.List<AreaChunk> sorted = new java.util.ArrayList<>(chunks.values());
-        sorted.sort((a, b) -> a.chunkZ() != b.chunkZ() ? Integer.compare(a.chunkZ(), b.chunkZ()) : Integer.compare(a.chunkX(), b.chunkX()));
-        float[] fill = new float[sorted.size() * 4];
-        int[] fillColors = new int[sorted.size()];
-        int runs = 0;
-        for (int i = 0; i < sorted.size(); ) {
-            AreaChunk first = sorted.get(i);
-            int j = i + 1;
-            while (j < sorted.size()) {
-                AreaChunk nx = sorted.get(j), pv = sorted.get(j - 1);
-                if (nx.chunkZ() != first.chunkZ() || nx.chunkX() != pv.chunkX() + 1 || nx.color() != first.color() || nx.style() != first.style()) break;
-                j++;
-            }
-            AreaChunk last = sorted.get(j - 1);
-            float sx0 = (float) (ox + first.chunkX() * 16 * ppb), sy0 = (float) (oz + first.chunkZ() * 16 * ppb);
-            float sx1 = (float) (ox + (last.chunkX() + 1) * 16 * ppb), sy1 = sy0 + side;
-            float fx0 = Math.max(sx0, clipX0), fy0 = Math.max(sy0, clipY0), fx1 = Math.min(sx1, clipX1), fy1 = Math.min(sy1, clipY1);
-            if (fx1 > fx0 && fy1 > fy0) {
-                float a = first.style() == MapApi.AreaStyle.FILL ? 0.22f : 0.12f;
-                fill[runs * 4] = fx0; fill[runs * 4 + 1] = fy0; fill[runs * 4 + 2] = fx1; fill[runs * 4 + 3] = fy1;
-                fillColors[runs++] = works.repka.ryscore.ui.Draw.alpha(first.color(), a);
-            }
-            i = j;
-        }
-        if (strips != null) {
-            Cut cut = cut(fill, fillColors, runs, strips, false);
-            quads(g, cut.xy(), cut.colors(), cut.count());
-        } else {
-            quads(g, fill, fillColors, runs);
-        }
-        float[] xy = new float[chunks.size() * 16];
-        int[] colors = new int[chunks.size() * 4];
-        int n = 0;
-        for (AreaChunk c : chunks.values()) {
-            float sx0 = (float) (ox + c.chunkX() * 16 * ppb), sy0 = (float) (oz + c.chunkZ() * 16 * ppb);
-            float sx1 = sx0 + side, sy1 = sy0 + side;
-            float fx0 = Math.max(sx0, clipX0), fy0 = Math.max(sy0, clipY0), fx1 = Math.min(sx1, clipX1), fy1 = Math.min(sy1, clipY1);
-            if (fx1 <= fx0 || fy1 <= fy0) continue;
-            // край группы: сверху, снизу, слева, справа
-            int[][] dirs = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}};
-            for (int[] d : dirs) {
-                AreaChunk nb = chunks.get(RegionData.key(c.chunkX() + d[0], c.chunkZ() + d[1]));
-                if (nb != null && nb.group() == c.group()) continue;
-                float lx0, ly0, lx1, ly1;
-                if (d[1] != 0) {
-                    float yy = d[1] < 0 ? sy0 + 0.5f : sy1 - 0.5f;
-                    if (yy < clipY0 || yy > clipY1) continue;
-                    lx0 = fx0; lx1 = fx1; ly0 = ly1 = yy;
-                } else {
-                    float xx = d[0] < 0 ? sx0 + 0.5f : sx1 - 0.5f;
-                    if (xx < clipX0 || xx > clipX1) continue;
-                    ly0 = fy0; ly1 = fy1; lx0 = lx1 = xx;
+        int runs = 0, n = 0;
+        MapApi.AreaStyle[] styles = MapApi.AreaStyle.values();
+        for (int rz = cz0 >> 5; rz <= cz1 >> 5; rz++) {
+            for (int rx = cx0 >> 5; rx <= cx1 >> 5; rx++) {
+                AreaGeometry geo = geometry(layer, dimension, rx, rz);
+                if (geo.runCount == 0) continue;
+                fillBuf = grow(fillBuf, (runs + geo.runCount) * 4);
+                fillColorBuf = grow(fillColorBuf, runs + geo.runCount);
+                for (int i = 0; i < geo.runCount; i++) {
+                    int o = i * 5;
+                    int z = geo.runs[o], x0 = geo.runs[o + 1], x1 = geo.runs[o + 2];
+                    if (z < cz0 || z > cz1 || x1 < cx0 || x0 > cx1) continue;
+                    float sx0 = (float) (ox + x0 * 16 * ppb), sy0 = (float) (oz + z * 16 * ppb);
+                    float sx1 = (float) (ox + (x1 + 1) * 16 * ppb), sy1 = sy0 + side;
+                    float fx0 = Math.max(sx0, clipX0), fy0 = Math.max(sy0, clipY0), fx1 = Math.min(sx1, clipX1), fy1 = Math.min(sy1, clipY1);
+                    if (fx1 <= fx0 || fy1 <= fy0) continue;
+                    float a = styles[geo.runs[o + 4]] == MapApi.AreaStyle.FILL ? 0.22f : 0.12f;
+                    fillBuf[runs * 4] = fx0;
+                    fillBuf[runs * 4 + 1] = fy0;
+                    fillBuf[runs * 4 + 2] = fx1;
+                    fillBuf[runs * 4 + 3] = fy1;
+                    fillColorBuf[runs++] = works.repka.ryscore.ui.Draw.alpha(geo.runs[o + 3], a);
                 }
-                if (n * 4 + 4 > xy.length) break;
-                xy[n * 4] = lx0; xy[n * 4 + 1] = ly0; xy[n * 4 + 2] = lx1; xy[n * 4 + 3] = ly1;
-                colors[n] = c.style() == MapApi.AreaStyle.DASHED ? works.repka.ryscore.ui.Draw.alpha(c.color(), 0.7f) : c.color();
-                n++;
+                lineBuf = grow(lineBuf, (n + geo.edgeCount) * 4);
+                lineColorBuf = grow(lineColorBuf, n + geo.edgeCount);
+                for (int i = 0; i < geo.edgeCount; i++) {
+                    int o = i * 5;
+                    int cx = geo.edges[o], cz = geo.edges[o + 1], d = geo.edges[o + 2];
+                    if (cx < cx0 || cx > cx1 || cz < cz0 || cz > cz1) continue;
+                    float sx0 = (float) (ox + cx * 16 * ppb), sy0 = (float) (oz + cz * 16 * ppb);
+                    float sx1 = sx0 + side, sy1 = sy0 + side;
+                    float fx0 = Math.max(sx0, clipX0), fy0 = Math.max(sy0, clipY0), fx1 = Math.min(sx1, clipX1), fy1 = Math.min(sy1, clipY1);
+                    if (fx1 <= fx0 || fy1 <= fy0) continue;
+                    int[] dir = AreaGeometry.DIRS[d];
+                    float lx0, ly0, lx1, ly1;
+                    if (dir[1] != 0) {
+                        float yy = dir[1] < 0 ? sy0 + 0.5f : sy1 - 0.5f;
+                        if (yy < clipY0 || yy > clipY1) continue;
+                        lx0 = fx0;
+                        lx1 = fx1;
+                        ly0 = ly1 = yy;
+                    } else {
+                        float xx = dir[0] < 0 ? sx0 + 0.5f : sx1 - 0.5f;
+                        if (xx < clipX0 || xx > clipX1) continue;
+                        ly0 = fy0;
+                        ly1 = fy1;
+                        lx0 = lx1 = xx;
+                    }
+                    lineBuf[n * 4] = lx0;
+                    lineBuf[n * 4 + 1] = ly0;
+                    lineBuf[n * 4 + 2] = lx1;
+                    lineBuf[n * 4 + 3] = ly1;
+                    int color = geo.edges[o + 3];
+                    lineColorBuf[n++] = styles[geo.edges[o + 4]] == MapApi.AreaStyle.DASHED ? works.repka.ryscore.ui.Draw.alpha(color, 0.7f) : color;
+                }
+            }
+        }
+        if (runs > 0) {
+            if (strips != null) {
+                Cut cut = cut(fillBuf, fillColorBuf, runs, strips, false);
+                quads(g, cut.xy(), cut.colors(), cut.count());
+            } else {
+                quads(g, fillBuf, fillColorBuf, runs);
             }
         }
         if (n > 0 && strips != null) {
-            Cut cut = cut(xy, colors, n, strips, true);
+            Cut cut = cut(lineBuf, lineColorBuf, n, strips, true);
             if (cut.count() > 0) works.repka.ryscore.ui.Draw.lines(g, cut.xy(), cut.colors(), cut.count(), 1f);
-        } else if (n > 0) works.repka.ryscore.ui.Draw.lines(g, xy, colors, n, 1f);
+        } else if (n > 0) works.repka.ryscore.ui.Draw.lines(g, lineBuf, lineColorBuf, n, 1f);
+    }
+
+    /** Буферы кадра: растут и живут дальше, только главный поток. */
+    private static float[] fillBuf = new float[256], lineBuf = new float[1024];
+    private static int[] fillColorBuf = new int[64], lineColorBuf = new int[256];
+
+    private static float[] grow(float[] a, int need) {
+        return a.length >= need ? a : java.util.Arrays.copyOf(a, Math.max(need, a.length * 2));
+    }
+
+    private static int[] grow(int[] a, int need) {
+        return a.length >= need ? a : java.util.Arrays.copyOf(a, Math.max(need, a.length * 2));
+    }
+
+    private record GeoCache(long self, long north, long south, long west, long east, AreaGeometry geometry) {}
+
+    private static final Map<String, Long2ObjectOpenHashMap<GeoCache>> GEOMETRY = new HashMap<>();
+
+    /** Геометрия региона из кэша; перестраивается, когда меняется ревизия региона или одного из четырёх соседей. */
+    static AreaGeometry geometry(MapApi.Layer layer, ResourceKey<Level> dimension, int rx, int rz) {
+        MapApi.Areas a;
+        try {
+            a = layer.areas();
+            if (a == null) return AreaGeometry.EMPTY;
+            long self = a.revision(dimension, rx, rz), north = a.revision(dimension, rx, rz - 1), south = a.revision(dimension, rx, rz + 1),
+                west = a.revision(dimension, rx - 1, rz), east = a.revision(dimension, rx + 1, rz);
+            Long2ObjectOpenHashMap<GeoCache> map = GEOMETRY.computeIfAbsent(layer.id() + "|" + dimension.location(), k -> new Long2ObjectOpenHashMap<>());
+            long rk = RegionData.key(rx, rz);
+            GeoCache c = map.get(rk);
+            if (c != null && c.self == self && c.north == north && c.south == south && c.west == west && c.east == east) return c.geometry;
+            List<AreaChunk> own = areas(layer, dimension, rx, rz);
+            AreaGeometry geo;
+            if (own.isEmpty()) {
+                geo = AreaGeometry.EMPTY;
+            } else {
+                Long2ObjectOpenHashMap<AreaChunk> near = new Long2ObjectOpenHashMap<>();
+                for (int[] d : new int[][]{{0, 0}, {0, -1}, {0, 1}, {-1, 0}, {1, 0}})
+                    for (AreaChunk ch : d[0] == 0 && d[1] == 0 ? own : areas(layer, dimension, rx + d[0], rz + d[1]))
+                        near.put(RegionData.key(ch.chunkX(), ch.chunkZ()), ch);
+                geo = AreaGeometry.build(own, near::get);
+            }
+            if (map.size() > 256) map.clear(); // потолок кэша: окно карты ушло далеко
+            map.put(rk, new GeoCache(self, north, south, west, east, geo));
+            return geo;
+        } catch (Throwable t) {
+            broken(layer, t);
+            return AreaGeometry.EMPTY;
+        }
     }
 
     /**
@@ -293,6 +340,7 @@ public final class Layers {
     public static void clear() {
         MARKERS.clear();
         AREAS.clear();
+        GEOMETRY.clear();
     }
 
     public static @Nullable MapApi.Layer find(ResourceLocation id) {
