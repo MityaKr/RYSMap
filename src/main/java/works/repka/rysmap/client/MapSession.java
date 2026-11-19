@@ -220,14 +220,21 @@ public final class MapSession {
 
         int pcx = player.getBlockX() >> 4, pcz = player.getBlockZ() >> 4;
         int prx = pcx >> 5, prz = pcz >> 5;
-        if (prx != pinnedX || prz != pinnedZ) {
+        if (prx != pinnedX || prz != pinnedZ || floorsPinned != floors) {
             pinnedX = prx;
             pinnedZ = prz;
+            floorsPinned = floors;
             String dim = dimension;
-            worker.submit(() -> dim(dim).pinAround(prx, prz));
+            int[] fl = floors;
+            worker.submit(() -> {
+                dim(dim).pinAround(prx, prz);
+                // этажи тоже: 3×3 вокруг игрока закреплены
+                for (int f : fl) dim(works.repka.rysmap.scan.Floors.id(dim, f)).pinAround(prx, prz);
+            });
         }
         if (ticks % DirtyColumns.PERIOD_TICKS == 0) dirty.drain(k -> queue.addUrgent(ChunkQueue.x(k), ChunkQueue.z(k)));
         if (ticks % 10 == 0) updateFloors(level, player);
+        if (ticks % 200 == 0) closeStaleFloors();
 
         long budget = config.scanBudgetMicros * 1000L;
         if (mc.getFps() < 40) budget /= 2;
@@ -338,6 +345,28 @@ public final class MapSession {
             // новые этажи: чанки рядом снова в очередь (недавно снятая поверхность не мешает, решает индекс этажа)
             requeueLoaded(level, player.getBlockX() >> 4, player.getBlockZ() >> 4, Minecraft.getInstance().options.getEffectiveRenderDistance() + 1);
         }
+    }
+
+    /** Когда этаж был нужен в последний раз (тики сессии): ушедший больше минуты назад закрывается. */
+    private final java.util.Map<Integer, Integer> floorSeen = new java.util.HashMap<>();
+    private int[] floorsPinned = new int[0];
+
+    /** Этажи, которых нет в снимаемых больше минуты, закрываются в рабочем потоке: до ~140 МБ иначе лежали до смены измерения. */
+    private void closeStaleFloors() {
+        String dim = dimension;
+        if (dim == null) return;
+        for (int f : floors) floorSeen.put(f, ticks);
+        java.util.List<String> stale = new java.util.ArrayList<>();
+        for (var it = floorSeen.entrySet().iterator(); it.hasNext(); ) {
+            var e = it.next();
+            if (ticks - e.getValue() > 1200) {
+                stale.add(works.repka.rysmap.scan.Floors.id(dim, e.getKey()));
+                it.remove();
+            }
+        }
+        if (!stale.isEmpty()) worker.submit(() -> {
+            for (String id : stale) closeDimension(id);
+        });
     }
 
     /** Этаж, который сейчас показывает миникарта, или null (поверхность). */
@@ -590,7 +619,8 @@ public final class MapSession {
         if (d == null) {
             try {
                 // у этажа свой маленький кэш: этажей снимается несколько сразу
-                int cap = works.repka.rysmap.scan.Floors.floor(id) == null ? config.rawRegions : Math.max(3, config.rawRegions / 3);
+                // потолок этажа не меньше 9: закреплённые 3×3 вокруг игрока не гоняются диск↔память (разбор логики 19.11, п. 4)
+                int cap = works.repka.rysmap.scan.Floors.floor(id) == null ? config.rawRegions : Math.max(9, config.rawRegions / 3);
                 d = new DimensionMap(store, id, ColorTable.INSTANCE, cap, index(id), s -> RYSMap.LOG.warn("[rysmap] {}", s));
             } catch (IOException e) {
                 throw new RuntimeException("папка карты " + id + " недоступна", e);
