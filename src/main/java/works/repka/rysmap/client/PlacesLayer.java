@@ -242,6 +242,9 @@ public final class PlacesLayer implements MapApi.Layer {
             b.row(Component.translatable("rysmap.place.panel.from_here"), Component.literal(Words.distance(Math.sqrt(dx * dx + dz * dz)) + " · " + Words.direction(dx, dz)));
         }
         b.row(Component.translatable("rysmap.point.dimension"), Component.literal(works.repka.rysmap.screen.MapScreen.dimensionName(p.dim())));
+        int[] pair = works.repka.rysmap.point.Portal.toOther(p.dim(), (int) Math.floor(p.x()), (int) Math.floor(p.z()));
+        if (pair != null) b.row(Component.translatable(p.dim().equals(works.repka.rysmap.point.Portal.NETHER) ? "rysmap.point.in_overworld" : "rysmap.point.in_nether"),
+            Component.literal(works.repka.rysmap.hud.Minimap.group(pair[0]) + " · " + works.repka.rysmap.hud.Minimap.group(pair[1])));
         String why = blocked(p);
         int pause = d.rules.row(fn(p)).pause;
         String tp = why != null ? why : pause > 0 ? Component.translatable("rysmap.place.panel.pause", pause).getString()

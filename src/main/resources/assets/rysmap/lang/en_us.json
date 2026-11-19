@@ -482,5 +482,16 @@
   "rysmap.place.bad_vis": "Visible to: all, moderators or operators.",
   "rysmap.place.note": "Description",
   "rysmap.place.vis_button": "Visible: %s",
-  "rysmap.place.forget": "Remove from history"
+  "rysmap.place.forget": "Remove from history",
+  "rysmap.screen.in_nether": "Nether %s · %s",
+  "rysmap.screen.in_overworld": "Overworld %s · %s",
+  "rysmap.point.until": "Disappears in",
+  "rysmap.point.lifetime": "Lifetime",
+  "rysmap.point.lifetime.left": "%s left",
+  "rysmap.point.lifetime.0": "Forever",
+  "rysmap.point.lifetime.1": "10 min",
+  "rysmap.point.lifetime.2": "1 hour",
+  "rysmap.point.lifetime.3": "1 day",
+  "rysmap.point.temp_name": "Marker",
+  "rysmap.menu.temp_here": "Marker for 10 minutes"
 }

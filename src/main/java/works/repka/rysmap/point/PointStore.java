@@ -50,6 +50,12 @@ public final class PointStore {
         public @Nullable String from;
         /** Пометка: {@code ftb_death} у бывших мест гибели FTB (обычная точка, правило «три последних» её не трогает). */
         public @Nullable String note;
+        /** Точка на время (план карты, раздел 5 «Потом»): когда пропадёт, секунды эпохи; 0 — навсегда. */
+        public long until;
+
+        public boolean temporary() {
+            return until > 0;
+        }
 
         public boolean death() {
             return "death".equals(kind);
@@ -90,6 +96,15 @@ public final class PointStore {
     public @Nullable Point find(UUID id) {
         for (Point p : points) if (p.id.equals(id)) return p;
         return null;
+    }
+
+    /** Убрать точки на время, срок которых прошёл; сколько убрано. */
+    public int expire(long nowSeconds) {
+        int before = points.size();
+        points.removeIf(p -> p.until > 0 && p.until <= nowSeconds);
+        int removed = before - points.size();
+        if (removed > 0) revision++;
+        return removed;
     }
 
     /** После правки полей точки снаружи. */
@@ -149,6 +164,7 @@ public final class PointStore {
             if (o.has("created")) p.created = o.get("created").getAsLong();
             p.from = o.has("from") ? o.get("from").getAsString() : null;
             p.note = o.has("note") ? o.get("note").getAsString() : null;
+            if (o.has("until")) p.until = o.get("until").getAsLong();
             s.points.add(p);
         }
         return s;
@@ -182,6 +198,7 @@ public final class PointStore {
             o.addProperty("created", p.created);
             if (p.from != null) o.addProperty("from", p.from);
             if (p.note != null) o.addProperty("note", p.note);
+            if (p.until > 0) o.addProperty("until", p.until);
             array.add(o);
         }
         json.add("points", array);

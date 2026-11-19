@@ -75,6 +75,10 @@ final class PointPanel {
         } else if (p.dimension.equals("minecraft:the_nether")) {
             rows.add(new String[]{Component.translatable("rysmap.point.in_overworld").getString(), Minimap.group(p.x * 8) + " · " + Minimap.group(p.z * 8), "info.overworld"});
         }
+        if (p.temporary()) {
+            long left = Math.max(0, p.until - System.currentTimeMillis() / 1000);
+            rows.add(new String[]{Component.translatable("rysmap.point.until").getString(), ago(left), null});
+        }
         if (p.death()) {
             long ago = Math.max(0, System.currentTimeMillis() / 1000 - p.created);
             rows.add(new String[]{Component.translatable("rysmap.point.ago").getString(), ago(ago), "info.death"});

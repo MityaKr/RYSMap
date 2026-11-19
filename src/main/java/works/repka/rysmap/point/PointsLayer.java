@@ -127,6 +127,23 @@ public final class PointsLayer implements MapApi.Layer {
                 s.points().add(p);
                 s.savePoints();
             }).build());
+        // метка на 10 минут: «встреча здесь», «сундук тут», сама пропадёт
+        api.menu(MapApi.MenuItem.builder(ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "temp_here"), Component.translatable("rysmap.menu.temp_here"))
+            .icon(Icons.Shape.CLOCK).order(1).run(spot -> {
+                MapSession s = ClientEntry.session();
+                if (s == null) return;
+                PointStore.Point p = new PointStore.Point();
+                p.dimension = spot.dimension().location().toString();
+                p.x = spot.x();
+                p.y = spot.y();
+                p.z = spot.z();
+                p.name = Component.translatable("rysmap.point.temp_name").getString();
+                p.icon = "target";
+                p.color = 3;
+                p.until = System.currentTimeMillis() / 1000 + 600;
+                s.points().add(p);
+                s.savePoints();
+            }).build());
         api.menu(MapApi.MenuItem.builder(ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "route_here"), Component.translatable("rysmap.menu.route_here"))
             .icon(Icons.Shape.TARGET).order(10)
             .run(spot -> api.track(MapApi.Target.builder(spot.dimension(), spot.x() + 0.5, spot.y(), spot.z() + 0.5).build())).build());

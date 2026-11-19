@@ -482,5 +482,16 @@
   "rysmap.place.bad_vis": "Кто видит: all, moderators или operators.",
   "rysmap.place.note": "Описание",
   "rysmap.place.vis_button": "Видят: %s",
-  "rysmap.place.forget": "Убрать из истории"
+  "rysmap.place.forget": "Убрать из истории",
+  "rysmap.screen.in_nether": "Нижний %s · %s",
+  "rysmap.screen.in_overworld": "Верхний %s · %s",
+  "rysmap.point.until": "Пропадёт через",
+  "rysmap.point.lifetime": "Срок",
+  "rysmap.point.lifetime.left": "ещё %s",
+  "rysmap.point.lifetime.0": "Навсегда",
+  "rysmap.point.lifetime.1": "10 мин",
+  "rysmap.point.lifetime.2": "1 час",
+  "rysmap.point.lifetime.3": "1 день",
+  "rysmap.point.temp_name": "Метка",
+  "rysmap.menu.temp_here": "Метка на 10 минут"
 }

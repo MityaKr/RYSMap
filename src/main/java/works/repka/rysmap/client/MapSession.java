@@ -192,6 +192,8 @@ public final class MapSession {
         LocalPlayer player = mc.player;
         if (level == null || player == null) return;
         ticks++;
+        // точки на время: раз в секунду убрать истёкшие
+        if (ticks % 20 == 0 && points.expire(System.currentTimeMillis() / 1000) > 0) savePoints();
         ColorTable colors = ColorTable.INSTANCE;
         if (!colors.step(2_000_000L)) return;
         if (colorsSeen != colors.version()) {

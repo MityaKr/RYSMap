@@ -664,10 +664,20 @@ public final class MapScreen extends ScaledScreen {
         if (overCanvas) {
             int bx = (int) Math.floor(blockX(mx)), bz = (int) Math.floor(blockZ(my));
             String biome = biome(bx, bz);
+            // то же место в парном мире: Верхний мир делится на 8, Нижний умножается (портал в пару)
+            int[] o = works.repka.rysmap.point.Portal.toOther(dimension.location().toString(), bx, bz);
+            boolean inNether = dimension.location().toString().equals(works.repka.rysmap.point.Portal.NETHER);
+            String other = o == null ? "" : Component.translatable(inNether ? "rysmap.screen.in_overworld" : "rysmap.screen.in_nether",
+                works.repka.rysmap.hud.Minimap.group(o[0]), works.repka.rysmap.hud.Minimap.group(o[1])).getString();
             float base = 5 + coordWidth("X", bx) + 5 + coordWidth("Z", bz) + 5;
-            float cwid = base + (biome.isEmpty() ? 0 : 5 + Draw.labelWidth(biome, 12, Weight.REGULAR) + 5);
+            float ow = other.isEmpty() ? 0 : 5 + Draw.labelWidth(other, 11.5f, Weight.REGULAR) + 5;
+            float cwid = base + ow + (biome.isEmpty() ? 0 : 5 + Draw.labelWidth(biome, 12, Weight.REGULAR) + 5);
             if (px + cwid > sx - 4) {
                 biome = "";
+                cwid = base + ow;
+            }
+            if (px + cwid > sx - 4) {
+                other = "";
                 cwid = base;
             }
             if (px + cwid <= right - 6) {
@@ -675,6 +685,11 @@ public final class MapScreen extends ScaledScreen {
                 float cx = px + 5;
                 cx = coord(g, t, "X", bx, cx, by + TOOL / 2f) + 5;
                 cx = coord(g, t, "Z", bz, cx, by + TOOL / 2f) + 5;
+                if (!other.isEmpty()) {
+                    Draw.rect(g, (int) cx, by + 3, 1, TOOL - 6, t.c("panel.border"));
+                    Draw.label(g, other, cx + 5, by + TOOL / 2f, 11.5f, Weight.REGULAR, t.c("text.muted"));
+                    cx += ow;
+                }
                 if (!biome.isEmpty()) {
                     Draw.rect(g, (int) cx, by + 3, 1, TOOL - 6, t.c("panel.border"));
                     Draw.label(g, biome, cx + 5, by + TOOL / 2f, 12, Weight.REGULAR, t.c("text.muted"));
@@ -1894,6 +1909,7 @@ public final class MapScreen extends ScaledScreen {
         int ax = (int) sx(x + 0.5), ay = (int) sy(z + 0.5);
         if (place == null) {
             setEditor(new PointEditor(null, dim.location().toString(), x, y, z, Component.translatable("rysmap.place.new_name").getString(), 0, ax, ay));
+            editor.lifetimeRow = false;
             placeEditing = "";
         } else {
             PointStore.Point tmp = new PointStore.Point();
@@ -1905,6 +1921,7 @@ public final class MapScreen extends ScaledScreen {
             tmp.icon = place.icon();
             tmp.color = place.color() < 0 ? 0 : place.color();
             setEditor(new PointEditor(tmp, tmp.dimension, x, y, z, tmp.name, tmp.color, ax, ay));
+            editor.lifetimeRow = false;
             placeEditing = place.name();
         }
         placeEdited = place;
