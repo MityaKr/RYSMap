@@ -70,6 +70,9 @@ public final class MapSession {
     private int caveFloor = Integer.MIN_VALUE;
     private @Nullable Integer viewFloor;
     private boolean underground;
+    /** Решение «под землёй» с задержкой (разбор 19.11: высокая крыша цеха больше не включает пещеры). */
+    private final works.repka.rysmap.scan.Underground undergroundGate = new works.repka.rysmap.scan.Underground();
+    private static final int[][] RING = works.repka.rysmap.scan.Underground.ring();
     private int minFloor, maxFloor;
     private int ticks;
     private int pinnedX = Integer.MIN_VALUE, pinnedZ = Integer.MIN_VALUE;
@@ -149,6 +152,7 @@ public final class MapSession {
         caveFloor = Integer.MIN_VALUE;
         viewFloor = null;
         underground = false;
+        undergroundGate.reset();
         queue.clear();
         dirty.clear();
         pinnedX = pinnedZ = Integer.MIN_VALUE;
@@ -337,8 +341,9 @@ public final class MapSession {
     // ---- этажи пещер (М5) ----
 
     /**
-     * Какие этажи снимать: в измерении с потолком всегда этаж игрока и соседние, в остальных только под землёй (неба
-     * не видно и до поверхности больше 8 блоков; выход наверх при запасе меньше 4, чтобы не мигало). Этаж, который
+     * Какие этажи снимать: в измерении с потолком всегда этаж игрока и соседние, в остальных только под землёй
+     * ({@link works.repka.rysmap.scan.Underground}: крыша над головой, нет света неба и земля вокруг выше ног; с 0.2.9
+     * высокая крыша постройки на ровной земле пещеры не включает). Этаж, который
      * листает окно карты, снимается тоже. Сервер может выключить пещеры правилом, игрок настройкой.
      */
     private void updateFloors(ClientLevel level, LocalPlayer player) {
@@ -346,12 +351,21 @@ public final class MapSession {
         int show = Integer.MIN_VALUE;
         boolean allowed = ServerRules.cavesAllowed() && config.caves;
         if (allowed) {
-            int surface = level.getHeight(Heightmap.Types.WORLD_SURFACE, player.getBlockX(), player.getBlockZ());
-            int below = surface - player.getBlockY();
+            int px = player.getBlockX(), pz = player.getBlockZ(), feet = player.getBlockY();
+            int surface = level.getHeight(Heightmap.Types.WORLD_SURFACE, px, pz);
             boolean sky = level.canSeeSky(player.blockPosition().above());
-            underground = !sky && (underground ? below >= 4 : below > 8);
+            int skyLight = level.getBrightness(net.minecraft.world.level.LightLayer.SKY, player.blockPosition().above());
+            // земля вокруг (без листвы и без незагруженных чанков): постройка на ровной земле не пещера
+            int[] ring = new int[RING.length];
+            for (int i = 0; i < RING.length; i++) {
+                int x = px + RING[i][0], z = pz + RING[i][1];
+                ring[i] = level.getChunkSource().hasChunk(x >> 4, z >> 4)
+                    ? level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) : works.repka.rysmap.scan.Underground.MISSING;
+            }
+            underground = undergroundGate.update(sky, skyLight, surface - feet, ring, feet);
         } else {
             underground = false;
+            undergroundGate.reset();
         }
         java.util.TreeSet<Integer> set = new java.util.TreeSet<>();
         if (allowed && (ceiling || underground)) {

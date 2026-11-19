@@ -2177,6 +2177,11 @@ public final class MapScreen extends ScaledScreen {
         exportPng(all);
     }
 
+    /** Показанный этаж пещер или null (поверхность): высота места, поставленного с карты. */
+    public @Nullable Integer shownFloor() {
+        return caves ? floor : null;
+    }
+
     public void openMenuForTest() {
         openMenu(cx0 + cw / 2 + 30, cy0 + ch / 2 + 20);
     }

@@ -396,7 +396,8 @@ public final class PlacesServer {
         place.dim = a.get("dim").getAsString();
         place.x = a.get("x").getAsDouble();
         place.z = a.get("z").getAsDouble();
-        // с карты высота неизвестна: место помечается «поверхность», телепорт ищет посадку в столбце (дом встаёт на землю)
+        // с карты без высоты: место помечается «поверхность», телепорт садит на верх столбца; с высотой (этаж пещер, игрок
+        // рядом, MapHeight) телепорт садит на ближайший к ней пол столбца
         place.y = a.has("y") ? a.get("y").getAsDouble() : p.getY();
         place.surface = !a.has("y");
         place.yRot = p.getYRot();

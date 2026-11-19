@@ -79,21 +79,34 @@ public final class PlaceActions {
         return h.isEmpty() ? null : h.get(0);
     }
 
+    /** Дома нет, а ставить можно: кнопка «Дом» колеса предлагает «Поставить дом тут». */
+    static boolean canSetHomeHere() {
+        PlacesClient.Data d = PlacesClient.data();
+        return d.present && d.allowed(PlaceRules.Fn.HOME) && d.homes.isEmpty() && d.rules.homes > 0;
+    }
+
     static @Nullable PlacesClient.Place lastBack() {
         List<PlacesClient.Place> b = PlacesClient.data().back;
         return b.isEmpty() ? null : b.get(0);
     }
 
     public static void register() {
-        Action.builder(id("home")).label(Component.translatable("rysmap.action.home")).icon(Icons.Shape.HOME).group(Action.Group.PLACES).order(0)
+        // без дома та же кнопка ставит его там, где стоит игрок (просьба автора 19.11: дом с карты встал на крышу)
+        Action.builder(id("home"))
+            .label(() -> Component.translatable(canSetHomeHere() ? "rysmap.action.home_set_here" : "rysmap.action.home"))
+            .icon(Icons.Shape.HOME).group(Action.Group.PLACES).order(0)
             .detail(() -> {
                 PlacesClient.Place h = firstHome();
-                return h == null ? "" : PlacesLayer.name(h) + " · " + distance(h);
+                if (h == null) return canSetHomeHere() ? Component.translatable("rysmap.action.home_set_detail").getString() : "";
+                return PlacesLayer.name(h) + " · " + distance(h);
             })
-            .state(() -> state(PlaceRules.Fn.HOME, firstHome(), Component.translatable("rysmap.action.no_home").getString()))
+            .state(() -> canSetHomeHere() ? Action.State.ready()
+                : state(PlaceRules.Fn.HOME, firstHome(), Component.translatable("rysmap.action.no_home").getString()))
             .run(() -> {
                 PlacesClient.Place h = firstHome();
                 if (h != null) PlacesLayer.teleport(h);
+                // без места в действии сервер ставит дом точно в ногах игрока, с его взглядом (как /sethome)
+                else if (canSetHomeHere()) PlacesClient.op("sethome", new JsonObject());
             }).register();
         Action.builder(id("back")).label(Component.translatable("rysmap.action.back")).icon(Icons.Shape.HISTORY).group(Action.Group.PLACES).order(1)
             .detail(() -> {

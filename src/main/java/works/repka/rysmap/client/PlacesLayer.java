@@ -318,6 +318,15 @@ public final class PlacesLayer implements MapApi.Layer {
         }
     }
 
+    /** Высота места с карты ({@link works.repka.rysmap.places.MapHeight}): этаж окна карты и игрок рядом. */
+    static @org.jetbrains.annotations.Nullable Double mapHeight(MapApi.Spot s) {
+        net.minecraft.client.player.LocalPlayer me = net.minecraft.client.Minecraft.getInstance().player;
+        Integer floor = net.minecraft.client.Minecraft.getInstance().screen instanceof works.repka.rysmap.screen.MapScreen m ? m.shownFloor() : null;
+        if (me == null) return floor == null ? null : works.repka.rysmap.places.MapHeight.pick(floor, false, 0, 0, 0, 0, 0);
+        return works.repka.rysmap.places.MapHeight.pick(floor, me.level().dimension().equals(s.dimension()), me.getX(), me.getY(), me.getZ(),
+            s.x() + 0.5, s.z() + 0.5);
+    }
+
     /** Слой и пункты меню: при запуске клиента. */
     public static void register() {
         MapApi api = MapApi.get();
@@ -327,7 +336,10 @@ public final class PlacesLayer implements MapApi.Layer {
             .run(s -> {
                 PlacesClient.Data d = PlacesClient.data();
                 JsonObject o = PlacesClient.at(s.dimension(), s.x() + 0.5, s.y(), s.z() + 0.5);
-                o.remove("y"); // высоты с карты нет: сервер посадит на поверхность
+                // высота по правилу MapHeight: этаж пещер, ноги игрока рядом с ним; иначе без высоты, сервер посадит на верх столбца
+                Double y = mapHeight(s);
+                if (y != null) o.addProperty("y", y);
+                else o.remove("y");
                 if (!d.homes.isEmpty() && d.rules.homes <= 1) o.addProperty("name", d.homes.get(0).name());
                 PlacesClient.op("sethome", o);
             }).build());

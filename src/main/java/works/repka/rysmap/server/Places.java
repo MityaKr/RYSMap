@@ -135,8 +135,9 @@ public final class Places {
         store(p).touch();
         PlacesServer.changed(p);
         return switch (put) {
-            case ADDED -> Reply.ok(Component.translatable("rysmap.place.home_set", homeLabelOf(book, p, name)));
-            case MOVED -> Reply.ok(Component.translatable("rysmap.place.home_moved", homeLabelOf(book, p, name)));
+            // с карты без высоты дом сядет на верх столбца (на крышу): ответ говорит об этом и как поставить внутрь
+            case ADDED -> Reply.ok(Component.translatable(place.surface ? "rysmap.place.home_set_top" : "rysmap.place.home_set", homeLabelOf(book, p, name)));
+            case MOVED -> Reply.ok(Component.translatable(place.surface ? "rysmap.place.home_moved_top" : "rysmap.place.home_moved", homeLabelOf(book, p, name)));
             case LIMIT -> Reply.fail(limit == 0 ? Component.translatable("rysmap.travel.off")
                 : Component.translatable("rysmap.place.home_limit", limit, names(book.homes(p.getUUID()))));
             case BAD_NAME -> Reply.fail(Component.translatable("rysmap.place.bad_name"));
