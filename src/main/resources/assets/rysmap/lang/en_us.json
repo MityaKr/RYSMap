@@ -220,6 +220,8 @@
   "rysmap.ping.kind.help": "help",
   "rysmap.ping.kind.loot": "loot",
   "rysmap.entity.track": "Click: path to the player",
+  "rysmap.entity.pile": "Mobs here: %s",
+  "rysmap.entity.pile_more": "%s more kinds",
   "rysmap.ping.kind.resource": "resource",
   "rysmap.ping.kind.mark": "mark",
   "rysmap.settings.entities": "Mobs and other players",

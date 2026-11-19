@@ -220,6 +220,8 @@
   "rysmap.ping.kind.help": "помощь",
   "rysmap.ping.kind.loot": "добыча",
   "rysmap.entity.track": "Клик: путь к игроку",
+  "rysmap.entity.pile": "Мобов в куче: %s",
+  "rysmap.entity.pile_more": "ещё видов: %s",
   "rysmap.ping.kind.resource": "ресурс",
   "rysmap.ping.kind.mark": "метка",
   "rysmap.settings.entities": "Мобы и чужие игроки",

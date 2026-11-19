@@ -97,6 +97,10 @@ final class MobsAutoTest {
             mc().player.connection.sendCommand(String.format("fill %d -30 %d %d -27 %d air", baseX - 6, baseZ - 6, baseX + 6, baseZ + 6));
             mc().player.connection.sendCommand(String.format("summon minecraft:creeper %d -30 %d {NoAI:1b,PersistenceRequired:1b,Silent:1b}", baseX + 3, baseZ + 2));
             mc().player.connection.sendCommand(String.format("summon minecraft:pig %d -30 %d {NoAI:1b,PersistenceRequired:1b,Silent:1b}", baseX - 3, baseZ - 2));
+            // одиночные значки и босс (отзыв автора 19.11): зомби, корова, иссушитель в стороне от фермы
+            mc().player.connection.sendCommand(String.format("summon minecraft:zombie %d %d %d {NoAI:1b,PersistenceRequired:1b,Silent:1b}", baseX + 9, groundY, baseZ + 9));
+            mc().player.connection.sendCommand(String.format("summon minecraft:cow %d %d %d {NoAI:1b,PersistenceRequired:1b,Silent:1b}", baseX - 9, groundY, baseZ + 10));
+            mc().player.connection.sendCommand(String.format("summon minecraft:wither %d %d %d {NoAI:1b,PersistenceRequired:1b,Silent:1b}", baseX + 10, groundY + 1, baseZ - 10));
             RYSMap.LOG.info("[autotest] ферма: {} мобов", n);
             ClientConfig c = ClientConfig.get();
             c.minimapSize = 128;
@@ -135,6 +139,26 @@ final class MobsAutoTest {
         }, 40);
         step("map zoom", () -> ((MapScreen) mc().screen).setZoom(6), 20);
         shot("map_crowd");
+        step("map zoom out", () -> ((MapScreen) mc().screen).setZoom(2), 20);
+        shot("map_piles");
+        step("menu", () -> {
+            // пункты в группе «Пинг» (как у RYSTeams 0.2.9) и пункт без группы: подменю и разделители
+            works.repka.ryscore.map.MapApi api = works.repka.ryscore.map.MapApi.get();
+            String[] kinds = {"Сюда", "Опасно", "Ресурс", "Помогите"};
+            for (int i = 0; i < kinds.length; i++) {
+                api.menu(works.repka.ryscore.map.MapApi.MenuItem.builder(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(RYSMap.MODID, "autotest_ping_" + i),
+                        net.minecraft.network.chat.Component.literal(kinds[i]))
+                    .icon(i == 1 ? works.repka.ryscore.ui.Icons.Shape.WARN : works.repka.ryscore.ui.Icons.Shape.BELL).order(11 + i)
+                    .group(works.repka.ryscore.map.MapApi.PING_GROUP).run(spot -> {}).build());
+            }
+            MapScreen s = (MapScreen) mc().screen;
+            s.openMenuForTest();
+            List<String> rows = s.openSubForTest();
+            RYSMap.LOG.info("[autotest] меню: {}", rows);
+            check("пинги собраны в «Пинг ›» с четырьмя пунктами", rows.contains("Пинг") && rows.contains("  Помогите") && !rows.contains("Помогите"));
+        }, 10);
+        shot("map_menu_ping");
+        step("menu close", () -> mc().screen.keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE, 0, 0), 5);
         step("cave", () -> {
             mc().setScreen(null);
             mc().player.connection.sendCommand(String.format("tp @s %d -30 %d 0 10", baseX, baseZ));

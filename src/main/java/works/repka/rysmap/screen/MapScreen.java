@@ -46,7 +46,7 @@ public final class MapScreen extends ScaledScreen {
     static final int W = 600, H = 364, HEADER = 28, SIDEBAR = 122;
     /** Единиц холста на блок: от дальнего плана до крупного. */
     private static final double MIN_ZOOM = 0.125, MAX_ZOOM = 8;
-    private static final int MENU_ROW = 13, MENU_W = 128, ROW = 14, TOOL = 15;
+    private static final int MENU_W = 128, ROW = 14, TOOL = 15;
     private static final int[] SCALE_STEPS = {10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000};
 
     private final Kit.Hits hits = new Kit.Hits();
@@ -56,7 +56,7 @@ public final class MapScreen extends ScaledScreen {
     double centerX, centerZ, zoom = 1;
     private boolean dragging, dragged;
     int wx, wy, ww, wh, cx0, cy0, cw, ch;
-    private @Nullable Menu menu;
+    private works.repka.ryscore.ui.@Nullable ContextMenu menu;
     private final List<String> dimensions = new ArrayList<>();
     private int listTop, listBottom;
     private @Nullable List<String> tip;
@@ -67,12 +67,6 @@ public final class MapScreen extends ScaledScreen {
     /** Открыта страница настроек вместо полотна (шестерёнка в шапке). */
     private @Nullable SettingsPage settings;
 
-    /** Меню ПКМ или меню игрока (макет Essentials 06): заголовок «Kot_Boris · Барсуки · 92 м», подсказки справа («запрос»). */
-    private record Menu(int x, int y, MapApi.Spot spot, List<MapApi.MenuItem> items, @Nullable String title, java.util.Map<ResourceLocation, String> hints) {
-        Menu(int x, int y, MapApi.Spot spot, List<MapApi.MenuItem> items) {
-            this(x, y, spot, items, null, java.util.Map.of());
-        }
-    }
 
     /** Чужая вкладка окна ({@link MapApi#tab}) вместо карты или null. */
     private MapApi.@Nullable Tab tab;
@@ -103,6 +97,8 @@ public final class MapScreen extends ScaledScreen {
     static final ResourceLocation PING_ITEM = ResourceLocation.fromNamespaceAndPath("rysmap", "ping");
     /** Игрок под курсором в прошлом кадре: клик ведёт к нему путь (Т2). */
     private works.repka.rysmap.hud.Entities.@Nullable Dot lastHoverDot;
+    /** Подсказка кучи мобов под курсором в этом кадре (отзыв автора 19.11) или null. */
+    private @Nullable List<String> hoverPile;
 
     private MapScreen(ResourceKey<Level> dimension, double x, double z) {
         super(Component.translatable("rysmap.screen.title"));
@@ -575,6 +571,7 @@ public final class MapScreen extends ScaledScreen {
         }
         selectionLine(g, partial);
         MapApi.Marker hover = markers(g, canvas, mx, my);
+        hoverPile = null;
         works.repka.rysmap.hud.Entities.Dot hoverDot = hover == null ? entities(g, canvas, mx, my, partial) : null;
         lastHoverDot = hoverDot;
         player(g, partial);
@@ -598,6 +595,8 @@ public final class MapScreen extends ScaledScreen {
                 }
             }
             tip = lines;
+        } else if (hoverDot == null && hoverPile != null && overCanvas) {
+            tip = hoverPile;
         } else if (hoverDot != null && overCanvas) {
             List<String> lines = new ArrayList<>();
             lines.add(hoverDot.label());
@@ -1049,7 +1048,8 @@ public final class MapScreen extends ScaledScreen {
         int right = visibleRight();
         double x0 = blockX(cx0), x1 = blockX(right), z0 = blockZ(cy0), z1 = blockZ(cy0 + ch);
         works.repka.rysmap.hud.Entities.Dot hover = null;
-        float mobSize = (float) Math.max(5, Math.min(9, zoom * 3));
+        float mobSize = (float) Math.max(6, Math.min(10, zoom * 3));
+        hoverPile = null;
         List<works.repka.rysmap.hud.Entities.Dot> all = works.repka.rysmap.hud.Entities.collect(dimension, x0, z0, x1, z1, partial, caves ? floor : null);
         // мобы пачкой (головы по типу), потом игроки с подписями
         List<works.repka.rysmap.hud.Entities.Dot> mobs = new ArrayList<>();
@@ -1061,9 +1061,13 @@ public final class MapScreen extends ScaledScreen {
             xy[mobs.size() * 2] = x;
             xy[mobs.size() * 2 + 1] = y;
             mobs.add(d);
-            if (hover == null && Math.abs(mx - x) <= mobSize / 2 + 1 && Math.abs(my - y) <= mobSize / 2 + 1) hover = d;
         }
-        works.repka.rysmap.hud.Entities.mobs(g, mobs, xy, mobSize);
+        // куча под курсором: один моб подсказывает как раньше, куча списком типов
+        for (works.repka.rysmap.hud.Entities.Drawn pile : works.repka.rysmap.hud.Entities.mobs(g, mobs, xy, mobSize)) {
+            if (!pile.over(mx, my)) continue;
+            if (pile.pile().count() == 1) hover = mobs.get(pile.pile().lead());
+            else hoverPile = works.repka.rysmap.hud.Entities.pileTip(mobs, pile.pile());
+        }
         for (works.repka.rysmap.hud.Entities.Dot d : all) {
             float x = sx(d.x()), y = sy(d.z());
             if (x < cx0 + 5 || x > right - 5 || y < cy0 + 5 || y > cy0 + ch - 5) continue;
@@ -1110,47 +1114,89 @@ public final class MapScreen extends ScaledScreen {
     }
 
     private void menu(GuiGraphics g, Theme t, int mx, int my) {
-        Menu m = menu;
-        int menuW = m.title != null || !m.hints.isEmpty() ? 150 : MENU_W;
-        int head = m.title != null ? 12 : 0;
-        int h = m.items.size() * MENU_ROW + 6 + head;
-        int x = Math.min(m.x, width - menuW - 4), y = Math.min(m.y, height - h - 4);
-        g.pose().pushPose();
-        g.pose().translate(0, 0, 400);
-        t.tooltipBox(g, x, y, menuW, h);
-        if (m.title != null) {
-            Draw.label(g, Draw.ellipsize(m.title, menuW - 12, 11, Weight.REGULAR), x + 6, y + 8, 11, Weight.REGULAR, t.c("text.muted"));
-            Draw.rect(g, x + 4, y + head + 1, menuW - 8, 1, t.c("panel.border"));
+        if (menu != null) menu.draw(g, t, hits, mx, my);
+    }
+
+    /**
+     * Меню ПКМ или меню игрока (макет Essentials 06) общим элементом ядра {@link works.repka.ryscore.ui.ContextMenu}:
+     * заголовок «Kot_Boris · Барсуки · 92 м», подсказки справа («запрос»). Пункты одной группы ({@link MapApi#menuGroup})
+     * уходят в подменю «Пинг ›» (отзыв автора 19.11); группа из одного видимого пункта остаётся пунктом. Между полосами
+     * порядка (метки до 10, дела до 900, инструменты дальше) тонкий разделитель.
+     */
+    private works.repka.ryscore.ui.ContextMenu buildMenu(int x, int y, MapApi.Spot spot, List<MapApi.MenuItem> items, @Nullable String title,
+                                                          java.util.Map<ResourceLocation, String> hints) {
+        record Entry(int order, @Nullable MapApi.MenuItem item, @Nullable MapApi.MenuGroup group, List<MapApi.MenuItem> members) {}
+        java.util.Map<ResourceLocation, List<MapApi.MenuItem>> grouped = new java.util.LinkedHashMap<>();
+        List<Entry> entries = new ArrayList<>();
+        for (MapApi.MenuItem item : items) {
+            ResourceLocation gid = menuGroupOf(item);
+            if (gid != null) grouped.computeIfAbsent(gid, k -> new ArrayList<>()).add(item);
+            else entries.add(new Entry(item.order(), item, null, List.of()));
         }
-        int ry = y + 3 + head;
-        for (MapApi.MenuItem item : m.items) {
-            boolean enabled = item.enabled(m.spot);
-            boolean hot = enabled && Kit.over(mx, my, x + 2, ry, menuW - 4, MENU_ROW);
-            if (hot) Draw.round(g, x + 2, ry, menuW - 4, MENU_ROW, 3, t.c("slot.hover"));
-            int color = enabled ? t.c("text.primary") : t.c("text.muted");
-            if (item.icon() != null) Icons.draw(g, item.icon(), x + 6, ry + 2.5f, 8, color);
-            String hint = m.hints.getOrDefault(item.id(), "");
-            float hw = hint.isEmpty() ? 0 : Draw.labelWidth(hint, 10.5f, Weight.REGULAR) + 6;
-            if (!hint.isEmpty()) Draw.label(g, hint, x + menuW - hw, ry + MENU_ROW / 2f, 10.5f, Weight.REGULAR, t.c("text.dim"));
-            Draw.label(g, Draw.ellipsize(item.label().getString(), menuW - 24 - hw, 12, Weight.REGULAR), x + 18, ry + MENU_ROW / 2f, 12, Weight.REGULAR, color);
-            if (enabled) {
-                hits.add(x + 2, ry, menuW - 4, MENU_ROW, b -> {
-                    menu = null;
-                    if (item.id().equals(PointsLayer.POINT_HERE)) {
-                        // в окне карты «Точка здесь» открывает окно новой точки (макет 16)
-                        openEditor(m.spot, (int) sx(m.spot.x() + 0.5), (int) sy(m.spot.z() + 0.5));
-                        return;
-                    }
-                    try {
-                        item.run(m.spot);
-                    } catch (Throwable e) {
-                        works.repka.rysmap.RYSMap.LOG.error("[rysmap] пункт меню {} упал", item.id(), e);
-                    }
-                });
+        for (java.util.Map.Entry<ResourceLocation, List<MapApi.MenuItem>> e : grouped.entrySet()) {
+            List<MapApi.MenuItem> members = e.getValue();
+            members.sort(java.util.Comparator.comparingInt(MapApi.MenuItem::order));
+            MapApi.MenuGroup group = MapApi.menuGroup(e.getKey());
+            if (members.size() == 1 || group == null) {
+                for (MapApi.MenuItem m : members) entries.add(new Entry(m.order(), m, null, List.of()));
+                continue;
             }
-            ry += MENU_ROW;
+            int order = group.order() != Integer.MIN_VALUE ? group.order() : members.get(0).order();
+            entries.add(new Entry(order, null, group, members));
         }
-        g.pose().popPose();
+        entries.sort(java.util.Comparator.comparingInt(Entry::order));
+        List<works.repka.ryscore.ui.ContextMenu.Item> rows = new ArrayList<>();
+        int band = -1;
+        for (Entry e : entries) {
+            int b = e.order() < 10 ? 0 : e.order() < 900 ? 1 : 2;
+            if (band >= 0 && b != band) rows.add(works.repka.ryscore.ui.ContextMenu.Item.divider());
+            band = b;
+            if (e.item() != null) {
+                rows.add(menuRow(e.item(), spot, hints));
+            } else {
+                List<works.repka.ryscore.ui.ContextMenu.Item> sub = new ArrayList<>();
+                for (MapApi.MenuItem m : e.members()) sub.add(menuRow(m, spot, hints));
+                Icons.Shape icon = e.group().icon() != null ? e.group().icon() : e.members().get(0).icon();
+                rows.add(works.repka.ryscore.ui.ContextMenu.Item.sub(icon, e.group().label().getString(), sub));
+            }
+        }
+        int menuW = title != null || !hints.isEmpty() ? 150 : MENU_W;
+        return new works.repka.ryscore.ui.ContextMenu(x, y, title, rows, menuW);
+    }
+
+    /**
+     * Группа пункта: своя, если ядро её знает; пинги RYSTeams 0.2.8 и свой пинг карты без группы тоже идут в «Пинг ›»,
+     * пока RYSTeams не обновлён.
+     */
+    static @Nullable ResourceLocation menuGroupOf(MapApi.MenuItem item) {
+        ResourceLocation g = item.group();
+        if (g != null && MapApi.menuGroup(g) != null) return g;
+        ResourceLocation id = item.id();
+        if (id.equals(PING_ITEM) || id.getNamespace().equals("rysteams") && id.getPath().startsWith("ping_")) return MapApi.PING_GROUP;
+        return null;
+    }
+
+    private works.repka.ryscore.ui.ContextMenu.Item menuRow(MapApi.MenuItem item, MapApi.Spot spot, java.util.Map<ResourceLocation, String> hints) {
+        boolean enabled;
+        try {
+            enabled = item.enabled(spot);
+        } catch (Throwable e) {
+            enabled = false;
+        }
+        works.repka.ryscore.ui.ContextMenu.Item row = works.repka.ryscore.ui.ContextMenu.Item.of(item.icon(), item.label().getString(), enabled, () -> {
+            if (item.id().equals(PointsLayer.POINT_HERE)) {
+                // в окне карты «Точка здесь» открывает окно новой точки (макет 16)
+                openEditor(spot, (int) sx(spot.x() + 0.5), (int) sy(spot.z() + 0.5));
+                return;
+            }
+            try {
+                item.run(spot);
+            } catch (Throwable e) {
+                works.repka.rysmap.RYSMap.LOG.error("[rysmap] пункт меню {} упал", item.id(), e);
+            }
+        });
+        String hint = hints.get(item.id());
+        return hint != null && !hint.isEmpty() ? row.hint(hint) : row;
     }
 
     /** Плашка подсветки сверху полотна: «Подсветка: Равнины» и крестик, который её снимает. */
@@ -1717,8 +1763,7 @@ public final class MapScreen extends ScaledScreen {
             return true;
         }
         if (menu != null) {
-            hits.click(x, y, button);
-            menu = null;
+            if (!menu.click(hits, x, y, button)) menu = null;
             return true;
         }
         if (hits.click(x, y, button)) return true;
@@ -1904,7 +1949,7 @@ public final class MapScreen extends ScaledScreen {
         String title = d.name() + (team ? " · " + Component.translatable("rysmap.player.own_team").getString() : "") + dist;
         int bx = (int) Math.floor(d.x()), bz = (int) Math.floor(d.z());
         MapApi.Spot spot = new MapApi.Spot(dimension, bx, (int) Math.floor(d.y()), bz, Math.floorDiv(bx, 16), Math.floorDiv(bz, 16));
-        menu = new Menu(x, y, spot, items, title, hints);
+        menu = buildMenu(x, y, spot, items, title, hints);
     }
 
     /** Для автотеста: меню игрока у метки. */
@@ -2136,6 +2181,22 @@ public final class MapScreen extends ScaledScreen {
         openMenu(cx0 + cw / 2 + 30, cy0 + ch / 2 + 20);
     }
 
+    /** Для автотеста: раскрыть первое подменю открытого меню («Пинг ›»); подписи пунктов меню и подменю. */
+    public List<String> openSubForTest() {
+        List<String> out = new ArrayList<>();
+        if (menu == null) return out;
+        List<works.repka.ryscore.ui.ContextMenu.Item> items = menu.items();
+        for (int i = 0; i < items.size(); i++) {
+            works.repka.ryscore.ui.ContextMenu.Item it = items.get(i);
+            if (it.submenu() && !it.children().isEmpty() && menu.openIndex() < 0) {
+                menu.openSub(i);
+                for (works.repka.ryscore.ui.ContextMenu.Item c : it.children()) out.add("  " + c.label());
+            }
+            out.add(it.label());
+        }
+        return out;
+    }
+
     void openMenu(int x, int y) {
         int bx = (int) Math.floor(blockX(x)), bz = (int) Math.floor(blockZ(y));
         LocalPlayer p = Minecraft.getInstance().player;
@@ -2153,7 +2214,7 @@ public final class MapScreen extends ScaledScreen {
             // свой пункт пинга (Т2); RYSTeams может заменить его своим, зарегистрировав тот же id rysmap:ping
             boolean own = MapApi.menus().stream().anyMatch(i -> i.id().equals(PING_ITEM));
             if (!own) items.add(MapApi.MenuItem.builder(PING_ITEM, Component.translatable("rysmap.menu.ping"))
-                .icon(Icons.Shape.BELL).order(10).run(sp -> works.repka.rysmap.client.ServerRules.ping(sp.dimension(), sp.x(), sp.y(), sp.z())).build());
+                .icon(Icons.Shape.BELL).order(11).group(MapApi.PING_GROUP).run(sp -> works.repka.rysmap.client.ServerRules.ping(sp.dimension(), sp.x(), sp.y(), sp.z())).build());
         }
         if (works.repka.rysmap.client.ServerRules.teleportAllowed()) {
             items.add(MapApi.MenuItem.builder(TELEPORT_ITEM, Component.translatable("rysmap.menu.teleport"))
@@ -2163,7 +2224,7 @@ public final class MapScreen extends ScaledScreen {
             .icon(Icons.Shape.SAVE).order(990).run(s -> exportPng(false)).build());
         items.add(MapApi.MenuItem.builder(ResourceLocation.fromNamespaceAndPath("rysmap", "copy"), Component.translatable("rysmap.menu.copy"))
             .icon(Icons.Shape.COPY).order(1000).run(s -> Minecraft.getInstance().keyboardHandler.setClipboard(s.x() + " " + s.y() + " " + s.z())).build());
-        menu = new Menu(x, y, spot, items);
+        menu = buildMenu(x, y, spot, items, null, java.util.Map.of());
     }
 
     @Override

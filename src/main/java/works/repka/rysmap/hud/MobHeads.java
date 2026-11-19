@@ -142,22 +142,39 @@ public final class MobHeads {
         Minecraft.getInstance().getMainRenderTarget().bindWrite(true);
     }
 
-    /** Места голов одной текстуры: x, y, сторона. */
+    /** Места голов одной текстуры: середина, радиус, прозрачность. */
     public static final class Batch {
         float[] xys = new float[32];
         int n;
 
-        void add(float x, float y, float size, float alpha) {
+        void add(float cx, float cy, float radius, float alpha) {
             if (n * 4 + 4 > xys.length) xys = java.util.Arrays.copyOf(xys, xys.length * 2);
-            xys[n * 4] = x;
-            xys[n * 4 + 1] = y;
-            xys[n * 4 + 2] = size;
+            xys[n * 4] = cx;
+            xys[n * 4 + 1] = cy;
+            xys[n * 4 + 2] = radius;
             xys[n * 4 + 3] = alpha;
             n++;
         }
     }
 
-    /** Головы по текстурам: один вызов отрисовки на тип. Текстура цели перевёрнута по высоте. */
+    /** Отрезков круга головы. */
+    private static final int SEGMENTS = 20;
+    /** Доля кадра в круге: лицо чуть крупнее, углы кадра (обычно пустые) срезаны. */
+    private static final float CROP = 0.46f;
+    private static final float[] COS = new float[SEGMENTS + 1], SIN = new float[SEGMENTS + 1];
+
+    static {
+        for (int i = 0; i <= SEGMENTS; i++) {
+            double a = Math.PI * 2 * i / SEGMENTS;
+            COS[i] = (float) Math.cos(a);
+            SIN[i] = (float) Math.sin(a);
+        }
+    }
+
+    /**
+     * Головы по текстурам кругами (отзыв автора 19.11: круг отличает моба от игрока, у которого квадрат): один вызов
+     * отрисовки на тип, круг треугольниками. Текстура цели перевёрнута по высоте.
+     */
     static void draw(GuiGraphics g, Map<Integer, Batch> heads) {
         works.repka.ryscore.ui.Batch.flush();
         g.flush();
@@ -168,13 +185,14 @@ public final class MobHeads {
         for (Map.Entry<Integer, Batch> e : heads.entrySet()) {
             Batch b = e.getValue();
             RenderSystem.setShaderTexture(0, e.getKey());
-            BufferBuilder buf = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            BufferBuilder buf = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_TEX_COLOR);
             for (int i = 0; i < b.n; i++) {
-                float x = b.xys[i * 4], y = b.xys[i * 4 + 1], s = b.xys[i * 4 + 2], a = b.xys[i * 4 + 3];
-                buf.addVertex(m, x, y, 0).setUv(0, 1).setColor(1f, 1f, 1f, a);
-                buf.addVertex(m, x, y + s, 0).setUv(0, 0).setColor(1f, 1f, 1f, a);
-                buf.addVertex(m, x + s, y + s, 0).setUv(1, 0).setColor(1f, 1f, 1f, a);
-                buf.addVertex(m, x + s, y, 0).setUv(1, 1).setColor(1f, 1f, 1f, a);
+                float cx = b.xys[i * 4], cy = b.xys[i * 4 + 1], r = b.xys[i * 4 + 2], a = b.xys[i * 4 + 3];
+                for (int k = 0; k < SEGMENTS; k++) {
+                    buf.addVertex(m, cx, cy, 0).setUv(0.5f, 0.5f).setColor(1f, 1f, 1f, a);
+                    buf.addVertex(m, cx + r * COS[k + 1], cy + r * SIN[k + 1], 0).setUv(0.5f + CROP * COS[k + 1], 0.5f - CROP * SIN[k + 1]).setColor(1f, 1f, 1f, a);
+                    buf.addVertex(m, cx + r * COS[k], cy + r * SIN[k], 0).setUv(0.5f + CROP * COS[k], 0.5f - CROP * SIN[k]).setColor(1f, 1f, 1f, a);
+                }
             }
             var mesh = buf.build();
             if (mesh != null) BufferUploader.drawWithShader(mesh);

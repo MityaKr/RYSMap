@@ -357,7 +357,7 @@ public final class Minimap {
             xy[mobs.size() * 2 + 1] = sy;
             mobs.add(d);
         }
-        Entities.mobs(g, mobs, xy, 5f);
+        Entities.mobs(g, mobs, xy, 6f);
         for (Entities.Dot d : dots) {
             if (!d.player()) continue;
             float sx = v.sx(d.x(), d.z()), sy = v.sy(d.x(), d.z());

@@ -32,8 +32,8 @@ import works.repka.rysmap.layer.Layers;
 import works.repka.rysmap.net.MapNet;
 
 /**
- * Сущности на миникарте и карте мира (просьба автора 18.11, план 5 «Потом»): игроки своей команды и чужие головами,
- * враждебные мобы красными точками, мирные зелёными. Два своих слоя «Игроки» и «Мобы» с глазом в списке слоёв.
+ * Сущности на миникарте и карте мира (просьба автора 18.11, план 5 «Потом»): игроки своей команды и чужие головами в
+ * квадрате, мобы головами в круге с кольцом цвета вида и кучами с числом (отзыв автора 19.11, {@link #mobs}). Два своих слоя «Игроки» и «Мобы» с глазом в списке слоёв.
  *
  * <p>Откуда данные. Рядом стоящих клиент знает сам и рисует плавно, между тиками. Дальних игроков (и в другом
  * измерении) раз в секунду присылает сервер с RYSMap ({@link MapNet.Players}), уже отобранных по правилу. Сервер может
@@ -258,6 +258,12 @@ public final class Entities {
         Draw.ring(g, cx, cy, r + 1 + t * r * 1.6f, 1f, Draw.alpha(color | 0xFF000000, 1f - t));
     }
 
+    /** Цвет кольца босса (иссушитель, дракон и боссы модов по тегу {@code c:bosses}). */
+    public static final int BOSS = 0xFFF2B84B;
+    /** Значок босса крупнее обычного во столько раз. */
+    static final float BOSS_SCALE = 1.5f;
+    private static final int RIM = 0xE6101216, BADGE_TEXT = 0xFF15181F;
+
     /** Точка моба: кружок с тёмной кромкой (запасной вид, пока голова не испечена или не печётся). */
     public static void mob(GuiGraphics g, Dot d, float x, float y, float r) {
         Draw.disc(g, x, y, r + 0.6f, Draw.alpha(0xCC101216, d.alpha()));
@@ -268,29 +274,108 @@ public final class Entities {
         return d.kind() == Kind.HOSTILE ? HOSTILE : d.kind() == Kind.PET ? PET : PASSIVE;
     }
 
+    static boolean boss(Dot d) {
+        return d.entity() != null && d.entity().getType().is(net.neoforged.neoforge.common.Tags.EntityTypes.BOSSES);
+    }
+
+    static int rank(Dot d) {
+        if (d.kind() == Kind.HOSTILE) return boss(d) ? MobPiles.BOSS : MobPiles.HOSTILE;
+        return d.kind() == Kind.PET ? MobPiles.PET : boss(d) ? MobPiles.BOSS : MobPiles.PASSIVE;
+    }
+
+    static int color(int rank) {
+        return switch (rank) {
+            case MobPiles.BOSS -> BOSS;
+            case MobPiles.HOSTILE -> HOSTILE;
+            case MobPiles.PET -> PET;
+            default -> PASSIVE;
+        };
+    }
+
+    /** Куча на экране: середина, радиус значка и сама куча (номера мобов во входном списке). */
+    public record Drawn(MobPiles.Pile pile, float x, float y, float r) {
+        public boolean over(double mx, double my) {
+            double dx = mx - x, dy = my - y;
+            return dx * dx + dy * dy <= (r + 1.5) * (r + 1.5);
+        }
+    }
+
     /**
-     * Мобы пачкой: голова моба ({@link MobHeads}) в рамке цвета «враждебный / мирный», без головы точка. Рамки идут
-     * общей пачкой ядра, головы одним вызовом отрисовки на тип моба.
+     * Мобы пачкой (отзыв автора 19.11, макет {@code _shared/_audit/map/mobs}, вариант B): голова моба ({@link MobHeads})
+     * в круге с тёмной кромкой и кольцом цвета вида: враждебные красные, мирные зелёные, питомцы синие, боссы золотые и в
+     * полтора раза крупнее. Круг отличает моба от игрока, у которого квадрат. Значки, которые легли бы друг на друга,
+     * схлопываются в один с числом ({@link MobPiles}). Без головы (печётся, не вышла, настройка «точками») кружок цвета.
+     * Кольца идут общей пачкой ядра, головы одним вызовом отрисовки на тип моба, числа поверх голов.
      *
-     * @param xy места на экране по паре чисел на моба
+     * @param xy   места на экране по паре чисел на моба
+     * @param size поперечник значка без кольца
+     * @return кучи на экране: окно карты ищет по ним моба под курсором
      */
-    public static void mobs(GuiGraphics g, List<Dot> dots, float[] xy, float size) {
-        if (dots.isEmpty()) return;
-        java.util.Map<Integer, MobHeads.Batch> heads = new java.util.HashMap<>();
-        float half = size / 2f;
-        for (int i = 0; i < dots.size(); i++) {
+    public static List<Drawn> mobs(GuiGraphics g, List<Dot> dots, float[] xy, float size) {
+        int n = dots.size();
+        if (n == 0) return List.of();
+        int[] rank = new int[n], type = new int[n];
+        float[] alpha = new float[n];
+        java.util.Map<Object, Integer> types = new java.util.IdentityHashMap<>();
+        for (int i = 0; i < n; i++) {
             Dot d = dots.get(i);
-            float x = xy[i * 2], y = xy[i * 2 + 1];
-            int tex = d.entity() == null || works.repka.rysmap.client.ClientConfig.get().mobsView == 2 ? -1 : MobHeads.texture(d.entity().getType());
-            if (tex < 0) {
-                mob(g, d, x, y, Math.max(1.5f, size * 0.28f));
-                continue;
+            rank[i] = rank(d);
+            alpha[i] = d.alpha();
+            Object key = d.entity() == null ? d.kind() : d.entity().getType();
+            Integer t = types.get(key);
+            if (t == null) types.put(key, t = types.size());
+            type[i] = t;
+        }
+        List<MobPiles.Pile> piles = MobPiles.group(xy, rank, type, alpha, n, size * 0.9f);
+        boolean dotsOnly = works.repka.rysmap.client.ClientConfig.get().mobsView == 2;
+        java.util.Map<Integer, MobHeads.Batch> heads = new java.util.HashMap<>();
+        List<Drawn> out = new ArrayList<>(piles.size());
+        for (MobPiles.Pile p : piles) {
+            Dot lead = dots.get(p.lead());
+            float r = size / 2f * (p.rank == MobPiles.BOSS ? BOSS_SCALE : 1f);
+            float a = p.alpha();
+            int color = color(p.rank);
+            Draw.disc(g, p.x, p.y, r + 1.5f, Draw.alpha(RIM, a));
+            Draw.disc(g, p.x, p.y, r + 0.8f, Draw.alpha(color, a));
+            int tex = lead.entity() == null || dotsOnly ? -1 : MobHeads.texture(lead.entity().getType());
+            if (tex < 0) Draw.disc(g, p.x, p.y, r, Draw.alpha(color, a));
+            else {
+                // под головой тёмный круг: прозрачные места кадра (рога, уши) не просвечивают картой
+                Draw.disc(g, p.x, p.y, r, Draw.alpha(0xFF22262E, a));
+                heads.computeIfAbsent(tex, k -> new MobHeads.Batch()).add(p.x, p.y, r, a);
             }
-            Draw.round(g, x - half - 1f, y - half - 1f, size + 2f, size + 2f, 1.5f, Draw.alpha(0xE0101216, d.alpha()));
-            Draw.round(g, x - half - 0.6f, y - half - 0.6f, size + 1.2f, size + 1.2f, 1.2f, Draw.alpha(rim(d), d.alpha()));
-            heads.computeIfAbsent(tex, k -> new MobHeads.Batch()).add(x - half, y - half, size, d.alpha());
+            out.add(new Drawn(p, p.x, p.y, r));
         }
         if (!heads.isEmpty()) MobHeads.draw(g, heads);
+        for (Drawn d : out) {
+            if (d.pile().count() > 1) badge(g, d.x(), d.y(), d.r(), size, MobPiles.countText(d.pile().count()), color(d.pile().rank), d.pile().alpha());
+        }
+        return out;
+    }
+
+    /** Число кучи: плашка цвета вида справа внизу от середины значка, тёмная кромка под фон. */
+    private static void badge(GuiGraphics g, float cx, float cy, float r, float size, String text, int color, float alpha) {
+        float px = Math.max(6f, size * 0.62f);
+        float h = px + 1f;
+        float w = Math.max(h, Draw.labelWidth(text, px, works.repka.ryscore.ui.Type.Weight.SEMIBOLD) + 3.5f);
+        float x = cx + r * 0.3f, y = cy + r * 0.15f;
+        Draw.round(g, x - 0.7f, y - 0.7f, w + 1.4f, h + 1.4f, (h + 1.4f) / 2f, Draw.alpha(RIM, alpha));
+        Draw.round(g, x, y, w, h, h / 2f, Draw.alpha(color, alpha));
+        float tw = Draw.labelWidth(text, px, works.repka.ryscore.ui.Type.Weight.SEMIBOLD);
+        Draw.label(g, text, x + (w - tw) / 2f, y + h / 2f, px, works.repka.ryscore.ui.Type.Weight.SEMIBOLD, Draw.alpha(BADGE_TEXT, alpha));
+    }
+
+    /** Подсказка над кучей: «Мобов: 6», ниже до трёх типов «Зомби ×4». */
+    public static List<String> pileTip(List<Dot> dots, MobPiles.Pile p) {
+        java.util.Map<String, Integer> byName = new java.util.LinkedHashMap<>();
+        for (int k = 0; k < p.count(); k++) byName.merge(dots.get(p.member(k)).label(), 1, Integer::sum);
+        List<java.util.Map.Entry<String, Integer>> sorted = new ArrayList<>(byName.entrySet());
+        sorted.sort((x, y) -> Integer.compare(y.getValue(), x.getValue()));
+        List<String> lines = new ArrayList<>();
+        lines.add(Component.translatable("rysmap.entity.pile", p.count()).getString());
+        for (int i = 0; i < Math.min(3, sorted.size()); i++) lines.add(sorted.get(i).getKey() + " ×" + sorted.get(i).getValue());
+        if (sorted.size() > 3) lines.add(Component.translatable("rysmap.entity.pile_more", sorted.size() - 3).getString());
+        return lines;
     }
 
     /** Голова игрока размером {@code size} в рамке: синей у своей команды, серой у чужих. */
