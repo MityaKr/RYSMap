@@ -222,6 +222,13 @@ final class SettingsPage {
         y = row(g, t, "rysmap.settings.corner", null, dw, lx, lw, y,
             (right, cy) -> Kit.dropdown(g, t, hits, cornerDrop, right - dw, cy + 2, dw, cornerName, Anchors.mapCorner() != Anchors.Corner.TOP_RIGHT, mx, my));
 
+        // где встают уведомления семьи (ядро 1.17): справа под миникартой, по центру под боссбарами, слева
+        works.repka.ryscore.ui.Notices.Place[] places = works.repka.ryscore.ui.Notices.Place.values();
+        String[] placeNames = new String[places.length];
+        for (int i = 0; i < places.length; i++) placeNames[i] = tr("rysmap.settings.notices." + places[i].name().toLowerCase(java.util.Locale.ROOT));
+        y = segRow(g, t, hits, "rysmap.settings.notices", "rysmap.settings.notices.note", lx, lw, y, placeNames,
+            works.repka.ryscore.ui.Notices.place().ordinal(), mx, my, i -> works.repka.ryscore.ui.Notices.setPlace(places[i]));
+
         int[] sizes = {0, 72, 96, 128};
         String[] sizeNames = {tr("rysmap.settings.size.auto"), "S", "M", "L"};
         int sel = 0;
