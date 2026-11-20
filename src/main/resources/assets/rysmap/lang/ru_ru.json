@@ -522,5 +522,8 @@
   "rysmap.export.failed": "Карта в PNG не сохранилась, причина в логе",
   "rysmap.export.done": "Карта сохранена: screenshots/rysmap",
   "rysmap.action.new_point": "Новая точка",
-  "rysmap.action.new_point.short": "Точка"
+  "rysmap.action.new_point.short": "Точка",
+  "rysmap.layers.tip.hide": "Клик: скрыть на карте",
+  "rysmap.layers.tip.show": "Клик: показать на карте",
+  "rysmap.layers.tip.settings": "ПКМ: настройки слоя"
 }

@@ -192,6 +192,8 @@ final class UiAutoTest {
             MapScreen.open();
         }, 80);
         shot("map");
+        // сайдбар 0.2.12: плитка слоёв, «Мир» на полотне; пещеры с этажом, узкое полотно, длинное имя, темы, сжатая, EN
+        sidebarShots();
         step("menu", () -> {
             if (mc().screen instanceof MapScreen s) s.openMenuForTest();
             else check("окно карты открыто", false);
@@ -241,5 +243,70 @@ final class UiAutoTest {
             RYSMap.LOG.info(MapAutoTest.failures == 0 ? "[autotest] PASS" : "[autotest] FAILED: {}", MapAutoTest.failures);
             mc().stop();
         }, 0);
+    }
+
+    private static MapScreen map() {
+        return (MapScreen) mc().screen;
+    }
+
+    private static void sidebarShots() {
+        step("sb caves", () -> map().cavesForTest(true, 3), 20);
+        shot("sb_caves");
+        step("sb panel", () -> check("точка Шахта выбрана", map().selectForTest("Шахта")), 15);
+        shot("sb_caves_panel");
+        step("sb long dim", () -> {
+            map().clearSelectionForTest();
+            map().cavesForTest(false, 0);
+            map().dimensionForTest("rysmap:very_long_dimension_name_for_the_world_bar_test");
+        }, 10);
+        shot("sb_long_dim");
+        step("sb glass", () -> {
+            map().dimensionForTest("");
+            works.repka.ryscore.theme.ThemeManager.select("ryscore:glass");
+        }, 15);
+        shot("sb_glass");
+        step("sb vanilla", () -> {
+            works.repka.ryscore.theme.ThemeManager.select("ryscore:vanilla");
+            map().cavesForTest(true, 3);
+        }, 15);
+        shot("sb_vanilla_caves");
+        step("sb compact", () -> {
+            works.repka.ryscore.theme.ThemeManager.select("ryscore:slate");
+            mc().setScreen(null);
+            org.lwjgl.glfw.GLFW.glfwSetWindowSize(mc().getWindow().getWindow(), 960, 600);
+        }, 20);
+        step("sb compact open", () -> {
+            check("маленькое окно включает сжатую раскладку", works.repka.ryscore.ui.UiScale.compactNeeded());
+            MapScreen.open();
+        }, 30);
+        step("sb compact caves", () -> map().cavesForTest(true, 3), 10);
+        shot("sb_compact_caves");
+        step("sb compact panel", () -> check("точка Шахта выбрана", map().selectForTest("Шахта")), 10);
+        shot("sb_compact_panel");
+        step("sb compact rail", () -> {
+            map().clearSelectionForTest();
+            map().cavesForTest(false, 0);
+            map().railForTest(true);
+        }, 10);
+        shot("sb_compact_rail");
+        step("sb big", () -> {
+            mc().setScreen(null);
+            org.lwjgl.glfw.GLFW.glfwSetWindowSize(mc().getWindow().getWindow(), 1280, 800);
+        }, 30);
+        step("sb en", () -> {
+            mc().options.languageCode = "en_us";
+            mc().getLanguageManager().setSelected("en_us");
+            mc().reloadResourcePacks();
+        }, 20);
+        when("sb en loaded", () -> mc().getOverlay() == null, MapScreen::open, 20);
+        step("sb en caves", () -> map().cavesForTest(true, 3), 10);
+        shot("sb_en_caves");
+        step("sb ru", () -> {
+            mc().setScreen(null);
+            mc().options.languageCode = "ru_ru";
+            mc().getLanguageManager().setSelected("ru_ru");
+            mc().reloadResourcePacks();
+        }, 20);
+        when("sb ru loaded", () -> mc().getOverlay() == null, MapScreen::open, 40);
     }
 }

@@ -36,9 +36,10 @@ import works.repka.rysmap.point.PointsLayer;
 
 /**
  * Окно карты (макет {@code 10}, урезано по плану 13.2). Шапка 28: плитка, имя мира, вкладка «Карта», шестерёнка
- * настроек, крестик. Сайдбар 122: «Мир» со списком измерений, «Слои» с глазом и числом меток, «Точки» по группам
- * «Мои» и «Гибель» с расстоянием, внизу «Точка здесь». Полотно: тайлы, области слоёв с обводкой групп, метки
- * с подписями; справа сверху справка и масштаб, слева снизу «Ко мне · Пробел» и координаты с биомом под курсором,
+ * настроек, крестик. Сайдбар 122 (0.2.12): «Слои» плиткой значков с числом меток, ниже всё место под «Точки» по
+ * группам «Мои» и «Гибель» с расстоянием, внизу «Точка здесь». Полотно: тайлы, области слоёв с обводкой групп, метки
+ * с подписями; слева сверху «Обзор | режимы», список измерения, «Поверхность | Пещеры» и этаж ({@link WorldBar});
+ * справа сверху справка и масштаб, слева снизу «Ко мне · Пробел» и координаты с биомом под курсором,
  * справа снизу линейка. Тянется мышью, колесо приближает к курсору, правая кнопка открывает меню (пункты модов из
  * {@link MapApi#menus()} и «Скопировать координаты»). Окно открывается сразу: недостающие тайлы приходят следом.
  */
@@ -223,7 +224,7 @@ public final class MapScreen extends ScaledScreen {
                 options.add(new Kit.Option(dimensionName(dimensions.get(i))));
                 if (dimensions.get(i).equals(dimension.location().toString())) selected = i;
             }
-            Kit.dropdownList(g, t, hits, dimDrop, options, selected, SIDEBAR - 14, mx, my, i -> switchTo(dimensions.get(i)));
+            Kit.dropdownList(g, t, hits, dimDrop, options, selected, 140, mx, my, i -> switchTo(dimensions.get(i)));
         }
         if (menu != null) menu(g, t, mx, my);
         else if (tip != null && !dimDrop.open && dialog == null && (editor == null || !editor.over(mx, my))) Kit.tooltip(g, t, tip, mx, my);
@@ -338,33 +339,14 @@ public final class MapScreen extends ScaledScreen {
             Draw.rect(g, wx + SIDEBAR - 1, top, 1, bottom - top - 1, t.c("panel.border"));
         }
         int x0 = wx + 4, rw = SIDEBAR - 8;
-        int y = top;
-        Kit.caps(g, t, Component.translatable("rysmap.screen.world").getString(), wx + 7, y + 10, 11, 0.44f);
-        y += 20;
-        Kit.dropdown(g, t, hits, dimDrop, wx + 7, y, SIDEBAR - 14, dimensionName(dimension.location().toString()), false, mx, my);
-        y += Kit.DROP_H + 2;
-        y = caveSwitch(g, t, wx + 7, y + 3, SIDEBAR - 14, mx, my) + 2;
+        int y = top + 2;
 
-        // слои
+        // слои плиткой значков (0.2.12): «Мир» переехал на полотно, место отдано точкам
         List<MapApi.Layer> layers = MapApi.layers();
         if (!layers.isEmpty() && !listExpanded) {
             Kit.caps(g, t, Component.translatable("rysmap.screen.layers").getString(), wx + 9, y + 6 + 3.25f, 11, 0.44f);
-            y += 15;
-            for (MapApi.Layer layer : layers) {
-                boolean on = Layers.visible(layer);
-                boolean hot = Kit.over(mx, my, x0, y, rw, ROW);
-                if (hot) Draw.round(g, x0, y, rw, ROW, 3.5f, t.c("slot.hover"));
-                int fg = on ? t.c("text.secondary") : t.c("text.dim");
-                Icons.draw(g, layer.icon(), x0 + 4.5f, y + 3, 8, on ? t.c("text.muted") : t.c("text.dim"));
-                int count = layer instanceof works.repka.rysmap.hud.Entities.Layer el ? el.count(dimension, caves ? floor : null) : Layers.markers(layer, dimension).size();
-                String ct = count > 0 ? Integer.toString(count) : "";
-                float ctw = Draw.labelWidth(ct, 11, Weight.REGULAR);
-                Draw.label(g, Draw.ellipsize(layer.name().getString(), rw - 30 - ctw, 12.5f, Weight.REGULAR), x0 + 17, y + ROW / 2f, 12.5f, Weight.REGULAR, hot ? t.c("text.primary") : fg);
-                if (!ct.isEmpty()) Draw.label(g, ct, x0 + rw - 17 - ctw, y + ROW / 2f, 11, Weight.REGULAR, on ? t.c("text.muted") : t.c("text.dim"));
-                eye(g, t, x0 + rw - 13, y + 3, on);
-                hits.add(x0, y, rw, ROW, b -> Layers.setVisible(layer, !on));
-                y += ROW;
-            }
+            y += 17;
+            y = layerTiles(g, t, layers, wx + 7, SIDEBAR - 14, y, mx, my) + 5;
         }
 
         // точки
@@ -493,11 +475,78 @@ public final class MapScreen extends ScaledScreen {
         return Math.sqrt(dx * dx + dz * dz);
     }
 
-    /** Глаз слоя: открытый, у выключенного тусклый и перечёркнутый. */
-    private static void eye(GuiGraphics g, Theme t, float x, float y, boolean on) {
-        int c = on ? t.c("text.secondary") : t.c("text.dim");
-        Icons.draw(g, Icons.Shape.EYE, x, y, 8, c);
-        if (!on) Draw.line(g, x + 0.5f, y + 7.5f, x + 7.5f, y + 0.5f, 0.9f, c);
+    /**
+     * Плитка слоёв (0.2.12): значок-переключатель на слой, включённый на плашке и яркий, выключенный без плашки и
+     * тусклый; число меток бейджем в правом верхнем углу. Имя, число и что делает клик в подсказке. Клик включает и
+     * выключает, ПКМ открывает настройки слоя, если они есть. Чужие слои реестра встают в ту же сетку, лишние уходят
+     * новой строкой. Возвращает низ сетки.
+     */
+    private int layerTiles(GuiGraphics g, Theme t, List<MapApi.Layer> layers, int x, int width, int top, int mx, int my) {
+        LayerGrid.Grid grid = LayerGrid.of(layers.size(), x, width);
+        boolean placesTab = works.repka.rysmap.client.PlacesClient.data().present && works.repka.rysmap.client.PlacesClient.data().op;
+        int hover = grid.at(mx, my, top);
+        for (int i = 0; i < layers.size(); i++) {
+            MapApi.Layer layer = layers.get(i);
+            int tx = grid.x(i), ty = grid.y(i, top), s = grid.tile();
+            boolean on = Layers.visible(layer), hot = i == hover;
+            if (t.beveled()) {
+                if (on) t.pressed(g, tx, ty, s, s, 0);
+                else t.button(g, tx, ty, s, s, hot, false);
+            } else {
+                float r = Math.min(t.r("button.radius"), 4.5f);
+                if (on) Draw.round(g, tx, ty, s, s, r, hot ? Draw.mix(t.c("filter.active.bg"), t.c("text.primary"), 0.08f) : t.c("filter.active.bg"));
+                else if (hot) Draw.round(g, tx, ty, s, s, r, t.c("slot.hover"));
+                Draw.roundBorder(g, tx, ty, s, s, r, on ? t.c("button.border") : Draw.alpha(t.c("panel.border"), 0.7f));
+            }
+            int fg = hot ? t.c("text.primary") : on ? t.c("text.secondary") : t.c("text.dim");
+            float ix = tx + (s - 8) / 2f, iy = ty + (s - 8) / 2f;
+            Icons.draw(g, layer.icon(), ix, iy, 8, fg);
+            // выключенный перечёркнут, как прежний глаз: состояние читается не только цветом (в vanilla плашки похожи)
+            if (!on) Draw.line(g, ix - 0.5f, iy + 8.5f, ix + 8.5f, iy - 0.5f, 0.9f, fg);
+        }
+        // бейджи отдельным проходом: угол бейджа заходит на соседний промежуток и не должен прятаться под плиткой
+        for (int i = 0; i < layers.size(); i++) {
+            MapApi.Layer layer = layers.get(i);
+            int count = layerCount(layer);
+            if (count <= 0) continue;
+            boolean on = Layers.visible(layer);
+            String text = count < 1000 ? Integer.toString(count) : works.repka.ryscore.ui.Numbers.compact(count);
+            float tw = Draw.labelWidth(text, 9.5f, Weight.SEMIBOLD);
+            float bh = 6.5f, bw = Math.max(bh, tw + 3);
+            float bx = grid.x(i) + grid.tile() - bw + 2.5f, by = grid.y(i, top) - 2.5f;
+            if (t.beveled()) Draw.rect(g, (int) bx, (int) by, (int) Math.ceil(bw), (int) Math.ceil(bh), t.c("button.bg"));
+            else Draw.roundBox(g, bx, by, bw, bh, bh / 2f, t.c("sidebar.bg"), on ? t.c("button.border") : t.c("panel.border"));
+            Draw.label(g, text, bx + (bw - tw) / 2f, by + bh / 2f, 9.5f, Weight.SEMIBOLD, on ? t.c("text.secondary") : t.c("text.dim"));
+        }
+        for (int i = 0; i < layers.size(); i++) {
+            MapApi.Layer layer = layers.get(i);
+            boolean on = Layers.visible(layer);
+            String tab = LayerGrid.settingsTab(layer.id().getNamespace(), layer.id().getPath(), placesTab);
+            hits.add(grid.x(i), grid.y(i, top), grid.tile(), grid.tile(), b -> {
+                if (b == GLFW.GLFW_MOUSE_BUTTON_RIGHT) {
+                    if (tab != null) {
+                        openSettings();
+                        if (settings != null) settings.tab(tab);
+                    }
+                } else if (b == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+                    Layers.setVisible(layer, !on);
+                }
+            });
+            if (i == hover) {
+                int count = layerCount(layer);
+                List<String> lines = new ArrayList<>();
+                lines.add(layer.name().getString() + (count > 0 ? " · " + works.repka.rysmap.hud.Minimap.group(count) : ""));
+                lines.add(Component.translatable(on ? "rysmap.layers.tip.hide" : "rysmap.layers.tip.show").getString());
+                if (tab != null) lines.add(Component.translatable("rysmap.layers.tip.settings").getString());
+                tip = lines;
+            }
+        }
+        return top + grid.height();
+    }
+
+    /** Число меток слоя в показанном измерении (у игроков и мобов по этажу). */
+    private int layerCount(MapApi.Layer layer) {
+        return layer instanceof works.repka.rysmap.hud.Entities.Layer el ? el.count(dimension, caves ? floor : null) : Layers.markers(layer, dimension).size();
     }
 
     /** Кнопка-инструмент (макет {@code .tb}, {@code .btn.sm}): значок, подпись, клавиша в рамке. */
@@ -580,7 +629,8 @@ public final class MapScreen extends ScaledScreen {
         works.repka.rysmap.hud.Entities.Dot hoverDot = hover == null ? entities(g, canvas, mx, my, partial) : null;
         lastHoverDot = hoverDot;
         player(g, partial);
-        modes(g, t, mx, my);
+        barBoxes.clear();
+        worldBar(g, t, modes(g, t, mx, my), mx, my);
         highlightChip(g, t, mx, my);
         keysHint(g, t, mx, my);
         tools(g, t, mx, my);
@@ -651,6 +701,7 @@ public final class MapScreen extends ScaledScreen {
 
     private boolean overTools(int mx, int my) {
         int right = visibleRight();
+        for (int[] b : barBoxes) if (Kit.over(mx, my, b[0], b[1], b[2], b[3])) return true;
         return Kit.over(mx, my, right - 6 - TOOL * 3 - 6, cy0 + 6, TOOL * 3 + 6, TOOL)
             || Kit.over(mx, my, cx0 + 6, cy0 + ch - 6 - TOOL, 170, TOOL)
             || Kit.over(mx, my, right - 6 - 110, cy0 + ch - 6 - TOOL, 110, TOOL)
@@ -1211,7 +1262,8 @@ public final class MapScreen extends ScaledScreen {
         String text = Component.translatable("rysmap.highlight", hl.title()).getString();
         float tw = Draw.labelWidth(text, 12, Weight.MEDIUM);
         int w = (int) Math.ceil(8 + 8 + 4 + tw + 6 + 10 + 4), h = 16;
-        int x = (int) (cx0 + (visibleRight() - cx0 - w) / 2f), y = cy0 + 6;
+        // под полосой режимов и «Мира» (0.2.12): сверху полотна она теперь занята
+        int x = (int) (cx0 + (visibleRight() - cx0 - w) / 2f), y = Math.max(cy0 + 6, barBottom + 4);
         Draw.roundBox(g, x, y, w, h, 4.5f, Draw.alpha(t.c("panel.bg"), 0.94f), Draw.alpha(hl.color() | 0xFF000000, 0.8f));
         Draw.disc(g, x + 10, y + h / 2f, 3.5f, hl.color() | 0xFF000000);
         Draw.label(g, text, x + 18, y + h / 2f, 12, Weight.MEDIUM, t.c("text.primary"));
@@ -1305,8 +1357,9 @@ public final class MapScreen extends ScaledScreen {
             Draw.rect(g, wx + RAIL - (int) r, (int) (bottom - 2 * r - 1), (int) r, (int) (2 * r), t.c("sidebar.bg"));
             Draw.rect(g, wx + RAIL - 1, top, 1, bottom - top - 1, t.c("panel.border"));
         }
-        Icons.Shape[] icons = {Icons.Shape.SIDEBAR, Icons.Shape.COMPASS, Icons.Shape.LAYERS, Icons.Shape.FLAG, Icons.Shape.USERS};
-        String[] tips = {"rysmap.rail.open", "rysmap.screen.world", "rysmap.screen.layers", "rysmap.screen.points", "rysmap.layer.players"};
+        // «Мир» живёт на полотне (0.2.12): в рейке его значка нет
+        Icons.Shape[] icons = {Icons.Shape.SIDEBAR, Icons.Shape.LAYERS, Icons.Shape.FLAG, Icons.Shape.USERS};
+        String[] tips = {"rysmap.rail.open", "rysmap.screen.layers", "rysmap.screen.points", "rysmap.layer.players"};
         int y = top + 6;
         for (int i = 0; i < icons.length; i++) {
             int iy = y + i * 17 + (i > 0 ? 6 : 0);
@@ -1353,51 +1406,116 @@ public final class MapScreen extends ScaledScreen {
         floor = Math.max(lo, Math.min(hi, floor + d));
     }
 
+    /** Места плашек полосы «Мира» в этом кадре: над ними полотно не тянется и не даёт подсказок чанка. */
+    private final List<int[]> barBoxes = new ArrayList<>();
+    /** Низ полосы режимов и «Мира»: плашка подсветки встаёт под ней. */
+    private int barBottom;
+
+    /** Пилюля сегмента полосы «Мира»: значок и подпись (или только значок), высота 14. */
+    private static final int SEG_PILL_H = 14;
+
+    private static int segPillWidth(String label, boolean active, boolean labels) {
+        if (!labels) return 18;
+        return (int) Math.ceil(Draw.labelWidth(label, 12, active ? Weight.MEDIUM : Weight.REGULAR)) + 9 + 12;
+    }
+
     /**
-     * «Поверхность | Пещеры» в сайдбаре (макеты {@code 21}, {@code 22}) и строка этажа со стрелками. В Нижнем мире
-     * «Срез | Этажи». Сервер может выключить пещеры: переключатель тогда серый с подсказкой. Возвращает низ.
+     * Полоса «Мира» сверху полотна (0.2.12, вариант 5 автора 20.11; макеты {@code 10}, {@code 21}, {@code 22}): справа от
+     * «Обзор | Приват» плашка со списком измерения и «Поверхность | Пещеры» (в Нижнем мире «Срез | Этажи»), под ней
+     * строка этажа со стрелками, когда включены пещеры. Сервер может выключить пещеры: сегмент тогда серый с подсказкой.
+     * Где что встаёт и что уступает место, решает {@link WorldBar}.
      */
-    private int caveSwitch(GuiGraphics g, Theme t, int x, int y, int w, int mx, int my) {
+    private void worldBar(GuiGraphics g, Theme t, int modesW, int mx, int my) {
         boolean allowed = works.repka.rysmap.client.ServerRules.cavesAllowed();
         if (!allowed) caves = false;
         MapSession s = ClientEntry.session();
         boolean nether = s != null && playerHere() && s.ceiling();
         String a = Component.translatable(nether ? "rysmap.cave.slice" : "rysmap.cave.surface").getString();
         String b = Component.translatable(nether ? "rysmap.cave.floors" : "rysmap.cave.caves").getString();
-        int h = 16, half = (w - 4) / 2;
-        if (t.beveled()) t.input(g, x, y, w, h, false);
-        else Draw.roundBox(g, x, y, w, h, 4.5f, t.c("input.bg"), t.c("panel.border"));
-        cavePill(g, t, x + 2, y + 2, half, Icons.Shape.SUN, a, !caves, true, mx, my, () -> caves = false);
-        cavePill(g, t, x + 2 + half, y + 2, w - 4 - half, Icons.Shape.CAVE, b, caves, allowed, mx, my, () -> caves = true);
-        if (!allowed && Kit.over(mx, my, x + 2 + half, y + 2, w - 4 - half, h - 4))
-            tip = List.of(Component.translatable("rysmap.cave.off_server").getString());
-        y += h + 2;
-        if (!caves) return y;
-        String text = Component.translatable("rysmap.cave.floor_short", Minimap.group(floor),
+        String dimName = dimensionName(dimension.location().toString());
+        int dropPref = Kit.dropdownWidth(dimName, 150), dropMin = Math.min(dropPref, 64);
+        int segFull = 2 + segPillWidth(a, !caves, true) + segPillWidth(b, caves, true);
+        int segIcons = 2 + 18 + 18;
+        String floorText = Component.translatable("rysmap.cave.floor_short", Minimap.group(floor),
             Minimap.group(works.repka.rysmap.scan.Floors.bottom(floor)), Minimap.group(works.repka.rysmap.scan.Floors.top(floor))).getString();
-        Draw.label(g, Draw.ellipsize(text, w - 30, 11.5f, Weight.REGULAR), x + 2, y + 6, 11.5f, Weight.REGULAR, t.c("text.secondary"));
-        int bx = x + w - 26;
-        boolean hotDown = Kit.over(mx, my, bx, y, 12, 12), hotUp = Kit.over(mx, my, bx + 14, y, 12, 12);
-        Icons.draw(g, Icons.Shape.DOWN, bx + 2, y + 2, 8, hotDown ? t.c("text.primary") : t.c("text.muted"));
-        Icons.draw(g, Icons.Shape.UP, bx + 16, y + 2, 8, hotUp ? t.c("text.primary") : t.c("text.muted"));
-        hits.add(bx, y, 12, 12, btn -> stepFloor(-1));
-        hits.add(bx + 14, y, 12, 12, btn -> stepFloor(1));
-        if (hotDown || hotUp) tip = List.of(Component.translatable("rysmap.cave.wheel").getString());
-        return y + 13;
+        int floorW = caves ? (int) Math.ceil(6 + 8 + 4 + Draw.labelWidth(floorText, 12, Weight.MEDIUM) + 6 + 14 + 1 + 14 + 2) : 0;
+        int right = visibleRight();
+        WorldBar.Plan plan = WorldBar.plan(cx0 + 6, cy0 + 6, right - 6 - TOOL * 3 - 6 - 6, right - 6, modesW, dropPref, dropMin, segFull, segIcons, floorW);
+        if (plan.modes() != null) barBoxes.add(new int[]{plan.modes().x(), plan.modes().y(), plan.modes().w(), WorldBar.H});
+
+        // плашка мира: список измерения и сегменты
+        WorldBar.Box w = plan.world();
+        barPlate(g, t, w.x(), w.y(), w.w(), WorldBar.H);
+        int dx = w.x() + WorldBar.PAD;
+        int dw = Kit.dropdown(g, t, hits, dimDrop, dx, w.y() + 2, plan.dropW(), dimName, false, mx, my);
+        if (dw < Draw.labelWidth(dimName, 12.5f, Weight.REGULAR) + 19 && Kit.over(mx, my, dx, w.y() + 2, dw, Kit.DROP_H) && !dimDrop.open) tip = List.of(dimName);
+        int px = dx + plan.dropW() + WorldBar.INNER;
+        Draw.rect(g, px - 2, w.y() + 4, 1, WorldBar.H - 8, t.c("panel.border"));
+        px += 1;
+        boolean labels = plan.segLabels();
+        px += segPill(g, t, px, w.y() + 2, Icons.Shape.SUN, a, !caves, true, labels, mx, my, () -> caves = false);
+        int bx = px;
+        int bw = segPill(g, t, px, w.y() + 2, Icons.Shape.CAVE, b, caves, allowed, labels, mx, my, () -> caves = true);
+        if (!allowed && Kit.over(mx, my, bx, w.y() + 2, bw, SEG_PILL_H)) tip = List.of(Component.translatable("rysmap.cave.off_server").getString());
+
+        // строка этажа (макет 22): значок, «Этаж 3 · y 48…63», стрелки ниже и выше
+        WorldBar.Box f = plan.floor();
+        if (f != null) {
+            barPlate(g, t, f.x(), f.y(), f.w(), WorldBar.H);
+            float cy = f.y() + WorldBar.H / 2f;
+            Icons.draw(g, Icons.Shape.LAYERS, f.x() + 6, cy - 4, 8, t.c("text.muted"));
+            int arrows = f.x() + f.w() - 2 - 14 - 1 - 14;
+            Draw.label(g, Draw.ellipsize(floorText, arrows - 6 - (f.x() + 18), 12, Weight.MEDIUM), f.x() + 18, cy, 12, Weight.MEDIUM, t.c("text.primary"));
+            boolean hotDown = Kit.over(mx, my, arrows, f.y() + 2, 14, 14), hotUp = Kit.over(mx, my, arrows + 15, f.y() + 2, 14, 14);
+            if (hotDown) Draw.round(g, arrows, f.y() + 2, 14, 14, 3.5f, Draw.alpha(t.c("filter.active.bg"), 0.5f));
+            if (hotUp) Draw.round(g, arrows + 15, f.y() + 2, 14, 14, 3.5f, Draw.alpha(t.c("filter.active.bg"), 0.5f));
+            Icons.draw(g, Icons.Shape.DOWN, arrows + 3, f.y() + 5, 8, hotDown ? t.c("text.primary") : t.c("text.muted"));
+            Icons.draw(g, Icons.Shape.UP, arrows + 18, f.y() + 5, 8, hotUp ? t.c("text.primary") : t.c("text.muted"));
+            hits.add(arrows, f.y() + 2, 14, 14, btn -> stepFloor(-1));
+            hits.add(arrows + 15, f.y() + 2, 14, 14, btn -> stepFloor(1));
+            if (hotDown || hotUp) tip = List.of(Component.translatable("rysmap.cave.wheel").getString());
+        }
+        barBottom = plan.bottom();
     }
 
-    private void cavePill(GuiGraphics g, Theme t, int x, int y, int w, Icons.Shape icon, String label, boolean active, boolean enabled, int mx, int my, Runnable run) {
-        int h = 12;
+    /** Подложка плашки на полотне: как у «Обзор | Приват»; нажатия мимо кнопок плашки не уходят в полотно. */
+    private void barPlate(GuiGraphics g, Theme t, int x, int y, int w, int h) {
+        barBoxes.add(new int[]{x, y, w, h});
+        hits.add(x, y, w, h, b -> {});
+        if (t.beveled()) t.input(g, x, y, w, h, false);
+        else Draw.roundBox(g, x, y, w, h, 4.5f, Draw.alpha(t.c("panel.bg"), 0.92f), t.c("panel.border"));
+    }
+
+    private int segPill(GuiGraphics g, Theme t, int x, int y, Icons.Shape icon, String label, boolean active, boolean enabled, boolean labels, int mx, int my, Runnable run) {
+        int h = SEG_PILL_H, w = segPillWidth(label, active, labels);
+        Weight weight = active ? Weight.MEDIUM : Weight.REGULAR;
         boolean hot = enabled && Kit.over(mx, my, x, y, w, h);
-        if (active) Draw.round(g, x, y, w, h, 3.5f, t.c("filter.active.bg"));
-        else if (hot) Draw.round(g, x, y, w, h, 3.5f, Draw.alpha(t.c("filter.active.bg"), 0.5f));
-        int fg = !enabled ? t.c("text.dim") : active ? t.c("text.primary") : t.c("text.muted");
-        String shown = Draw.ellipsize(label, w - 14, 11.5f, active ? Weight.MEDIUM : Weight.REGULAR);
-        float tw = Draw.labelWidth(shown, 11.5f, active ? Weight.MEDIUM : Weight.REGULAR);
-        float cx = x + (w - tw - 9) / 2f;
-        Icons.draw(g, icon, cx, y + 2.5f, 7, fg);
-        Draw.label(g, shown, cx + 9, y + h / 2f, 11.5f, active ? Weight.MEDIUM : Weight.REGULAR, fg);
-        if (enabled) hits.add(x, y, w, h, b -> run.run());
+        if (active) Draw.round(g, x, y, w, h, 4f, t.c("filter.active.bg"));
+        else if (hot) Draw.round(g, x, y, w, h, 4f, Draw.alpha(t.c("filter.active.bg"), 0.5f));
+        int fg = !enabled ? t.c("text.dim") : active || hot ? t.c("text.primary") : t.c("text.muted");
+        if (labels) {
+            Icons.draw(g, icon, x + 6, y + 3.5f, 7, fg);
+            Draw.label(g, label, x + 15, y + h / 2f, 12, weight, fg);
+        } else {
+            Icons.draw(g, icon, x + (w - 8) / 2f, y + 3, 8, fg);
+            if (Kit.over(mx, my, x, y, w, h)) tip = List.of(label);
+        }
+        if (enabled) hits.add(x, y, w, h, b -> {
+            if (b == 0) run.run();
+        });
+        return w;
+    }
+
+    /** Для автотеста: показать измерение по id (длинное имя в полосе «Мира»); пустая строка возвращает к игроку. */
+    public void dimensionForTest(String id) {
+        if (id.isEmpty()) toPlayer();
+        else switchTo(id);
+    }
+
+    /** Для автотеста: снять выбор точки и чужой метки. */
+    public void clearSelectionForTest() {
+        selected = null;
+        panelMarker = null;
     }
 
     /** Для автотеста: пещеры и этаж. */
@@ -1537,13 +1655,13 @@ public final class MapScreen extends ScaledScreen {
         }
     }
 
-    /** «Обзор | режимы модов» слева сверху полотна (макет {@code 10}); без режимов ничего. */
-    private void modes(GuiGraphics g, Theme t, int mx, int my) {
+    /** «Обзор | режимы модов» слева сверху полотна (макет {@code 10}); без режимов ничего. Возвращает ширину или 0. */
+    private int modes(GuiGraphics g, Theme t, int mx, int my) {
         List<MapApi.Mode> list = new ArrayList<>();
         for (MapApi.Mode m : MapApi.modes()) if (safe(m::available, false)) list.add(m);
         if (list.isEmpty()) {
             if (mode != null) setMode(null);
-            return;
+            return 0;
         }
         int x = cx0 + 6, y = cy0 + 6;
         String overview = Component.translatable("rysmap.screen.mode.overview").getString();
@@ -1556,6 +1674,7 @@ public final class MapScreen extends ScaledScreen {
         int px = x + 2;
         px += modePill(g, t, px, y + 2, Icons.Shape.COMPASS, overview, mode == null, mx, my, () -> setMode(null)) + 1;
         for (MapApi.Mode m : list) px += modePill(g, t, px, y + 2, m.icon(), m.name().getString(), mode == m, mx, my, () -> setMode(m)) + 1;
+        return bw;
     }
 
     private static int modePillWidth(String label, boolean active) {

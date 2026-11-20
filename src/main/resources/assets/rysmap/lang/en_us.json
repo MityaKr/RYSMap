@@ -522,5 +522,8 @@
   "rysmap.export.failed": "Map PNG was not saved, see the log",
   "rysmap.export.done": "Map saved: screenshots/rysmap",
   "rysmap.action.new_point": "New point",
-  "rysmap.action.new_point.short": "Point"
+  "rysmap.action.new_point.short": "Point",
+  "rysmap.layers.tip.hide": "Click: hide on the map",
+  "rysmap.layers.tip.show": "Click: show on the map",
+  "rysmap.layers.tip.settings": "Right-click: layer settings"
 }
