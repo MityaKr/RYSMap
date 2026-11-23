@@ -36,7 +36,7 @@ public final class FtbPoints {
             try {
                 json = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
             } catch (RuntimeException e) {
-                throw new FtbRegionReader.FormatException(dim.getKey() + ": waypoints.json не JSON (" + e.getMessage() + ")");
+                throw new FtbRegionReader.FormatException(dim.getKey() + ": waypoints.json is not JSON (" + e.getMessage() + ")");
             }
             if (!json.has("waypoints")) continue;
             for (JsonElement e : json.getAsJsonArray("waypoints")) {

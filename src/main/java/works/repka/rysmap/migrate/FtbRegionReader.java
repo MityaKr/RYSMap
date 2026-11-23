@@ -80,7 +80,7 @@ public final class FtbRegionReader {
 
     public static World open(Path dir) throws IOException {
         for (String f : List.of("dimensions.txt", "block_map.txt", "biome_map.txt"))
-            if (!Files.isRegularFile(dir.resolve(f))) throw new FormatException("нет " + f + " в " + dir.getFileName());
+            if (!Files.isRegularFile(dir.resolve(f))) throw new FormatException("no " + f + " in " + dir.getFileName());
         Map<String, Path> dims = new LinkedHashMap<>();
         for (String line : Files.readAllLines(dir.resolve("dimensions.txt"), StandardCharsets.UTF_8)) {
             String id = line.trim();
@@ -100,11 +100,11 @@ public final class FtbRegionReader {
             if (line.isEmpty()) continue;
             int space = line.indexOf(' ');
             if (!line.startsWith("#") || space != digits + 1)
-                throw new FormatException(file.getFileName() + ", строка " + n + ": ждали «#" + "X".repeat(digits) + " id»");
+                throw new FormatException(file.getFileName() + ", line " + n + ": expected '#" + "X".repeat(digits) + " id'");
             try {
                 out.put(Integer.parseInt(line.substring(1, space), 16), line.substring(space + 1).trim());
             } catch (NumberFormatException e) {
-                throw new FormatException(file.getFileName() + ", строка " + n + ": номер не число");
+                throw new FormatException(file.getFileName() + ", line " + n + ": the number is not a number");
             }
         }
         return out;
@@ -175,20 +175,20 @@ public final class FtbRegionReader {
     /** Читает регион. Картинки живут только внутри вызова. */
     public static Region read(Path zip) throws IOException {
         int[] xz = coords(zip.getFileName().toString());
-        if (xz == null) throw new FormatException("имя " + zip.getFileName() + " не XXXXX-ZZZZZ.zip");
+        if (xz == null) throw new FormatException("name " + zip.getFileName() + " is not XXXXX-ZZZZZ.zip");
         Map<String, byte[]> files = new HashMap<>();
         try (ZipInputStream in = new ZipInputStream(Files.newInputStream(zip))) {
             ZipEntry e;
             while ((e = in.getNextEntry()) != null) {
-                if (!ENTRIES.contains(e.getName())) throw new FormatException("в архиве лишний файл " + e.getName());
+                if (!ENTRIES.contains(e.getName())) throw new FormatException("extra file in the archive: " + e.getName());
                 // оттенки не нужны: пропускаются без распаковки в кучу
                 if (e.getName().equals("chunks.dat") || e.getName().equals("data.png") || e.getName().equals("blocks.png")) files.put(e.getName(), in.readAllBytes());
                 else files.put(e.getName(), new byte[0]);
             }
         } catch (java.util.zip.ZipException e) {
-            throw new FormatException("архив испорчен: " + e.getMessage());
+            throw new FormatException("archive is corrupt: " + e.getMessage());
         }
-        if (files.size() != ENTRIES.size()) throw new FormatException("в архиве " + files.size() + " файлов из " + ENTRIES.size() + ": " + files.keySet());
+        if (files.size() != ENTRIES.size()) throw new FormatException("the archive has " + files.size() + " files of " + ENTRIES.size() + ": " + files.keySet());
         List<Chunk> chunks = chunks(files.get("chunks.dat"));
         BufferedImage data = image(files.remove("data.png"), "data.png");
         BufferedImage blocks = image(files.remove("blocks.png"), "blocks.png");
@@ -213,20 +213,20 @@ public final class FtbRegionReader {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes))) {
             int zero = in.readUnsignedByte();
             int version = in.readUnsignedByte();
-            if (zero != 0 || version != CHUNKS_VERSION) throw new FormatException("chunks.dat: версия " + version + ", читается " + CHUNKS_VERSION);
+            if (zero != 0 || version != CHUNKS_VERSION) throw new FormatException("chunks.dat: version " + version + ", readable " + CHUNKS_VERSION);
             int count = in.readShort();
-            if (count < 0 || count > 1024) throw new FormatException("chunks.dat: число чанков " + count);
+            if (count < 0 || count > 1024) throw new FormatException("chunks.dat: chunk count " + count);
             List<Chunk> out = new ArrayList<>(count);
             for (int i = 0; i < count; i++) {
                 in.readUnsignedByte(); // версия чанка, у RepYS 4
                 int x = in.readUnsignedByte(), z = in.readUnsignedByte();
                 long time = in.readLong();
-                if (x > 31 || z > 31) throw new FormatException("chunks.dat: чанк " + x + "," + z + " вне региона");
+                if (x > 31 || z > 31) throw new FormatException("chunks.dat: chunk " + x + "," + z + " outside the region");
                 out.add(new Chunk(x, z, time));
             }
             return out;
         } catch (java.io.EOFException e) {
-            throw new FormatException("chunks.dat обрезан");
+            throw new FormatException("chunks.dat is truncated");
         }
     }
 
@@ -236,9 +236,9 @@ public final class FtbRegionReader {
         try (InputStream in = new ByteArrayInputStream(bytes)) {
             img = ImageIO.read(in);
         }
-        if (img == null) throw new FormatException(name + " не картинка");
+        if (img == null) throw new FormatException(name + " is not an image");
         if (img.getWidth() != RegionData.SIZE || img.getHeight() != RegionData.SIZE)
-            throw new FormatException(name + " " + img.getWidth() + "×" + img.getHeight() + ", ждали 512×512");
+            throw new FormatException(name + " " + img.getWidth() + "×" + img.getHeight() + ", expected 512×512");
         return img;
     }
 
@@ -249,7 +249,7 @@ public final class FtbRegionReader {
      * @return сколько чанков перенесено
      */
     public static int write(Region src, World world, RegionData dst, Palette palette) {
-        if (src.x != dst.x || src.z != dst.z) throw new IllegalArgumentException("регионы разные");
+        if (src.x != dst.x || src.z != dst.z) throw new IllegalArgumentException("different regions");
         Map<Integer, Integer> blockIds = new HashMap<>(), biomeIds = new HashMap<>();
         int written = 0;
         for (Chunk c : src.chunks) {

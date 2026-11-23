@@ -133,7 +133,7 @@ public final class ColorTable implements MapColors {
         pending = null;
         version.incrementAndGet();
         ready = true;
-        RYSMap.LOG.info("[rysmap] цвета {} блоков готовы за {} мс главного потока, поправок {}", names.size(), buildNanos / 1_000_000, overrides.size());
+        RYSMap.LOG.info("[rysmap] colors of {} blocks ready in {} ms of the main thread, adjustments {}", names.size(), buildNanos / 1_000_000, overrides.size());
         return true;
     }
 
@@ -246,7 +246,7 @@ public final class ColorTable implements MapColors {
                         if (o != null) out.put(e.getKey(), o);
                     }
                 } catch (Exception ex) {
-                    RYSMap.LOG.warn("[rysmap] {} из {} не прочитался: {}", loc, res.sourcePackId(), ex.toString());
+                    RYSMap.LOG.warn("[rysmap] {} from {} could not be read: {}", loc, res.sourcePackId(), ex.toString());
                 }
             }
         }

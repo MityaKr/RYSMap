@@ -59,7 +59,7 @@ public final class PlacesStep implements Migrations.Step {
     @Override
     public Migrations.Report run(Migrations.Context c) throws Exception {
         MinecraftServer server = c.server();
-        if (server == null) throw new IllegalStateException("шаг places идёт только на сервере");
+        if (server == null) throw new IllegalStateException("the places step runs only on the server");
         FtbPlaces.Source src = FtbPlaces.read(dir(c));
         PlaceStore store = PlaceStore.get(server);
         PlaceBook book = store.book();
@@ -70,13 +70,13 @@ public final class PlacesStep implements Migrations.Step {
         // база одним сохранением до отметки «сделано»
         server.overworld().getDataStorage().save();
         Migrations.Report r = Migrations.Report.create().count("places", n.places).count("homes", n.homes).count("back", n.back).count("players", n.players);
-        r.line("перенесено: мест сервера " + n.places + ", домов " + n.homes + ", записей «назад» " + n.back + " (игроков " + n.players + ")");
-        r.line("теперь в базе: " + PlaceStore.summary(book));
-        if (n.placesSkipped + n.homesSkipped > 0) r.line("уже были и не тронуты: мест " + n.placesSkipped + ", домов " + n.homesSkipped);
+        r.line(Say.t("places_done", "migrated: %s server places, %s homes, %s \"back\" entries (players: %s)", n.places, n.homes, n.back, n.players));
+        r.line(Say.t("now_in_base", "now in the base: %s", PlaceStore.summary(book)));
+        if (n.placesSkipped + n.homesSkipped > 0) r.line(Say.t("untouched", "already there and untouched: %s places, %s homes", n.placesSkipped, n.homesSkipped));
         for (String s : n.skipped) r.skipped(s, "");
-        r.skipped("nick, kits, kit_use_times, muted, fly, god, last_seen", "не места: их переносит RYSHelm (шаг admin) или не переносим");
-        for (String bad : src.unreadable()) r.partial("файл игрока не прочитался: " + bad);
-        c.log("места FTB Essentials: " + n.places + " мест сервера, " + n.homes + " домов, " + n.back + " записей «назад»");
+        r.skipped("nick, kits, kit_use_times, muted, fly, god, last_seen", Say.t("not_places", "not places: RYSHelm migrates them (admin step) or they are not migrated"));
+        for (String bad : src.unreadable()) r.partial(Say.t("player_unread", "player file could not be read: %s", bad));
+        c.log("FTB Essentials places: " + n.places + " server places, " + n.homes + " homes, " + n.back + " 'back' entries");
         return r;
     }
 }

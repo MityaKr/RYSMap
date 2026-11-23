@@ -111,7 +111,7 @@ class FtbMapStepTest {
         // первый заход: «выход из мира» после 40 регионов
         host.regionsLeft = 40;
         IOException stop = assertThrows(IOException.class, () -> FtbMapStep.migrate(ftb, data, () -> saves[0]++, host, false));
-        assertTrue(stop.getMessage().contains("продолжится"), stop.getMessage());
+        assertTrue(stop.getMessage().contains("continue"), stop.getMessage());
         assertEquals(40, data.getAsJsonArray("regions").size(), "пройденные регионы записаны в данные шага");
         assertEquals(expectedPoints, data.get("points").getAsInt());
         host.close();
@@ -198,13 +198,13 @@ class FtbMapStepTest {
         Files.createDirectories(maps.resolve(old.id()).resolve("minecraft/overworld"));
         Files.writeString(maps.resolve(old.id()).resolve("points.json"), "{\"v\":1,\"points\":[]}");
         String what = MapStore.adopt(maps, old, uuid);
-        assertTrue(what.contains("переехала"), what);
+        assertTrue(what.contains("moved to"), what);
         assertFalse(Files.exists(maps.resolve(old.id())));
         assertTrue(Files.isRegularFile(maps.resolve(uuid.id()).resolve("points.json")));
         assertTrue(Files.readString(maps.resolve(uuid.id()).resolve("world.json")).contains(old.id()), "старый ключ записан");
         // обе папки есть: старая остаётся как есть
         Files.createDirectories(maps.resolve(old.id()));
-        assertTrue(MapStore.adopt(maps, old, uuid).contains("уже есть"));
+        assertTrue(MapStore.adopt(maps, old, uuid).contains("already exists"));
         assertTrue(Files.isDirectory(maps.resolve(old.id())));
         Set<String> names = new HashSet<>();
         try (Stream<Path> s = Files.list(maps)) {

@@ -385,7 +385,7 @@ public final class Travel implements TravelApi {
                 Res res = land(p, trip, level, column, x, z, done, retry, attempt);
                 if (!res.result().ok()) fail(p, done, res.result().message(), res.code());
             } catch (RuntimeException e) {
-                RYSMap.LOG.warn("[rysmap] перенос {} не прошёл: {}", p == null ? id : p.getGameProfile().getName(), e.toString());
+                RYSMap.LOG.warn("[rysmap] transfer {} failed: {}", p == null ? id : p.getGameProfile().getName(), e.toString());
                 if (p != null) fail(p, done, Component.translatable("rysmap.tp.unsafe"), "unsafe");
             } finally {
                 for (ChunkPos cp : held) level.getChunkSource().removeRegionTicket(TICKET, cp, 1, cp);
@@ -419,7 +419,7 @@ public final class Travel implements TravelApi {
                     return Res.of(Result.done());
                 }
             }
-            RYSMap.LOG.info("[rysmap] перенос {} ({}): в {} {} {} нет безопасного места", player.getGameProfile().getName(), trip.reason(),
+            RYSMap.LOG.info("[rysmap] transfer {} ({}): no safe spot at {} {} {}", player.getGameProfile().getName(), trip.reason(),
                 level.dimension().location(), x, z);
             if (trip.reason().equals(Reason.MAP)) mark(player, MAP_KEY);
             return new Res(Result.denied(Component.translatable(retry != null ? "rysmap.travel.no_random" : "rysmap.tp.unsafe")), "unsafe");
@@ -443,7 +443,7 @@ public final class Travel implements TravelApi {
         player.resetFallDistance();
         if (trip.recordBack()) rememberBack(player, from, trip.reason());
         if (!trip.skipCooldown() && !trip.reason().equals(Reason.STAFF)) mark(player, key(trip.reason()));
-        RYSMap.LOG.info("[rysmap] перенос {} ({}): {} {} {} {}", player.getGameProfile().getName(), trip.reason(), level.dimension().location(),
+        RYSMap.LOG.info("[rysmap] transfer {} ({}): {} {} {} {}", player.getGameProfile().getName(), trip.reason(), level.dimension().location(),
             (int) Math.floor(x), (int) Math.floor(y), (int) Math.floor(z));
         if (done != null) done.accept(true, Component.empty(), "");
         PlacesServer.changed(player);

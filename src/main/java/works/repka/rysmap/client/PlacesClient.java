@@ -133,7 +133,7 @@ public final class PlacesClient {
             if (o.has("spawn")) d.spawn = place(o.getAsJsonObject("spawn"), "spawn", 0);
             if (o.has("bed")) d.bed = place(o.getAsJsonObject("bed"), "bed", 0);
         } catch (RuntimeException e) {
-            RYSMap.LOG.warn("[rysmap] места с сервера не прочитались: {}", e.toString());
+            RYSMap.LOG.warn("[rysmap] places from the server could not be read: {}", e.toString());
             return;
         }
         d.at = System.currentTimeMillis();

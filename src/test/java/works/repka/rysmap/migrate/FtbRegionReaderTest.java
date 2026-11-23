@@ -150,11 +150,11 @@ class FtbRegionReaderTest {
         Path zip = world.resolve("minecraft_overworld/0EA60-0EA60.zip");
         Files.write(zip, region(true, 3));
         var extra = assertThrows(FtbRegionReader.FormatException.class, () -> FtbRegionReader.read(zip));
-        assertTrue(extra.getMessage().contains("лишний"), extra.getMessage());
+        assertTrue(extra.getMessage().contains("extra"), extra.getMessage());
 
         Files.write(zip, region(false, 2));
         var version = assertThrows(FtbRegionReader.FormatException.class, () -> FtbRegionReader.read(zip));
-        assertTrue(version.getMessage().contains("версия"), version.getMessage());
+        assertTrue(version.getMessage().contains("version"), version.getMessage());
 
         byte[] good = region(false, 3);
         Files.write(zip, java.util.Arrays.copyOf(good, good.length / 2));

@@ -88,20 +88,20 @@ public final class MapSession {
     public MapSession(MapStore store, ClientConfig config) {
         this.store = store;
         this.config = config;
-        this.worker = new MapWorker("RYSMap worker", t -> RYSMap.LOG.error("[rysmap] сбой задачи рабочего потока", t));
+        this.worker = new MapWorker("RYSMap worker", t -> RYSMap.LOG.error("[rysmap] worker thread task failed", t));
         this.tiles = new TileTextures(this::requestRegion, config.textures, config.textureIdleSeconds);
         this.overview = new TileTextures(this::requestOverview, 256, 30, OVERVIEW_SIDE);
         this.highlight = new TileTextures(this::requestHighlight, 128, 20, 128);
         try {
             store.touch();
         } catch (IOException e) {
-            RYSMap.LOG.warn("[rysmap] world.json не записался: {}", e.toString());
+            RYSMap.LOG.warn("[rysmap] world.json was not saved: {}", e.toString());
         }
         works.repka.rysmap.point.PointStore p;
         try {
             p = works.repka.rysmap.point.PointStore.load(store.root().resolve("points.json"));
         } catch (IOException | RuntimeException e) {
-            RYSMap.LOG.warn("[rysmap] points.json не прочитался ({}), файл отложен, точки начнутся заново", e.toString());
+            RYSMap.LOG.warn("[rysmap] points.json could not be read ({}), file set aside, points start anew", e.toString());
             try {
                 java.nio.file.Path f = store.root().resolve("points.json");
                 if (java.nio.file.Files.exists(f)) works.repka.rysmap.tile.RegionFile.quarantine(f);
@@ -111,7 +111,7 @@ public final class MapSession {
             p = new works.repka.rysmap.point.PointStore();
         }
         this.points = p;
-        RYSMap.LOG.info("[rysmap] карта мира «{}» в {}, точек {}", store.key().name(), store.root(), points.points().size());
+        RYSMap.LOG.info("[rysmap] map of world '{}' in {}, points {}", store.key().name(), store.root(), points.points().size());
     }
 
     public works.repka.rysmap.point.PointStore points() {
@@ -123,7 +123,7 @@ public final class MapSession {
         try {
             points.save(store.root().resolve("points.json"));
         } catch (IOException e) {
-            RYSMap.LOG.warn("[rysmap] points.json не записался: {}", e.toString());
+            RYSMap.LOG.warn("[rysmap] points.json was not saved: {}", e.toString());
         }
     }
 
@@ -160,7 +160,7 @@ public final class MapSession {
         overview.keepOnly(dim);
         highlight.keepOnly(dim);
         if (old != null) worker.submit(() -> closeOthers(dim));
-        RYSMap.LOG.info("[rysmap] измерение {}{}{}", dim, ceiling ? " (потолок: срез под потолком)" : "", noMap ? " (без карты)" : "");
+        RYSMap.LOG.info("[rysmap] dimension {}{}{}", dim, ceiling ? " (ceiling: slice under the ceiling)" : "", noMap ? " (no map)" : "");
     }
 
     public void chunkLoaded(int chunkX, int chunkZ) {
@@ -440,7 +440,7 @@ public final class MapSession {
             try {
                 dim(dim).index(regionX, regionZ);
             } catch (IOException e) {
-                RYSMap.LOG.warn("[rysmap] регион {},{} {} не прочитался: {}", regionX, regionZ, dim, e.toString());
+                RYSMap.LOG.warn("[rysmap] region {},{} {} could not be read: {}", regionX, regionZ, dim, e.toString());
                 index(dim).putIfAbsent(RegionData.key(regionX, regionZ), new int[RegionData.CHUNKS * RegionData.CHUNKS]);
             }
         });
@@ -452,7 +452,7 @@ public final class MapSession {
             try {
                 px = dim(dim).bakeRegion(regionX, regionZ);
             } catch (IOException e) {
-                RYSMap.LOG.warn("[rysmap] регион {},{} {} не прочитался: {}", regionX, regionZ, dim, e.toString());
+                RYSMap.LOG.warn("[rysmap] region {},{} {} could not be read: {}", regionX, regionZ, dim, e.toString());
             }
             results.add(new TileTextures.Pixels(dim, regionX, regionZ, px));
         });
@@ -483,7 +483,7 @@ public final class MapSession {
             try {
                 px = dim(dim).highlightRegion(regionX, regionZ, biomes, h.minY(), h.maxY(), (h.color() & 0xFFFFFF) | 0x99000000, 128);
             } catch (IOException e) {
-                RYSMap.LOG.warn("[rysmap] регион {},{} {} не прочитался: {}", regionX, regionZ, dim, e.toString());
+                RYSMap.LOG.warn("[rysmap] region {},{} {} could not be read: {}", regionX, regionZ, dim, e.toString());
             }
             results.add(new HighlightMask(h, new TileTextures.Pixels(dim, regionX, regionZ, px)));
         });
@@ -499,7 +499,7 @@ public final class MapSession {
                 int[] full = dim(dim).bakeRegion(regionX, regionZ);
                 if (full != null) px = TileTextures.downsample(full, OVERVIEW_SIDE);
             } catch (IOException e) {
-                RYSMap.LOG.warn("[rysmap] регион {},{} {} не прочитался: {}", regionX, regionZ, dim, e.toString());
+                RYSMap.LOG.warn("[rysmap] region {},{} {} could not be read: {}", regionX, regionZ, dim, e.toString());
             }
             results.add(new Overview(new TileTextures.Pixels(dim, regionX, regionZ, px)));
         });
@@ -527,7 +527,7 @@ public final class MapSession {
                                                                     works.repka.rysmap.migrate.FtbRegionReader.World world) {
         java.util.concurrent.CompletableFuture<Integer> out = new java.util.concurrent.CompletableFuture<>();
         if (closed) {
-            out.completeExceptionally(new IOException("карта закрыта"));
+            out.completeExceptionally(new IOException("map is closed"));
             return out;
         }
         worker.submit(() -> {
@@ -550,7 +550,7 @@ public final class MapSession {
                                                                              java.nio.file.Path file) {
         java.util.concurrent.CompletableFuture<java.nio.file.Path> out = new java.util.concurrent.CompletableFuture<>();
         if (closed) {
-            out.completeExceptionally(new IOException("карта закрыта"));
+            out.completeExceptionally(new IOException("map is closed"));
             return out;
         }
         java.util.List<int[]> regions = new java.util.ArrayList<>();
@@ -573,14 +573,14 @@ public final class MapSession {
             write.run();
             return out;
         }
-        RYSMap.LOG.info("[rysmap] экспорт {}: {} регионов из {}, {}×{} точек, шаг {}", dimensionId, regions.size(), dir, plan.width(), plan.height(), plan.step());
+        RYSMap.LOG.info("[rysmap] export {}: {} regions of {}, {}×{} points, step {}", dimensionId, regions.size(), dir, plan.width(), plan.height(), plan.step());
         for (int[] r : regions) {
             worker.submit(() -> {
                 try {
                     int[] px = dim(dimensionId).bakeRegion(r[0], r[1]);
                     if (px != null) works.repka.rysmap.tile.MapExport.compose(plan, px, r[0], r[1], image);
                 } catch (Throwable t) {
-                    RYSMap.LOG.warn("[rysmap] экспорт: регион {} {} не испёкся: {}", r[0], r[1], t.toString());
+                    RYSMap.LOG.warn("[rysmap] export: region {} {} was not baked: {}", r[0], r[1], t.toString());
                 }
                 if (left.decrementAndGet() == 0) write.run();
             });
@@ -641,7 +641,7 @@ public final class MapSession {
                 java.nio.file.Files.copy(file, file.resolveSibling("points.before-ftb-" + stamp + ".json"));
             }
         } catch (IOException e) {
-            RYSMap.LOG.warn("[rysmap] копия points.json не сделана: {}", e.toString());
+            RYSMap.LOG.warn("[rysmap] points.json copy was not made: {}", e.toString());
         }
         int added = works.repka.rysmap.migrate.FtbImport.mergePoints(points, ftb);
         if (added > 0) savePoints();
@@ -659,7 +659,7 @@ public final class MapSession {
                 int cap = works.repka.rysmap.scan.Floors.floor(id) == null ? config.rawRegions : Math.max(9, config.rawRegions / 3);
                 d = new DimensionMap(store, id, ColorTable.INSTANCE, cap, index(id), s -> RYSMap.LOG.warn("[rysmap] {}", s));
             } catch (IOException e) {
-                throw new RuntimeException("папка карты " + id + " недоступна", e);
+                throw new RuntimeException("map folder " + id + " is not available", e);
             }
             dims.put(id, d);
         }
@@ -682,7 +682,7 @@ public final class MapSession {
             scanCount.incrementAndGet();
             stats(d);
         } catch (IOException e) {
-            RYSMap.LOG.warn("[rysmap] чанк {},{} не записался: {}", snap.chunkX, snap.chunkZ, e.toString());
+            RYSMap.LOG.warn("[rysmap] chunk {},{} was not saved: {}", snap.chunkX, snap.chunkZ, e.toString());
         } finally {
             pending.decrementAndGet();
         }
@@ -724,7 +724,7 @@ public final class MapSession {
             try {
                 d.flush();
             } catch (IOException e) {
-                RYSMap.LOG.warn("[rysmap] карта {} не записалась: {}", d.dimension, e.toString());
+                RYSMap.LOG.warn("[rysmap] map {} was not saved: {}", d.dimension, e.toString());
             }
         }
         if (!dims.isEmpty()) stats(null);
@@ -742,7 +742,7 @@ public final class MapSession {
         try {
             d.close();
         } catch (IOException e) {
-            RYSMap.LOG.warn("[rysmap] карта {} не записалась: {}", id, e.toString());
+            RYSMap.LOG.warn("[rysmap] map {} was not saved: {}", id, e.toString());
         }
         stats(null);
     }
@@ -757,7 +757,7 @@ public final class MapSession {
         overview.close();
         highlight.close();
         results.clear();
-        RYSMap.LOG.info("[rysmap] карта закрыта: снимков {}, среднее {} мкс, худший {} мкс; разбор в рабочем потоке {} мкс на чанк",
+        RYSMap.LOG.info("[rysmap] map closed: snapshots {}, average {} µs, worst {} µs; worker parse {} µs per chunk",
             snapCount, snapCount == 0 ? 0 : snapNanos / snapCount / 1000, snapMaxNanos / 1000, scanCount.get() == 0 ? 0 : scanNanos.get() / scanCount.get() / 1000);
     }
 
@@ -766,7 +766,7 @@ public final class MapSession {
     /** Строка F3: «RYSMap: N МБ, M регионов». */
     public String debugLine() {
         long mb = (rawBytes + tiles.bytes()) / (1024 * 1024);
-        return "RYSMap: " + mb + " МБ, " + rawRegions + " рег. в памяти, " + tiles.textures() + " текстур, очередь " + queue.size();
+        return "RYSMap: " + mb + " MB, " + rawRegions + " regions in memory, " + tiles.textures() + " textures, queue " + queue.size();
     }
 
     public long snapshotCount() {

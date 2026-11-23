@@ -115,7 +115,7 @@ public final class MapServer {
     public static void setRules(ServerPlayer player, MapNet.SetRules set) {
         MinecraftServer server = player.getServer();
         if (server == null || !op(player)) {
-            RYSMap.LOG.warn("[rysmap] {} пытался изменить правила карты без прав оператора", player.getGameProfile().getName());
+            RYSMap.LOG.warn("[rysmap] {} tried to change the map rules without operator rights", player.getGameProfile().getName());
             return;
         }
         MapRules r = rules.copy();
@@ -130,7 +130,7 @@ public final class MapServer {
         if (set.slime() != 0) r.slime = set.slime() == 2;
         rules = r;
         r.save(rulesFile(server));
-        RYSMap.LOG.info("[rysmap] {} изменил правила карты: телепорт {}, пауза {} с, миникарта {}, пещеры {}, игроки {}, мобы {}",
+        RYSMap.LOG.info("[rysmap] {} changed the map rules: teleport {}, cooldown {} s, minimap {}, caves {}, players {}, mobs {}",
             player.getGameProfile().getName(), r.teleport, r.pause, r.minimap, r.caves, r.players, r.mobs);
         for (ServerPlayer p : server.getPlayerList().getPlayers()) sendRules(p);
     }
@@ -146,7 +146,7 @@ public final class MapServer {
         PlaceStore store = PlaceStore.get(server);
         store.book().trimBack(r.places.backSize);
         store.touch();
-        RYSMap.LOG.info("[rysmap] {} изменил правила мест: {}", player.getGameProfile().getName(), r.places.toJson());
+        RYSMap.LOG.info("[rysmap] {} changed the place rules: {}", player.getGameProfile().getName(), r.places.toJson());
         PlacesServer.changedAll(server);
     }
 
@@ -175,7 +175,7 @@ public final class MapServer {
             JsonObject o = Snbt.readObject(file);
             return Snbt.string(o, "id", "");
         } catch (Exception e) {
-            RYSMap.LOG.warn("[rysmap] {} не прочитался: {}", file, e.toString());
+            RYSMap.LOG.warn("[rysmap] {} could not be read: {}", file, e.toString());
             return "";
         }
     }

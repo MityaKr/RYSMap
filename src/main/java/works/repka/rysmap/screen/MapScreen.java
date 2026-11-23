@@ -196,7 +196,7 @@ public final class MapScreen extends ScaledScreen {
             try {
                 current.render(g, t, wx, wy + HEADER, ww, wh - HEADER, compact(), hits, mx, my);
             } catch (Throwable e) {
-                works.repka.rysmap.RYSMap.LOG.error("[rysmap] вкладка {} упала", current.id(), e);
+                works.repka.rysmap.RYSMap.LOG.error("[rysmap] tab {} crashed", current.id(), e);
                 tab = null;
             }
             header(g, t, s, mx, my);
@@ -619,7 +619,7 @@ public final class MapScreen extends ScaledScreen {
             try {
                 view.render(g, canvas, surface, mx, my);
             } catch (Throwable e) {
-                works.repka.rysmap.RYSMap.LOG.error("[rysmap] режим {} упал", mode == null ? "?" : mode.id(), e);
+                works.repka.rysmap.RYSMap.LOG.error("[rysmap] mode {} crashed", mode == null ? "?" : mode.id(), e);
                 setMode(null);
             }
         }
@@ -1248,7 +1248,7 @@ public final class MapScreen extends ScaledScreen {
             try {
                 item.run(spot);
             } catch (Throwable e) {
-                works.repka.rysmap.RYSMap.LOG.error("[rysmap] пункт меню {} упал", item.id(), e);
+                works.repka.rysmap.RYSMap.LOG.error("[rysmap] menu item {} crashed", item.id(), e);
             }
         });
         String hint = hints.get(item.id());
@@ -1531,7 +1531,7 @@ public final class MapScreen extends ScaledScreen {
             T v = call.get();
             return v == null ? fallback : v;
         } catch (Throwable e) {
-            works.repka.rysmap.RYSMap.LOG.error("[rysmap] вкладка или режим мода упали", e);
+            works.repka.rysmap.RYSMap.LOG.error("[rysmap] a mod tab or mode crashed", e);
             return fallback;
         }
     }
@@ -1706,7 +1706,7 @@ public final class MapScreen extends ScaledScreen {
         try {
             pv.render(g, t, x, cy0, w, ch, hits, mx, my);
         } catch (Throwable e) {
-            works.repka.rysmap.RYSMap.LOG.error("[rysmap] панель режима упала", e);
+            works.repka.rysmap.RYSMap.LOG.error("[rysmap] mode panel crashed", e);
         }
     }
 
@@ -2284,12 +2284,12 @@ public final class MapScreen extends ScaledScreen {
             .title(Component.translatable("rysmap.export.started", plan.width(), plan.height()).getString()).show();
         s.exportPng(dim, plan, file).whenComplete((path, err) -> Minecraft.getInstance().execute(() -> {
             if (err != null) {
-                works.repka.rysmap.RYSMap.LOG.warn("[rysmap] экспорт не записался: {}", err.toString());
+                works.repka.rysmap.RYSMap.LOG.warn("[rysmap] export was not saved: {}", err.toString());
                 works.repka.ryscore.ui.Notice.row(works.repka.ryscore.ui.Notice.MAP, "export").icon(Icons.Shape.WARN)
                     .title(Component.translatable("rysmap.export.failed").getString()).bad().show();
                 return;
             }
-            works.repka.rysmap.RYSMap.LOG.info("[rysmap] экспорт карты: {}", path);
+            works.repka.rysmap.RYSMap.LOG.info("[rysmap] map export: {}", path);
             works.repka.ryscore.ui.Notice.card(works.repka.ryscore.ui.Notice.MAP, "export").icon(Icons.Shape.SAVE)
                 .title(Component.translatable("rysmap.export.done").getString()).lines(path.getFileName().toString())
                 .action(() -> net.minecraft.Util.getPlatform().openFile(dir.toFile())).millis(8000).show();

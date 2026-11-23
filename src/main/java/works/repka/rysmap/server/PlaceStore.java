@@ -163,6 +163,6 @@ public final class PlaceStore extends SavedData {
         int homes = 0, back = 0;
         for (UUID id : b.homeOwners()) homes += b.homes(id).size();
         for (UUID id : b.backOwners()) back += b.back(id).size();
-        return "мест сервера " + b.places().size() + ", домов " + homes + ", записей «назад» " + back;
+        return works.repka.rysmap.migrate.Say.t("summary", "%s server places, %s homes, %s \"back\" entries", b.places().size(), homes, back);
     }
 }

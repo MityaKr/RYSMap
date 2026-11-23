@@ -79,7 +79,7 @@ public final class FtbPlaces {
                 PlaceBook.Place p = place(e.getKey(), e.getValue());
                 if (p == null) {
                     c.bad++;
-                    c.skipped.add("место " + e.getKey() + ": не читается");
+                    c.skipped.add("place " + e.getKey() + ": unreadable");
                     continue;
                 }
                 p.at = now;
@@ -87,7 +87,7 @@ public final class FtbPlaces {
                 if (book.addPlaceIfAbsent(p)) c.places++;
                 else {
                     c.placesSkipped++;
-                    c.skipped.add("место " + e.getKey() + ": уже есть");
+                    c.skipped.add("place " + e.getKey() + ": already exists");
                 }
             }
         }
@@ -101,7 +101,7 @@ public final class FtbPlaces {
                     PlaceBook.Place p = place(h.getKey(), h.getValue());
                     if (p == null) {
                         c.bad++;
-                        c.skipped.add("дом " + id + " " + h.getKey() + ": не читается");
+                        c.skipped.add("home " + id + " " + h.getKey() + ": unreadable");
                         continue;
                     }
                     p.icon = "home";
@@ -109,7 +109,7 @@ public final class FtbPlaces {
                     if (book.addHomeIfAbsent(id, p)) c.homes++;
                     else {
                         c.homesSkipped++;
-                        c.skipped.add("дом " + id + " " + h.getKey() + ": уже есть");
+                        c.skipped.add("home " + id + " " + h.getKey() + ": already exists");
                     }
                 }
             }
@@ -117,7 +117,7 @@ public final class FtbPlaces {
                 var arr = o.getAsJsonArray("teleport_history");
                 if (!book.back(id).isEmpty()) {
                     c.backSkipped += arr.size();
-                    if (!arr.isEmpty()) c.skipped.add("история " + id + ": своя уже есть");
+                    if (!arr.isEmpty()) c.skipped.add("history " + id + ": own one already exists");
                     continue;
                 }
                 // у FTB новые записи в конце списка, у нас первыми: читаем с конца

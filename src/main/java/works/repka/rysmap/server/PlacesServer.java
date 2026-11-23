@@ -99,7 +99,7 @@ public final class PlacesServer {
             Requests.clear();
             DIRTY.clear();
             dirtyAll = false;
-            if (ftbEssentials()) RYSMap.LOG.info("[rysmap] FTB Essentials загружен: команды мест только /rys place …, перенос places ждёт");
+            if (ftbEssentials()) RYSMap.LOG.info("[rysmap] FTB Essentials is loaded: place commands only via /rys place …, places migration waits");
         });
         bus.addListener((PlayerEvent.PlayerLoggedInEvent e) -> {
             if (e.getEntity() instanceof ServerPlayer p) sync(p);
@@ -320,7 +320,7 @@ public final class PlacesServer {
         try {
             r = run(p, op.op(), a);
         } catch (RuntimeException e) {
-            RYSMap.LOG.warn("[rysmap] действие места {} от {} не прошло: {}", op.op(), p.getGameProfile().getName(), e.toString());
+            RYSMap.LOG.warn("[rysmap] place action {} from {} failed: {}", op.op(), p.getGameProfile().getName(), e.toString());
             return;
         }
         if (r == null || r.text().getString().isEmpty()) return;
@@ -366,7 +366,7 @@ public final class PlacesServer {
     /** Оператор правит блок «Перемещения». */
     private static Places.Reply setRules(ServerPlayer p, JsonObject a) {
         if (!MapServer.op(p)) {
-            RYSMap.LOG.warn("[rysmap] {} пытался изменить правила мест без прав оператора", p.getGameProfile().getName());
+            RYSMap.LOG.warn("[rysmap] {} tried to change the place rules without operator rights", p.getGameProfile().getName());
             return null;
         }
         MapServer.setPlaceRules(p, PlaceRules.fromJson(a));

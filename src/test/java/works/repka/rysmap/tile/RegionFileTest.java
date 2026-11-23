@@ -78,7 +78,7 @@ class RegionFileTest {
         assertEquals(RegionFile.VERSION, bytes[4]);
         bytes[4] = 2;
         var e = assertThrows(RegionFile.BrokenException.class, () -> RegionFile.decode(bytes, 1, 1));
-        assertTrue(e.getMessage().contains("версия"), e.getMessage());
+        assertTrue(e.getMessage().contains("version"), e.getMessage());
     }
 
     @Test
@@ -93,7 +93,7 @@ class RegionFileTest {
         magic[0] = 'X';
         assertThrows(RegionFile.BrokenException.class, () -> RegionFile.decode(magic, 2, 2), "магия");
         var e = assertThrows(RegionFile.BrokenException.class, () -> RegionFile.decode(good, 3, 2), "чужие координаты");
-        assertTrue(e.getMessage().contains("ждали"));
+        assertTrue(e.getMessage().contains("expected"));
         assertThrows(RegionFile.BrokenException.class, () -> RegionFile.decode(new byte[3], 0, 0));
     }
 

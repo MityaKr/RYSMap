@@ -97,7 +97,7 @@ public final class Teleports {
 
         private ChunkAccess chunk(int x, int z) {
             ChunkAccess c = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
-            if (c == null) throw new IllegalStateException("чанк места телепорта не загружен");
+            if (c == null) throw new IllegalStateException("teleport place chunk is not loaded");
             return c;
         }
 

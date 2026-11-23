@@ -144,7 +144,7 @@ public final class PointStore {
         if (!Files.isRegularFile(file)) return s;
         JsonObject json = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
         int v = json.has("v") ? json.get("v").getAsInt() : 0;
-        if (v != VERSION) throw new IOException("points.json: версия " + v + ", читается " + VERSION);
+        if (v != VERSION) throw new IOException("points.json: version " + v + ", readable " + VERSION);
         JsonArray array = json.getAsJsonArray("points");
         if (array == null) return s;
         for (JsonElement e : array) {

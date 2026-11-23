@@ -58,7 +58,7 @@ public final class WhatsNewScreen extends ScaledScreen {
         try {
             Files.writeString(seen, "{\"v\":1,\"shown\":" + System.currentTimeMillis() / 1000 + "}", StandardCharsets.UTF_8);
         } catch (Exception e) {
-            RYSMap.LOG.warn("[rysmap] whatsnew.json не записался: {}", e.toString());
+            RYSMap.LOG.warn("[rysmap] whatsnew.json was not saved: {}", e.toString());
             return; // не записалось: не показывать, чтобы не всплывала каждый вход
         }
         mc.setScreen(new WhatsNewScreen(counts[0], counts[1]));

@@ -95,7 +95,7 @@ public final class FtbMapStep implements Migrations.Step {
     public Migrations.Report run(Migrations.Context c) throws Exception {
         Host h = host;
         Path dir = FtbImport.find(c.gameDir(), c.value(VALUE_FTB_ID));
-        if (h == null || dir == null) throw new IOException("карты FTB нет или мир закрыт");
+        if (h == null || dir == null) throw new IOException("no FTB map, or the world is closed");
         Result r = migrate(dir, c.data(), () -> {
             try {
                 c.save();
@@ -105,10 +105,10 @@ public final class FtbMapStep implements Migrations.Step {
         }, h, true);
         Migrations.Report report = Migrations.Report.create()
             .count("points", r.points).count("regions", r.regions).count("chunks", r.chunks);
-        if (r.pointsKnown > 0) report.skipped("точки: " + r.pointsKnown, "уже есть");
-        if (r.regionsBefore > 0) report.line("регионов перенесено раньше: " + r.regionsBefore);
-        for (String s : r.skipped) report.skipped(s, s.startsWith("измерение") ? "без карты" : "формат");
-        c.log("точек " + r.points + ", регионов " + r.regions + ", чанков " + r.chunks + ", пропущено " + r.skipped.size());
+        if (r.pointsKnown > 0) report.skipped(Say.t("points", "points: %s", r.pointsKnown), Say.t("already", "already there"));
+        if (r.regionsBefore > 0) report.line(Say.t("regions_before", "regions migrated earlier: %s", r.regionsBefore));
+        for (String s : r.skipped) report.skipped(s, s.startsWith("dimension") ? Say.t("no_map", "no map") : Say.t("format", "format"));
+        c.log("points " + r.points + ", regions " + r.regions + ", chunks " + r.chunks + ", skipped " + r.skipped.size());
         h.finished(r.points, r.regions);
         return report;
     }
@@ -138,12 +138,12 @@ public final class FtbMapStep implements Migrations.Step {
         List<String> skipped = new ArrayList<>();
         List<String> noMapDims = new ArrayList<>();
         List<FtbImport.Job> jobs = FtbImport.plan(world, h.playerDimension(), h.playerRegionX(), h.playerRegionZ(), h.noMap(), noMapDims);
-        for (String d : noMapDims) skipped.add("измерение " + d);
+        for (String d : noMapDims) skipped.add("dimension " + d);
         int regions = 0, chunks = 0;
         for (FtbImport.Job job : jobs) {
             if (passed.contains(job.key())) continue;
             while (pace && h.slow() && h.alive()) Thread.sleep(SLOW_WAIT_MS);
-            if (!h.alive()) throw new IOException("выход из мира: перенос продолжится при следующем входе (пройдено " + passed.size() + " из " + jobs.size() + ")");
+            if (!h.alive()) throw new IOException("left the world: the migration will continue on the next join (done " + passed.size() + " of " + jobs.size() + ")");
             FtbRegionReader.Region region;
             try {
                 region = FtbRegionReader.read(job.zip());

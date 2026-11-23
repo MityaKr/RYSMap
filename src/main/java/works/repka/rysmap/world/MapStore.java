@@ -61,10 +61,10 @@ public final class MapStore {
      * @return что случилось, строкой для лога
      */
     public static String adopt(Path mapsRoot, WorldKey from, WorldKey to) throws IOException {
-        if (from.id().equals(to.id())) return "ключ тот же";
+        if (from.id().equals(to.id())) return "same key";
         Path src = mapsRoot.resolve(from.id()), dst = mapsRoot.resolve(to.id());
-        if (!Files.isDirectory(src)) return "старой папки нет";
-        if (Files.exists(dst)) return "папка " + to.id() + " уже есть, " + from.id() + " оставлена как есть";
+        if (!Files.isDirectory(src)) return "no old folder";
+        if (Files.exists(dst)) return "folder " + to.id() + " already exists, " + from.id() + " left as is";
         Files.move(src, dst);
         Path file = dst.resolve("world.json");
         JsonObject json = new JsonObject();
@@ -79,7 +79,7 @@ public final class MapStore {
         was.add(from.id());
         json.add("was", was);
         Files.writeString(file, GSON.toJson(json), StandardCharsets.UTF_8);
-        return "папка " + from.id() + " переехала в " + to.id();
+        return "folder " + from.id() + " moved to " + to.id();
     }
 
     /**

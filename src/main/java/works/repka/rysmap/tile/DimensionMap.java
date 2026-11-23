@@ -41,7 +41,7 @@ public final class DimensionMap {
             p = Palette.load(store.palette(dimension));
         } catch (IOException | RuntimeException e) {
             // палитра потеряна: регионы с её номерами нечитаемы по смыслу, поэтому в сторону уходит вся папка измерения
-            log.accept("palette.json " + dimension + " не прочитался (" + e.getMessage() + "), карта измерения начнётся заново");
+            log.accept("palette.json " + dimension + " could not be read (" + e.getMessage() + "), the dimension map starts anew");
             Path file = store.palette(dimension);
             if (java.nio.file.Files.exists(file)) RegionFile.quarantine(file);
             for (Path region : regionFiles()) RegionFile.quarantine(region);
@@ -78,8 +78,8 @@ public final class DimensionMap {
         } catch (RegionFile.BrokenException e) {
             broken++;
             Path moved = RegionFile.quarantine(file);
-            log.accept("регион " + file.getFileName() + " не прочитался (" + e.getMessage() + "), перенесён в " + moved.getParent().getFileName()
-                + "; кусок перерисуется при проходе");
+            log.accept("region " + file.getFileName() + " could not be read (" + e.getMessage() + "), moved to " + moved.getParent().getFileName()
+                + "; the piece is redrawn on the next pass");
             r = null;
         }
         publish(regionX, regionZ, r);
@@ -230,7 +230,7 @@ public final class DimensionMap {
             } catch (RegionFile.BrokenException e) {
                 broken++;
                 Path moved = RegionFile.quarantine(file);
-                log.accept("регион " + file.getFileName() + " не прочитался (" + e.getMessage() + "), перенесён в " + moved.getParent().getFileName());
+                log.accept("region " + file.getFileName() + " could not be read (" + e.getMessage() + "), moved to " + moved.getParent().getFileName());
                 r = null;
             }
             if (r == null) r = new RegionData(src.x, src.z);

@@ -122,7 +122,7 @@ public final class Palette {
         if (!Files.isRegularFile(file)) return p;
         JsonObject json = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
         int v = json.has("v") ? json.get("v").getAsInt() : 0;
-        if (v != VERSION) throw new IOException("palette.json: версия " + v + ", читается " + VERSION);
+        if (v != VERSION) throw new IOException("palette.json: version " + v + ", readable " + VERSION);
         read(json.getAsJsonArray("blocks"), p.blocks, p.blockIds, NO_BLOCK);
         read(json.getAsJsonArray("biomes"), p.biomes, p.biomeIds, NO_BIOME);
         p.dirty = false;
@@ -131,7 +131,7 @@ public final class Palette {
 
     private static void read(JsonArray array, List<String> list, Map<String, Integer> ids, String zero) throws IOException {
         if (array == null || array.isEmpty()) return;
-        if (!zero.equals(array.get(0).getAsString())) throw new IOException("palette.json: номер 0 должен быть «" + zero + "»");
+        if (!zero.equals(array.get(0).getAsString())) throw new IOException("palette.json: id 0 must be '" + zero + "'");
         list.clear();
         ids.clear();
         for (JsonElement e : array) {

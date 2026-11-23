@@ -62,7 +62,7 @@ public final class MobHeads {
                 else FAILED.add(type);
             } catch (Throwable e) {
                 FAILED.add(type);
-                RYSMap.LOG.debug("[rysmap] голова {} не испеклась: {}", EntityType.getKey(type), e.toString());
+                RYSMap.LOG.debug("[rysmap] head {} was not baked: {}", EntityType.getKey(type), e.toString());
                 restore();
             }
             bakeNanos += System.nanoTime() - t0;

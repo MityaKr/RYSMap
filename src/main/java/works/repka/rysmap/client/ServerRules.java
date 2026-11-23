@@ -49,7 +49,7 @@ public final class ServerRules {
     public static void accept(MapNet.Rules r) {
         rules = r;
         rulesAt = System.currentTimeMillis();
-        RYSMap.LOG.info("[rysmap] правила сервера: телепорт {}, пауза {} с, миникарта {}, пещеры {}, чужие игроки {}, мобы {}, оператор {}",
+        RYSMap.LOG.info("[rysmap] server rules: teleport {}, cooldown {} s, minimap {}, caves {}, other players {}, mobs {}, operator {}",
             r.teleport(), r.pause(), r.minimap(), r.caves(), r.playersMode(), r.mobs(), r.op());
     }
 

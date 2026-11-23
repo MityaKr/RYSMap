@@ -58,7 +58,7 @@ public final class ChunkShare {
                 }
             }
         }
-        if (biomeNames.size() > 256) throw new IOException("биомов в регионе больше 256");
+        if (biomeNames.size() > 256) throw new IOException("more than 256 biomes in the region");
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(new DeflaterOutputStream(bytes))) {
             out.writeByte(V);
@@ -92,7 +92,7 @@ public final class ChunkShare {
     /** Регион пакета {x, z} без распаковки всего. */
     public static int[] region(byte[] data) throws IOException {
         try (DataInputStream in = open(data)) {
-            if (in.readByte() != V) throw new IOException("версия пакета карты не та");
+            if (in.readByte() != V) throw new IOException("wrong map packet version");
             return new int[]{in.readInt(), in.readInt()};
         }
     }
@@ -104,9 +104,9 @@ public final class ChunkShare {
      */
     public static int merge(byte[] data, RegionData dst, Palette p) throws IOException {
         try (DataInputStream in = open(data)) {
-            if (in.readByte() != V) throw new IOException("версия пакета карты не та");
+            if (in.readByte() != V) throw new IOException("wrong map packet version");
             int rx = in.readInt(), rz = in.readInt();
-            if (rx != dst.x || rz != dst.z) throw new IOException("регион пакета " + rx + " " + rz + ", а не " + dst.x + " " + dst.z);
+            if (rx != dst.x || rz != dst.z) throw new IOException("packet region " + rx + " " + rz + ", not " + dst.x + " " + dst.z);
             int nb = in.readUnsignedShort();
             int[] blockIds = new int[nb];
             for (int i = 0; i < nb; i++) blockIds[i] = p.block(in.readUTF());
@@ -114,12 +114,12 @@ public final class ChunkShare {
             int[] biomeIds = new int[nbi];
             for (int i = 0; i < nbi; i++) biomeIds[i] = p.biome(in.readUTF());
             int chunks = in.readUnsignedShort();
-            if (chunks > RegionData.CHUNKS * RegionData.CHUNKS) throw new IOException("чанков больше, чем в регионе");
+            if (chunks > RegionData.CHUNKS * RegionData.CHUNKS) throw new IOException("more chunks than the region holds");
             int written = 0;
             for (int k = 0; k < chunks; k++) {
                 int cx = in.readUnsignedByte(), cz = in.readUnsignedByte();
                 int time = in.readInt();
-                if (cx >= RegionData.CHUNKS || cz >= RegionData.CHUNKS) throw new IOException("чанк вне региона");
+                if (cx >= RegionData.CHUNKS || cz >= RegionData.CHUNKS) throw new IOException("chunk outside the region");
                 boolean take = !dst.has(cx, cz);
                 for (int z = 0; z < 16; z++) {
                     for (int x = 0; x < 16; x++) {
@@ -130,7 +130,7 @@ public final class ChunkShare {
                             continue;
                         }
                         int b = readVarint(in), bi = in.readUnsignedByte(), flags = in.readUnsignedByte();
-                        if (b >= nb || bi >= nbi) throw new IOException("номер блока или биома вне словаря");
+                        if (b >= nb || bi >= nbi) throw new IOException("block or biome id outside the dictionary");
                         if (take) dst.set(lx, lz, h, blockIds[b], biomeIds[bi], flags);
                     }
                 }
@@ -163,7 +163,7 @@ public final class ChunkShare {
             v |= (b & 0x7F) << shift;
             if ((b & 0x80) == 0) return v;
             shift += 7;
-            if (shift > 28) throw new IOException("varint длиннее 5 байт");
+            if (shift > 28) throw new IOException("varint longer than 5 bytes");
         }
     }
 
@@ -178,7 +178,7 @@ public final class ChunkShare {
 
         @Override
         public int read() throws IOException {
-            if (left <= 0) throw new IOException("пакет карты распаковывается больше предела");
+            if (left <= 0) throw new IOException("map packet unpacks beyond the limit");
             int b = super.read();
             if (b >= 0) left--;
             return b;
@@ -186,7 +186,7 @@ public final class ChunkShare {
 
         @Override
         public int read(byte[] b, int off, int len) throws IOException {
-            if (left <= 0) throw new IOException("пакет карты распаковывается больше предела");
+            if (left <= 0) throw new IOException("map packet unpacks beyond the limit");
             int n = super.read(b, off, (int) Math.min(len, left));
             if (n > 0) left -= n;
             return n;

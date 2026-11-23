@@ -141,7 +141,7 @@ public final class ClientConfig {
                 c.save();
             }
         } catch (Exception e) {
-            RYSMap.LOG.warn("[rysmap] {} не прочитался, взяты значения по умолчанию: {}", file, e.toString());
+            RYSMap.LOG.warn("[rysmap] {} could not be read, defaults taken: {}", file, e.toString());
         }
         return c;
     }
@@ -195,7 +195,7 @@ public final class ClientConfig {
             Files.createDirectories(file().getParent());
             Files.writeString(file(), GSON.toJson(json), StandardCharsets.UTF_8);
         } catch (Exception e) {
-            RYSMap.LOG.warn("[rysmap] настройки не записались: {}", e.toString());
+            RYSMap.LOG.warn("[rysmap] settings were not saved: {}", e.toString());
         }
     }
 }

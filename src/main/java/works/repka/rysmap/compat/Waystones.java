@@ -75,9 +75,9 @@ public final class Waystones {
             onEvent.invoke(events, removeEvent, (Consumer) e -> safe(() -> onRemove(e)));
             MapApi.get().layer(new Layer());
             active = true;
-            RYSMap.LOG.info("[rysmap] камни пути Waystones на карте: связка включена");
+            RYSMap.LOG.info("[rysmap] Waystones on the map: link enabled");
         } catch (Throwable t) {
-            RYSMap.LOG.warn("[rysmap] связка с Waystones не встала, камней на карте не будет: {}", t.toString());
+            RYSMap.LOG.warn("[rysmap] Waystones link failed, no waystones on the map: {}", t.toString());
         }
     }
 
@@ -90,7 +90,7 @@ public final class Waystones {
             try {
                 r.run();
             } catch (Throwable t) {
-                RYSMap.LOG.warn("[rysmap] событие Waystones не разобралось: {}", t.toString());
+                RYSMap.LOG.warn("[rysmap] Waystones event could not be handled: {}", t.toString());
             }
         });
     }

@@ -40,7 +40,7 @@ public final class TeamPings {
         try {
             teams.ping(team, ping.dimension(), ping.x(), ping.y(), ping.z(), kind, by);
         } catch (Throwable e) {
-            RYSMap.LOG.warn("[rysmap] пинг в RYSTeams не прошёл: {}", e.toString());
+            RYSMap.LOG.warn("[rysmap] ping to RYSTeams failed: {}", e.toString());
         }
         int color;
         try {

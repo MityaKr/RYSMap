@@ -64,7 +64,7 @@ public final class RegionFile {
     // ---- запись ----
 
     public static void write(Path file, List<RegionData> layers) throws IOException {
-        if (layers.isEmpty()) throw new IllegalArgumentException("нет слоёв");
+        if (layers.isEmpty()) throw new IllegalArgumentException("no layers");
         byte[] bytes = encode(layers);
         Files.createDirectories(file.getParent());
         Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
@@ -86,7 +86,7 @@ public final class RegionFile {
         out.writeInt(first.x);
         out.writeInt(first.z);
         for (RegionData layer : layers) {
-            if (layer.x != first.x || layer.z != first.z) throw new IllegalArgumentException("слои разных регионов");
+            if (layer.x != first.x || layer.z != first.z) throw new IllegalArgumentException("layers of different regions");
             out.writeByte(layer.floor);
             for (long bits : layer.present) out.writeLong(bits);
             for (int t : layer.scanned) out.writeInt(t);
@@ -148,34 +148,34 @@ public final class RegionFile {
     }
 
     public static List<RegionData> decode(byte[] bytes, int regionX, int regionZ) throws IOException {
-        if (bytes.length < HEADER + 4) throw new BrokenException("файл короче заголовка: " + bytes.length + " байт");
-        for (int i = 0; i < 4; i++) if (bytes[i] != MAGIC[i]) throw new BrokenException("нет магии RYSM");
+        if (bytes.length < HEADER + 4) throw new BrokenException("file shorter than the header: " + bytes.length + " bytes");
+        for (int i = 0; i < 4; i++) if (bytes[i] != MAGIC[i]) throw new BrokenException("no RYSM magic");
         int version = bytes[4] & 0xFF;
-        if (version != VERSION) throw new BrokenException("версия " + version + ", читается " + VERSION);
+        if (version != VERSION) throw new BrokenException("version " + version + ", readable " + VERSION);
         CRC32 crc = new CRC32();
         crc.update(bytes, 0, bytes.length - 4);
         int stored = ((bytes[bytes.length - 4] & 0xFF) << 24) | ((bytes[bytes.length - 3] & 0xFF) << 16)
             | ((bytes[bytes.length - 2] & 0xFF) << 8) | (bytes[bytes.length - 1] & 0xFF);
-        if (stored != (int) crc.getValue()) throw new BrokenException("сумма не сошлась");
+        if (stored != (int) crc.getValue()) throw new BrokenException("checksum mismatch");
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes, 5, bytes.length - 9));
             int count = in.readUnsignedByte();
             int x = in.readInt(), z = in.readInt();
-            if (x != regionX || z != regionZ) throw new BrokenException("в файле регион " + x + "," + z + ", ждали " + regionX + "," + regionZ);
+            if (x != regionX || z != regionZ) throw new BrokenException("the file holds region " + x + "," + z + ", expected " + regionX + "," + regionZ);
             List<RegionData> layers = new ArrayList<>(count);
             for (int l = 0; l < count; l++) {
                 RegionData layer = new RegionData(x, z, in.readUnsignedByte());
                 for (int i = 0; i < layer.present.length; i++) layer.present[i] = in.readLong();
                 for (int i = 0; i < layer.scanned.length; i++) layer.scanned[i] = in.readInt();
                 int length = in.readInt();
-                if (length < 0 || length > in.available()) throw new BrokenException("слой " + l + ": длина " + length + " больше файла");
+                if (length < 0 || length > in.available()) throw new BrokenException("layer " + l + ": length " + length + " exceeds the file");
                 inflate(new BoundedStream(in, length), layer);
                 layer.dirty = false;
                 layers.add(layer);
             }
             return layers;
         } catch (EOFException e) {
-            throw new BrokenException("файл обрезан");
+            throw new BrokenException("file is truncated");
         }
     }
 
@@ -200,9 +200,9 @@ public final class RegionFile {
             in.readFully(layer.biome);
             in.readFully(layer.flags);
         } catch (EOFException e) {
-            throw new BrokenException("сжатые данные обрезаны");
+            throw new BrokenException("compressed data is truncated");
         } catch (java.util.zip.ZipException e) {
-            throw new BrokenException("сжатые данные испорчены: " + e.getMessage());
+            throw new BrokenException("compressed data is corrupt: " + e.getMessage());
         } finally {
             inflater.end();
         }

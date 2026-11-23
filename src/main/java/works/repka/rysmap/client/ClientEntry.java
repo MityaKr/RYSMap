@@ -169,13 +169,13 @@ public final class ClientEntry {
         helloWorld = world;
         helloFtb = ftbId == null ? "" : ftbId;
         Minecraft mc = Minecraft.getInstance();
-        RYSMap.LOG.info("[rysmap] MapHello: мир {}, id FTB {}", world, helloFtb.isEmpty() ? "нет" : helloFtb);
+        RYSMap.LOG.info("[rysmap] MapHello: world {}, FTB id {}", world, helloFtb.isEmpty() ? "none" : helloFtb);
         if (mc.level == null) return;
         works.repka.rysmap.world.WorldKey want0 = MapSession.keyFor(mc, world);
         try {
             MapStore.remember(maps(), MapSession.fallbackKey(mc).id(), want0.id());
         } catch (java.io.IOException e) {
-            RYSMap.LOG.warn("[rysmap] keys.json не записался: {}", e.toString());
+            RYSMap.LOG.warn("[rysmap] keys.json was not saved: {}", e.toString());
         }
         MapSession s = session;
         if (s == null) {
@@ -192,10 +192,10 @@ public final class ClientEntry {
         old.close();
         works.repka.rysmap.world.WorldKey key = want;
         try {
-            RYSMap.LOG.info("[rysmap] ключ мира {} → {}: {}", old.store.key().id(), want.id(), MapStore.adopt(maps(), old.store.key(), want));
+            RYSMap.LOG.info("[rysmap] world key {} → {}: {}", old.store.key().id(), want.id(), MapStore.adopt(maps(), old.store.key(), want));
         } catch (java.io.IOException e) {
             // папка занята или нет прав: карта остаётся в старой папке, попытка повторится при следующем входе
-            RYSMap.LOG.warn("[rysmap] папка карты не переехала на {}: {}", want.id(), e.toString());
+            RYSMap.LOG.warn("[rysmap] map folder did not move to {}: {}", want.id(), e.toString());
             key = new works.repka.rysmap.world.WorldKey(old.store.key().id(), want.name());
         }
         session = new MapSession(new MapStore(maps(), key), config);
@@ -214,7 +214,7 @@ public final class ClientEntry {
         works.repka.ryscore.migrate.Migrations.runClient(mc.gameDirectory.toPath(), s.store.root(),
                 java.util.Map.of(works.repka.rysmap.migrate.FtbMapStep.VALUE_FTB_ID, helloFtb))
             .whenComplete((r, t) -> {
-                if (t != null) RYSMap.LOG.warn("[rysmap] переезд карты FTB не запустился", t);
+                if (t != null) RYSMap.LOG.warn("[rysmap] FTB map migration did not start", t);
             });
     }
 

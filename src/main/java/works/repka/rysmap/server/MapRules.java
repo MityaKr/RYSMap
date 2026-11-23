@@ -86,7 +86,7 @@ public final class MapRules {
             // версия 1 раздела places не знала: умолчания как в FTB Essentials RepYS
             if (o.has("places") && o.get("places").isJsonObject()) r.places = works.repka.rysmap.places.PlaceRules.fromJson(o.getAsJsonObject("places"));
         } catch (Exception e) {
-            RYSMap.LOG.warn("[rysmap] {} не прочитался, правила по умолчанию: {}", file, e.toString());
+            RYSMap.LOG.warn("[rysmap] {} could not be read, default rules: {}", file, e.toString());
         }
         return r;
     }
@@ -111,7 +111,7 @@ public final class MapRules {
             Files.writeString(tmp, GSON.toJson(o), StandardCharsets.UTF_8);
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (Exception e) {
-            RYSMap.LOG.warn("[rysmap] {} не записался: {}", file, e.toString());
+            RYSMap.LOG.warn("[rysmap] {} was not saved: {}", file, e.toString());
         }
     }
 

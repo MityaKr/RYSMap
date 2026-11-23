@@ -297,7 +297,7 @@ public final class Places {
         PlaceBook.Put put = book.setPlace(place);
         store(p).touch();
         PlacesServer.changedAll(p.server);
-        PlacesServer.log(p, (put == PlaceBook.Put.ADDED ? "поставил" : "переставил") + " место сервера " + place.name);
+        PlacesServer.log(p, (put == PlaceBook.Put.ADDED ? "set" : "moved") + " server place " + place.name);
         return Reply.ok(Component.translatable(put == PlaceBook.Put.ADDED ? "rysmap.place.place_set" : "rysmap.place.place_moved", place.name));
     }
 
@@ -321,7 +321,7 @@ public final class Places {
         book.setPlace(upd);
         store(p).touch();
         PlacesServer.changedAll(p.server);
-        PlacesServer.log(p, "изменил место сервера " + upd.name);
+        PlacesServer.log(p, "edited server place " + upd.name);
         return Reply.ok(Component.translatable("rysmap.place.place_edited", upd.name));
     }
 
@@ -358,7 +358,7 @@ public final class Places {
         store(p).book().removePlace(w.name);
         store(p).touch();
         PlacesServer.changedAll(p.server);
-        PlacesServer.log(p, "удалил место сервера " + w.name);
+        PlacesServer.log(p, "removed server place " + w.name);
         return Reply.ok(Component.translatable("rysmap.place.place_removed", w.name));
     }
 

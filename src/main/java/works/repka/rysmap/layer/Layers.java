@@ -333,7 +333,7 @@ public final class Layers {
     }
 
     private static void broken(MapApi.Layer layer, Throwable t) {
-        if (BROKEN.add(layer.id())) RYSMap.LOG.error("[rysmap] слой {} упал и выключен до перезапуска", layer.id(), t);
+        if (BROKEN.add(layer.id())) RYSMap.LOG.error("[rysmap] layer {} crashed and is off until restart", layer.id(), t);
     }
 
     /** Выход из мира: кэши слоёв не нужны. */

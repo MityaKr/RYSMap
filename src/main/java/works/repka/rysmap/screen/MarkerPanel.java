@@ -109,7 +109,7 @@ final class MarkerPanel {
         try {
             a.run();
         } catch (Throwable e) {
-            works.repka.rysmap.RYSMap.LOG.error("[rysmap] кнопка панели метки упала", e);
+            works.repka.rysmap.RYSMap.LOG.error("[rysmap] marker panel button crashed", e);
         }
     }
 }
