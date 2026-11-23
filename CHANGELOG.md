@@ -1,5 +1,10 @@
 # Изменения RYSMap
 
+## 0.2.16 (24.11.2026)
+
+* Иконка мода (витраж «Роза») в списке модов игры; файл иконки для страницы CurseForge лежит в `docs/icon-400.png`.
+* EN: Mod icon (stained-glass "Rose") shown in the in-game mod list; a 400x400 icon for the CurseForge page is in `docs/icon-400.png`.
+
 ## 0.2.15 (23.11.2026)
 
 * Ядро RYSCore 1.17.2: цифры клавиш у секторов колеса плашками, вкладки колец «Моё | Оператор» больше не наезжают на цифру «1».
