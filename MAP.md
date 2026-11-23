@@ -1,8 +1,8 @@
 # Карта проекта RYSMap
 
-Собрана `_shared/tools/make-map.py` 2026-11-20. Руками не править: после структурных правок пересобрать.
+Собрана `_shared/tools/make-map.py` 2026-11-23. Руками не править: после структурных правок пересобрать.
 
-Java: 131 файлов, 23669 строк. Переводы: `src/main/resources/assets/rysmap/lang/en_us.json`, `src/main/resources/assets/rysmap/lang/ru_ru.json`.
+Java: 133 файлов, 23796 строк. Переводы: `src/main/resources/assets/rysmap/lang/en_us.json`, `src/main/resources/assets/rysmap/lang/ru_ru.json`.
 Читать сначала: `CLAUDE.md`, `README.md`.
 
 ## Точки входа
@@ -13,19 +13,20 @@ Java: 131 файлов, 23669 строк. Переводы: `src/main/resources/
 - `docs/` — 2 файлов
 - `gradle/` — 2 файлов
 - `shots/` — 45 файлов
-- `src/` — 135 файлов
+- `src/` — 137 файлов
 
 ## `src/autotest/java` — пакет `works.repka.rysmap.dev`
 
-**(корень)** (8)
+**(корень)** (9)
 - `FixesAutoTest` 439 — Правки 18.11 вечером (gradlew runAutotest -Pheap=3G --offline -Pautotest=fixes): земля на миникарте без сетки при дробном месте игрока (два снимка со сдвигом в полблока), буква сев…
 - `LabelsAutoTest` 165 — Подписи точек в мире (gradlew runAutotest -Pheap=3G --offline -Pautotest=labels): новый мир, десять точек по кругу радиусом 24 блока вокруг игрока, прицел на точку «Шахта», путь к …
-- `MapAutoTest` 284 — Проверка М1 в игре (gradlew runAutotest): новый мир, сканер у спавна и после перелёта, регионы на диске, повторный вход читает их без пересканирования, MapApi.drawTiles рисует фон.
+- `MapAutoTest` 288 — Проверка М1 в игре (gradlew runAutotest): новый мир, сканер у спавна и после перелёта, регионы на диске, повторный вход читает их без пересканирования, MapApi.drawTiles рисует фон.
 - `MigrateAutoTest` 219 — Серверная часть и переезд (gradlew runAutotest -Pautotest=migrate): встроенный сервер шлёт MapHello, папка карты встаёт на UUID мира; в мир кладётся ftbteams/ftbteams.snbt с id нас…
 - `MobsAutoTest` 175 — Мобы на картах (gradlew runAutotest -Pheap=3G --offline -Pautotest=mobs): толпа из 200 мобов шести типов (ферма), головы печёные по типу, цена кадра миникарты с толпой; слои: мобы …
 - `PlacesAutoTest` 305 — «Места» в игре (gradlew runAutotest -Pheap=3G --offline -Pautotest=places): команды дома и мест сервера, имя в кавычках (/warp "boos apoth"), «назад», пауза, разогрев правилом опер…
 - `ServerAutoTest` 344 — Вход на настоящий сервер RepYS с RYSClaims (gradlew runAutotest -Pautotest=server -PrunDir=run-repys -Pplan=): игровая папка это копия клиента сборки (моды в run-repys/mods, RYSCla…
 - `UiAutoTest` 313 — Снимки интерфейса (gradlew runAutotest -Pautotest=ui): миникарта рядом с макетом 01, окно карты рядом с 10, меню правой кнопки (17).
+- `WheelAutoTest` 97 — Колесо с вкладками колец (баг автора 23.11: цифра «1» висела между «Моё» и «Оператор»).
 
 ## `src/main/java` — пакет `works.repka.rysmap`
 
@@ -64,12 +65,13 @@ Java: 131 файлов, 23669 строк. Переводы: `src/main/resources/
 - `AreaGeometry` 91 — Геометрия областей одного региона 32×32 чанка в координатах чанков (разбор логики 19.11, п.
 - `Layers` 351 — Слои карты: чужие из реестра ядра (layers()) с глазом игрока.
 
-**migrate** (5)
+**migrate** (6)
 - `FtbImport` 95 — Чистая часть шага map (план 10.6): где лежит карта FTB, в каком порядке идут регионы, как точки FTB встают в наши без повторов.
 - `FtbMapStep` 167 — Шаг map переезда с FTB (порядок 40, клиент; план 10.6).
 - `FtbPoints` 79 — Точки FTB Chunks (/waypoints.json) в наши (план 10.6, шаг 2): default становится личной точкой со значком флага и ближайшим из двенадцати цветов, hidden выключает «на миникарте».
 - `FtbRegionReader` 277 — Читатель разведанной карты FTB Chunks 2101.1.22 (local/ftbchunks/data//).
 - `PlacesStep` 83 — Шаг places переезда с FTB Essentials (порядок 50, сервер; план Essentials 6): места сервера (варпы), дома игроков и история «назад» из world/ftbessentials в world/data/rysmap_place…
+- `Say` 19 — Text of migration report lines.
 
 **mixin** (1)
 - `ClientLevelMixin` 23 · миксин — Правки блоков на клиенте для карты.
@@ -114,7 +116,7 @@ Java: 131 файлов, 23669 строк. Переводы: `src/main/resources/
 - `PointWidgets` 113 — Общие части окон точки (макеты 09, 16): поле ввода, сетка значков, ряд цветов, рамка всплывающего окна.
 - `QuickPointScreen` 151 — Маленькое окно новой точки поверх игры (макет 09): клавиша «Новая точка» (по умолчанию не назначена), имя выделено, восемь значков, восемь цветов, «Поставить · Enter».
 - `RowLayout` 44 — Раскладка строки настроек (0.2.10, отзыв автора 19.11: «настройки поплыли»): подпись с пояснением слева, переключатель справа.
-- `SettingsPage` 583 — Страница настроек карты внутри окна (макет 50, урезано по плану 13.2).
+- `SettingsPage` 590 — Страница настроек карты внутри окна (макет 50, урезано по плану 13.2).
 - `SettingsTabs` 27 — Вкладки страницы настроек карты (0.2.10): какие видны и какая открыта.
 - `WhatsNewScreen` 170 — Карточка «что нового» один раз при первом входе после переезда с FTB (скептик s4): клавиша карты, что перенесено, что нового.
 - `Words` 33 — Числа и слова для подписей карты: формы слова по числу, расстояние, сторона света.
