@@ -499,11 +499,15 @@ final class SettingsPage {
         return w;
     }
 
-    /** Ширина сегментного переключателя {@link #segmented}. */
+    /** Ширина сегментного переключателя {@link #segmented}: не зависит от выбранного пункта. */
     private static float segWidth(String[] options, int selected) {
-        float w = 4;
-        for (int i = 0; i < options.length; i++) w += Draw.labelWidth(options[i], 12.5f, i == selected ? Weight.MEDIUM : Weight.REGULAR) + 12 + (i > 0 ? 1 : 0);
-        return w;
+        return Kit.segmentedWidth(works.repka.ryscore.theme.ThemeManager.get(), segments(options));
+    }
+
+    private static java.util.List<Kit.Segment> segments(String[] options) {
+        java.util.List<Kit.Segment> out = new java.util.ArrayList<>(options.length);
+        for (String option : options) out.add(Kit.Segment.of(option));
+        return out;
     }
 
     /** Ряд независимых выключателей справа до {@code right} (макет 50: «Миникарта», «Пещеры»). */
@@ -516,18 +520,12 @@ final class SettingsPage {
         }
     }
 
-    /** Сегментный переключатель справа до {@code right}: ряд {@link Kit#pill} на общей подложке. */
+    /** Сегментный переключатель справа до {@code right}: {@link Kit#segmented} ядра, равный отступ выбранного пункта со всех сторон. */
     private static int segmented(GuiGraphics g, Theme t, Kit.Hits hits, int right, int y, String[] options, int selected, int mx, int my,
                                  java.util.function.IntConsumer pick) {
-        int w = (int) Math.ceil(segWidth(options, selected));
-        int x = right - w;
-        if (t.beveled()) t.input(g, x, y, w, SEG_H, false);
-        else Draw.roundBox(g, x, y, w, SEG_H, 4.5f, t.c("input.bg"), t.c("panel.border"));
-        int px = x + 2;
-        for (int i = 0; i < options.length; i++) {
-            int index = i;
-            px += Kit.pill(g, t, hits, px, y + 2, options[i], i == selected, mx, my, () -> pick.accept(index)) + 1;
-        }
+        java.util.List<Kit.Segment> items = segments(options);
+        int w = (int) Math.ceil(Kit.segmentedWidth(t, items));
+        Kit.segmented(g, t, hits, right - w, y, SEG_H, items, selected, mx, my, pick);
         return w;
     }
 
